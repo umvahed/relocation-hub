@@ -1,14 +1,14 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { getChecklist, updateTask } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 
-const SECTION_ORDER = ['documents', 'visa', 'admin', 'employment', 'housing', 'banking', 'healthcare', 'transport', 'shipping', 'pets']
+const SECTION_ORDER = ['critical', 'visa', 'admin', 'employment', 'housing', 'banking', 'healthcare', 'transport', 'shipping', 'pets']
 
 const SECTION_META: Record<string, { label: string; color: string; text: string }> = {
-  documents:  { label: 'Document Preparation', color: 'bg-violet-50',  text: 'text-violet-700' },
-  visa:       { label: 'Visa & Immigration',    color: 'bg-red-50',     text: 'text-red-700'    },
+  critical:   { label: 'Critical — Required First', color: 'bg-rose-50',   text: 'text-rose-700'   },
+  visa:       { label: 'Visa & Immigration',         color: 'bg-red-50',    text: 'text-red-700'    },
   admin:      { label: 'Administration',        color: 'bg-gray-100',   text: 'text-gray-700'   },
   employment: { label: 'Employment',            color: 'bg-purple-50',  text: 'text-purple-700' },
   housing:    { label: 'Housing',               color: 'bg-blue-50',    text: 'text-blue-700'   },
@@ -26,8 +26,6 @@ export default function DashboardPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [taskDocs, setTaskDocs] = useState<Record<string, any[]>>({})
   const [uploading, setUploading] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [uploadingTaskId, setUploadingTaskId] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 

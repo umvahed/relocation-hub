@@ -9,6 +9,67 @@ router = APIRouter()
 _supabase = None
 _claude = None
 
+# These are hardcoded — they are fixed legal requirements for every NL relocation.
+# They always appear first, before Claude-generated tasks, and all support document attachment.
+REQUIRED_DOCUMENT_TASKS = [
+    {
+        "title": "Check passport validity",
+        "description": "Your passport must be valid for at least 6 months beyond your intended stay in the Netherlands, with a minimum of 2 blank pages for visa stamps. Check the expiry date now. If renewal is needed, start immediately — South African passports take 4–8 weeks to renew at Home Affairs.",
+        "category": "critical",
+        "priority": 0,
+        "external_link": "https://www.dha.gov.za",
+    },
+    {
+        "title": "Obtain IND approval letter from employer",
+        "description": "Your employer must first apply for your residence permit (TEV procedure) through the IND before you can apply for the MVV. Once approved, the IND issues an approval letter authorising your MVV. You cannot book a VFS appointment without this letter. Chase your employer's HR or immigration lawyer for the timeline.",
+        "category": "critical",
+        "priority": 0,
+        "external_link": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant",
+    },
+    {
+        "title": "Complete and sign MVV application form",
+        "description": "Download and complete the official MVV application form from the VFS Global Netherlands (South Africa) website. It must be signed in blue or black ink. Have this form ready before your VFS appointment — incomplete forms will result in rejection.",
+        "category": "critical",
+        "priority": 0,
+        "external_link": "https://www.vfsglobal.com/netherlands/southafrica/",
+    },
+    {
+        "title": "Get passport photos (Dutch ICAO requirements)",
+        "description": "You need recent passport photos complying with Dutch ICAO requirements: 35x45mm, plain white background, neutral expression, mouth closed, no glasses. Bring at least 2 original prints to your VFS appointment. Photos must be taken within the last 6 months.",
+        "category": "critical",
+        "priority": 0,
+        "external_link": "https://www.netherlandsworldwide.nl/dutch-passport-photos",
+    },
+    {
+        "title": "Pay VFS application fee and save proof of payment",
+        "description": "The VFS Global service fee must be paid before or at your appointment. The current fee is displayed on the VFS Netherlands South Africa page. Save and print your proof of payment — it is a required document at the VFS centre and your application will not be accepted without it.",
+        "category": "critical",
+        "priority": 0,
+        "external_link": "https://www.vfsglobal.com/netherlands/southafrica/",
+    },
+    {
+        "title": "Obtain apostilled birth certificate",
+        "description": "Your original birth certificate must be apostilled by the Department of Home Affairs in South Africa. Submit your original certificate to a Home Affairs office or use an approved courier service. Processing typically takes 4–8 weeks. The IND requires the apostille for residence permit applications — do not delay.",
+        "category": "critical",
+        "priority": 0,
+        "external_link": "https://www.dha.gov.za/index.php/civic-services/apostille-authentication",
+    },
+    {
+        "title": "Obtain apostilled police clearance certificate",
+        "description": "Apply for a Police Clearance Certificate (PCC) at your nearest SAPS Criminal Record Centre or online via the SAPS website. Once received, submit it to Home Affairs for apostilling. Allow 6–10 weeks total. The IND requires this for all adult applicants.",
+        "category": "critical",
+        "priority": 0,
+        "external_link": "https://www.saps.gov.za/services/crimrecordinfo.php",
+    },
+    {
+        "title": "Apostille academic and professional qualifications",
+        "description": "Your highest qualification certificates must be authenticated and apostilled. In South Africa, submit originals to SAQA (South African Qualifications Authority) for evaluation, then to Home Affairs for apostilling. Required for Knowledge Migrant and other skilled work permit categories.",
+        "category": "critical",
+        "priority": 0,
+        "external_link": "https://www.saqa.org.za",
+    },
+]
+
 def get_supabase():
     global _supabase
     if _supabase is None:
@@ -127,8 +188,15 @@ Generate 25-30 tasks. Return ONLY valid JSON array."""
 
         tasks = json.loads(tasks_json)
 
-        valid_categories = {"documents", "visa", "admin", "employment", "housing", "banking", "healthcare", "transport", "shipping", "pets"}
-        tasks_to_insert = []
+        valid_categories = {"critical", "visa", "admin", "employment", "housing", "banking", "healthcare", "transport", "shipping", "pets"}
+
+        # Critical tasks always come first — hardcoded, not AI-generated
+        tasks_to_insert = [
+            {**doc, "user_id": request.user_id, "status": "pending"}
+            for doc in REQUIRED_DOCUMENT_TASKS
+        ]
+
+        # Claude-generated tasks appended after
         for task in tasks:
             category = task.get("category", "admin")
             if category not in valid_categories:
