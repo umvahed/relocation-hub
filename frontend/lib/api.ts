@@ -20,6 +20,9 @@ export async function generateChecklist(data: {
   origin_country: string
   employment_type: string
   move_date?: string
+  has_pets?: boolean
+  shipping_type?: string
+  has_relocation_allowance?: boolean
 }) {
   const res = await fetch(`${API_URL}/api/checklist/generate`, {
     method: 'POST',
