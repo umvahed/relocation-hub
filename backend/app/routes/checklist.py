@@ -42,13 +42,13 @@ async def generate_checklist(request: GenerateChecklistRequest):
 
         conditional_notes = []
         if request.has_pets:
-            conditional_notes.append("- The user is bringing pets — include pet import permit, veterinary health certificate, microchip/vaccination records, and airline pet policy tasks.")
+            conditional_notes.append("- The user is bringing pets — include: EU pet passport or third-country health certificate, rabies vaccination and titre test (done 30+ days before travel), microchip registration, NVWA import notification, and airline pet policy research.")
         if request.shipping_type == "container":
-            conditional_notes.append("- The user is shipping a full container — include packing inventory, container booking, customs declaration, port of entry clearance, and delivery coordination tasks.")
+            conditional_notes.append("- The user is shipping a container — include: packing inventory list, container/removal company booking, customs declaration (T2L form), port of entry clearance, Dutch customs (Douane) registration, and final delivery coordination.")
         else:
-            conditional_notes.append("- The user is bringing luggage only — include a task to decide what to sell/donate/store, and baggage allowance planning.")
+            conditional_notes.append("- The user is bringing luggage only — include: deciding what to sell/store/donate, and checking airline baggage allowance and excess baggage costs.")
         if request.has_relocation_allowance:
-            conditional_notes.append("- The user has an employer relocation/housing allowance — include tasks to confirm allowance amount, understand tax implications of the allowance, and submit expense claims.")
+            conditional_notes.append("- The user has an employer relocation/housing allowance — include: confirming allowance amount and tax treatment (30% ruling interaction), keeping all receipts, and submitting expense claims to HR.")
 
         conditional_block = "\n".join(conditional_notes) if conditional_notes else ""
 
@@ -63,46 +63,55 @@ User profile:
 
 {conditional_block}
 
-CRITICAL SEQUENCING RULES — follow this order exactly:
+CRITICAL SEQUENCING — tasks must appear in this exact order of priority:
 
-PRE-ARRIVAL (immigration & documents first):
-1. Confirm with employer that they are a recognised IND sponsor
-2. Employer submits knowledge migrant application to IND
-3. Obtain apostilled documents (birth certificate, marriage certificate if applicable, police clearance, qualifications)
-4. Book and attend consulate/VFS appointment to obtain MVV entry visa (required before travelling to NL — for South Africans this is done via VFS Global)
-5. Complete antecedents declaration form (for family members — their residence permits follow after 3 months)
-6. Book flight to Netherlands
-7. Arrange temporary accommodation for first 1-3 months (Airbnb, short-stay, serviced apartment — NOT permanent housing yet)
+PHASE 1 — DOCUMENT PREPARATION (always first, before anything else):
+These are gating documents. Nothing else can proceed without them.
+1. Obtain apostilled birth certificate (original + apostille stamp from home country)
+2. Obtain apostilled marriage certificate (if applicable)
+3. Obtain police clearance certificate (apostilled — required by IND)
+4. Obtain and apostille academic/professional qualifications
+5. Prepare passport (valid 6+ months beyond intended stay, minimum 2 blank pages)
 
-PRE-ARRIVAL (logistics):
-8. Ship container or arrange luggage (based on user profile)
-9. Sort finances: notify home bank, set up international transfer, confirm relocation allowance details
+PHASE 2 — VISA & IND (depends on Phase 1):
+6. Confirm employer is a recognised IND sponsor (check IND public register)
+7. Employer submits combined MVV + residence permit application (TEV procedure) to IND — this is done by the employer, not the individual
+8. Receive IND approval letter (MVV sticker authorisation) — wait time: 2-90 days depending on permit type
+9. Book VFS Global appointment to submit passport and biometrics (for {request.origin_country} — VFS centres in Pretoria and Cape Town)
+10. Attend VFS appointment: bring passport, IND approval letter, MVV application form, passport photo, proof of payment
+11. Collect passport with MVV sticker from VFS
 
-ARRIVAL & FIRST WEEKS:
-10. Register at gemeente (municipal registration) — this must happen within 5 days of arrival
-11. Obtain BSN number (issued at gemeente registration — do NOT list this before gemeente)
-12. Open Dutch bank account (bunq or ING — requires BSN)
-13. Apply for DigiD (requires BSN and Dutch address)
-14. Register with a Dutch GP (huisarts)
-15. Arrange Dutch health insurance / zorgverzekering (mandatory within 4 months of arrival)
+PHASE 3 — PRE-DEPARTURE LOGISTICS:
+12. Complete antecedents declaration form for accompanying family members (their residence permits processed after 3 months in NL)
+13. Book flight to Netherlands (MVV is valid for 90 days from issue — must enter within this window)
+14. Arrange temporary accommodation for first 1-3 months (short-stay apartment, serviced accommodation or Airbnb — do NOT commit to permanent housing before arriving)
+15. Notify home country bank of relocation, set up international transfer capability
+16. Sort logistics (container or luggage — based on profile)
 
-POST-ARRIVAL (housing & settling in):
-16. Begin permanent housing search (Funda, Pararius) — only after understanding the local market
-17. Understand Dutch rental market: income requirements, guarantor rules, bidding process
-18. Arrange contents insurance
-19. Transfer driving licence if applicable
-20. Register children at school if applicable
+PHASE 4 — ARRIVAL (first 2 weeks):
+17. Register at gemeente (municipal registration / inschrijving) — MUST happen within 5 days of establishing a residential address in NL
+18. Receive BSN number — issued at gemeente registration (this is the Dutch equivalent of a tax/ID number; required for everything below)
+19. Open Dutch bank account (bunq, ING, or Rabobank — all require BSN)
+20. Apply for DigiD (Dutch digital ID — requires BSN and Dutch address; takes ~5 days by post)
+21. Register with a Dutch GP (huisarts) — find one near your address via your health insurer's website
+22. Arrange Dutch health insurance / zorgverzekering (legally mandatory within 4 months of registering in NL; backdated to registration date)
+
+PHASE 5 — SETTLING IN (weeks 2-8):
+23. Begin permanent housing search (Funda.nl, Pararius.nl) — only after understanding local rental market; Dutch landlords require proof of income, employer letter, and often 2 months deposit
+24. Understand Dutch rental rules: income must be 3-4x monthly rent; bidding is competitive; use a local makelaar (estate agent) for guidance
+25. Arrange contents insurance (inboedelverzekering)
+26. Exchange foreign driving licence for Dutch licence if eligible (within 6 months of registration at gemeente)
+27. Register children at school (basisschool) if applicable — contact local gemeente for school allocation
 
 Return ONLY a JSON array. No other text. Each task must have:
-- title: string (concise, action-oriented)
-- description: string (2-3 sentences explaining what to do, why it matters, and any deadline)
-- category: one of [visa, housing, banking, employment, healthcare, transport, admin, shipping, pets]
-- phase: one of [pre_arrival, arrival, post_arrival]
-- priority: integer 1-10 (10 = most urgent / must happen first)
-- estimated_days: integer (days before move date this should be completed — use negative numbers for post-arrival tasks, e.g. -7 means 7 days after arrival)
-- external_link: string or null (verified official URL only — IND, VFS, gemeente, DigiD, etc.)
+- title: string (concise, action-oriented — start with a verb)
+- description: string (3-4 sentences: what to do, why it matters, what documents/actions are needed, and any hard deadline or consequence of missing it)
+- category: one of [documents, visa, admin, employment, housing, banking, healthcare, transport, shipping, pets]
+- priority: integer 1-10 (10 = must happen first; documents and visa tasks = 9-10)
+- estimated_days: integer (days before move date to complete this; post-arrival tasks use negative values e.g. -7 = 7 days after arrival)
+- external_link: string or null (verified official URL — IND, VFS Global, DigiD, gemeente, Rijksoverheid only)
 
-Generate 25-30 tasks total covering all phases. Return ONLY valid JSON array."""
+Generate 25-30 tasks. Return ONLY valid JSON array."""
 
         message = claude.messages.create(
             model="claude-sonnet-4-5",
@@ -118,13 +127,17 @@ Generate 25-30 tasks total covering all phases. Return ONLY valid JSON array."""
 
         tasks = json.loads(tasks_json)
 
+        valid_categories = {"documents", "visa", "admin", "employment", "housing", "banking", "healthcare", "transport", "shipping", "pets"}
         tasks_to_insert = []
         for task in tasks:
+            category = task.get("category", "admin")
+            if category not in valid_categories:
+                category = "admin"
             tasks_to_insert.append({
                 "user_id": request.user_id,
                 "title": task["title"],
                 "description": task.get("description", ""),
-                "category": task.get("category", "admin"),
+                "category": category,
                 "priority": task.get("priority", 5),
                 "status": "pending",
                 "external_link": task.get("external_link"),
