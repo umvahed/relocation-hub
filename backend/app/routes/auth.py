@@ -23,21 +23,16 @@ class OnboardingData(BaseModel):
 async def onboard_user(data: OnboardingData):
     try:
         supabase = get_supabase()
-        existing = supabase.table("profiles").select("id").eq("id", data.user_id).execute()
-
-        if existing.data:
-            return {"message": "Profile already exists", "user_id": data.user_id}
-
-        supabase.table("profiles").insert({
+        supabase.table("profiles").upsert({
             "id": data.user_id,
             "email": data.email,
             "full_name": data.full_name,
             "origin_country": data.origin_country,
             "destination_country": "Netherlands",
             "move_date": data.move_date,
-        }).execute()
+        }, on_conflict="id").execute()
 
-        return {"message": "Profile created", "user_id": data.user_id}
+        return {"message": "Profile upserted", "user_id": data.user_id}
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
