@@ -6,8 +6,20 @@ import anthropic
 import json
 
 router = APIRouter()
-supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-claude = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+_supabase = None
+_claude = None
+
+def get_supabase():
+    global _supabase
+    if _supabase is None:
+        _supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+    return _supabase
+
+def get_claude():
+    global _claude
+    if _claude is None:
+        _claude = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    return _claude
 
 class GenerateChecklistRequest(BaseModel):
     user_id: str
@@ -19,6 +31,8 @@ class GenerateChecklistRequest(BaseModel):
 @router.post("/checklist/generate")
 async def generate_checklist(request: GenerateChecklistRequest):
     try:
+        supabase = get_supabase()
+        claude = get_claude()
         existing = supabase.table("tasks").select("id").eq("user_id", request.user_id).execute()
         if existing.data:
             return {"message": "Checklist already exists", "tasks": existing.data}
@@ -30,7 +44,7 @@ Move date: {request.move_date or "Not specified"}
 
 Return ONLY a JSON array of tasks. No other text. Each task must have:
 - title: string
-- description: string  
+- description: string
 - category: one of [visa, housing, banking, employment, healthcare, transport, admin, shipping]
 - priority: integer 1-10 (10 = most urgent)
 - estimated_days: integer (days before move this should be done)
@@ -61,7 +75,7 @@ Generate 20-25 tasks total. Return ONLY valid JSON array."""
             tasks_json = tasks_json.split("```")[1]
             if tasks_json.startswith("json"):
                 tasks_json = tasks_json[4:]
-        
+
         tasks = json.loads(tasks_json)
 
         tasks_to_insert = []
@@ -85,6 +99,7 @@ Generate 20-25 tasks total. Return ONLY valid JSON array."""
 @router.get("/checklist/{user_id}")
 async def get_checklist(user_id: str):
     try:
+        supabase = get_supabase()
         result = supabase.table("tasks").select("*").eq("user_id", user_id).order("priority", desc=True).execute()
         return {"tasks": result.data}
     except Exception as e:
@@ -93,6 +108,7 @@ async def get_checklist(user_id: str):
 @router.patch("/checklist/task/{task_id}")
 async def update_task(task_id: str, status: str):
     try:
+        supabase = get_supabase()
         result = supabase.table("tasks").update({"status": status}).eq("id", task_id).execute()
         return {"message": "Task updated", "task": result.data}
     except Exception as e:
