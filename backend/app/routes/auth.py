@@ -4,7 +4,13 @@ from app.config import settings
 from supabase import create_client
 
 router = APIRouter()
-supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+_supabase = None
+
+def get_supabase():
+    global _supabase
+    if _supabase is None:
+        _supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+    return _supabase
 
 class OnboardingData(BaseModel):
     user_id: str
@@ -16,11 +22,12 @@ class OnboardingData(BaseModel):
 @router.post("/auth/onboard")
 async def onboard_user(data: OnboardingData):
     try:
+        supabase = get_supabase()
         existing = supabase.table("profiles").select("id").eq("id", data.user_id).execute()
-        
+
         if existing.data:
             return {"message": "Profile already exists", "user_id": data.user_id}
-        
+
         supabase.table("profiles").insert({
             "id": data.user_id,
             "email": data.email,
@@ -38,6 +45,7 @@ async def onboard_user(data: OnboardingData):
 @router.get("/auth/profile/{user_id}")
 async def get_profile(user_id: str):
     try:
+        supabase = get_supabase()
         result = supabase.table("profiles").select("*").eq("id", user_id).execute()
         if not result.data:
             raise HTTPException(status_code=404, detail="Profile not found")
