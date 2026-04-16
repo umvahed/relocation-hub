@@ -35,27 +35,35 @@ export default function OnboardingPage() {
   }, [])
 
   const handleSubmit = async () => {
-    if (!user) return
-    setLoading(true)
-    try {
-      await onboardUser({
-        user_id: user.id,
-        email: user.email!,
-        full_name: form.full_name,
-        origin_country: form.origin_country,
-        move_date: form.move_date,
-      })
+  if (!user) return
+  setLoading(true)
+  try {
+    const onboardResult = await onboardUser({
+      user_id: user.id,
+      email: user.email!,
+      full_name: form.full_name,
+      origin_country: form.origin_country,
+      move_date: form.move_date,
+    })
+    console.log('Onboard result:', onboardResult)
 
-      await generateChecklist({
-        user_id: user.id,
-        origin_country: form.origin_country,
-        employment_type: form.employment_type,
-        move_date: form.move_date,
-      })
+    const checklistResult = await generateChecklist({
+      user_id: user.id,
+      origin_country: form.origin_country,
+      employment_type: form.employment_type,
+      move_date: form.move_date,
+    })
+    console.log('Checklist result:', checklistResult)
 
-      router.push('/dashboard')
+    if (checklistResult.detail) {
+      alert('Error: ' + JSON.stringify(checklistResult.detail))
+      return
+    }
+
+    router.push('/dashboard')
     } catch (e) {
-      console.error(e)
+      console.error('Error:', e)
+      alert('Something went wrong: ' + e)
     } finally {
       setLoading(false)
     }
