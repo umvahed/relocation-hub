@@ -48,7 +48,7 @@
 **Stack:**
 - FastAPI + Uvicorn
 - Supabase Python client (database + auth)
-- Anthropic Python SDK (Claude AI)
+- Anthropic Python SDK (Claude AI — claude-sonnet-4-5)
 - Stripe Python SDK (payments, not yet wired to routes)
 - Pydantic v2 + pydantic-settings (config + validation)
 
@@ -75,12 +75,90 @@ backend/
 | GET | `/api/health` | Railway healthcheck |
 | POST | `/api/auth/onboard` | Creates user profile in Supabase |
 | GET | `/api/auth/profile/{user_id}` | Fetches user profile |
-| POST | `/api/checklist/generate` | Calls Claude API to generate 20-25 NL-specific tasks, stores in DB |
+| POST | `/api/checklist/generate` | Inserts hardcoded critical tasks + calls Claude for remaining tasks |
 | GET | `/api/checklist/{user_id}` | Returns all tasks for a user |
 | PATCH | `/api/checklist/task/{task_id}` | Updates a task status (pending/completed) |
 
-**How Claude generates the checklist:**
-Claude receives a prompt describing the user's origin country and employment type, and returns a JSON array of 20-25 tasks — each with a title, description, category (visa/housing/banking/etc), priority score (1-10), and official resource URL. These tasks are inserted into Supabase and returned to the frontend.
+**Checklist generation logic:**
+1. Always inserts 8 hardcoded `critical` category tasks first (see below)
+2. Calls Claude to generate 25-30 additional tasks covering visa, admin, housing, banking, etc.
+3. Claude tasks with unrecognised categories default to `admin`
+4. All tasks stored in Supabase `tasks` table
+
+**Onboarding inputs passed to Claude:**
+- `origin_country`, `employment_type`, `move_date`
+- `has_pets` (bool) — adds pet import/vet tasks if true
+- `shipping_type` (`container` or `luggage_only`) — adds container/customs tasks if container
+- `has_relocation_allowance` (bool) — adds allowance/tax tasks if true
+
+---
+
+### Checklist Task Categories (display order in dashboard)
+
+| Category | Label | Notes |
+|---|---|---|
+| `critical` | Critical — Required First | Always shown first. Hardcoded. Priority 0. |
+| `visa` | Visa & Immigration | MVV, VFS appointment, IND |
+| `admin` | Administration | BSN, DigiD, gemeente, SARS notification |
+| `employment` | Employment | Contract, 30% ruling, employer tasks |
+| `housing` | Housing | Temp accommodation first, then permanent |
+| `banking` | Banking & Finance | bunq, ING, international transfers |
+| `healthcare` | Healthcare | Zorgverzekering, huisarts registration |
+| `transport` | Transport | Driving licence exchange, OV-chipkaart |
+| `shipping` | Shipping & Logistics | Container or luggage tasks |
+| `pets` | Pet Relocation | Only shown if user has pets |
+
+**Critical tasks (hardcoded, always present, priority 0):**
+1. Check passport validity (valid 6+ months, 2 blank pages)
+2. Obtain IND approval letter from employer (TEV procedure)
+3. Complete and sign MVV application form (VFS Global)
+4. Get passport photos (Dutch ICAO: 35x45mm, white background)
+5. Pay VFS application fee and save proof of payment
+6. Obtain apostilled birth certificate (Home Affairs SA)
+7. Obtain apostilled police clearance certificate (SAPS + Home Affairs)
+8. Apostille academic and professional qualifications (SAQA + Home Affairs)
+
+These tasks always appear first, support document attachment, and cannot be overridden by Claude.
+
+---
+
+### Correct Relocation Process (South Africa → Netherlands)
+
+This is the real-world sequence that the product must reflect:
+
+**PHASE 1 — Document preparation (must happen before anything else):**
+- Apostilled birth certificate, marriage cert (if applicable), police clearance, qualifications
+- Valid passport (6+ months validity, 2 blank pages)
+- All documents from Home Affairs SA — allow 6-10 weeks
+
+**PHASE 2 — Visa & IND:**
+- Employer applies to IND for TEV (combined MVV + residence permit) — NOT the individual
+- IND approval letter received (2–90 days depending on permit type)
+- Book VFS Global appointment (Pretoria or Cape Town)
+- Attend VFS: passport + IND approval letter + signed MVV form + photos + proof of payment
+- Collect passport with MVV sticker
+- Family members: complete antecedents declaration form — their permits processed 3 months after arrival
+
+**PHASE 3 — Pre-departure logistics:**
+- Book flight (MVV valid 90 days from issue — must enter NL within this window)
+- Arrange temporary accommodation (Airbnb, short-stay, serviced apt) — do NOT commit to permanent housing yet
+- Notify SA bank, arrange international transfers
+- Container shipping or luggage decisions
+
+**PHASE 4 — Arrival (first 2 weeks):**
+- Register at gemeente within 5 days of establishing address
+- BSN issued at gemeente registration
+- Open Dutch bank account (bunq/ING — requires BSN)
+- Apply for DigiD (requires BSN, takes ~5 days by post)
+- Register with a huisarts (GP)
+- Arrange zorgverzekering (mandatory within 4 months, backdated to registration)
+
+**PHASE 5 — Settling in:**
+- Begin permanent housing search (Funda, Pararius) — income must be 3-4x monthly rent
+- Understand Dutch rental market: deposit, bidding, makelaar
+- Contents insurance (inboedelverzekering)
+- Driving licence exchange (within 6 months of gemeente registration)
+- School registration for children
 
 ---
 
@@ -99,20 +177,20 @@ stripe_customer_id, stripe_subscription_id
 created_at, updated_at
 ```
 
-**`tasks`** — Checklist items generated by Claude
+**`tasks`** — Checklist items
 ```sql
 id (UUID)
 user_id (FK to profiles)
 title, description
-category (visa/housing/banking/employment/healthcare/transport/admin/shipping)
+category (critical/visa/admin/employment/housing/banking/healthcare/transport/shipping/pets)
 status (pending/completed)
-priority (1-10)
-depends_on (UUID array — for future dependency logic)
+priority (0 = critical prerequisite, 1-10 = Claude-generated priority)
+depends_on (UUID array — future dependency logic)
 due_date, external_link
 created_at, updated_at
 ```
 
-**`documents`** — User-uploaded files (table ready, upload logic not yet built)
+**`documents`** — User-uploaded files, attached per task
 ```sql
 id (UUID)
 user_id (FK to profiles)
@@ -123,7 +201,9 @@ ai_validation_status, ai_validation_notes
 created_at
 ```
 
-**Row Level Security (RLS)** is enabled on all three tables — users can only read and write their own data.
+**Supabase Storage:** `documents` bucket (private). RLS policies restrict access to own folder (`{user_id}/{task_id}/...`).
+
+**Row Level Security (RLS)** is enabled on all three tables.
 
 ---
 
@@ -137,6 +217,7 @@ created_at
 - Next.js 16 (App Router)
 - TypeScript
 - Tailwind CSS v4
+- Inter font (Google Fonts)
 - Supabase SSR client (`@supabase/ssr`)
 - Google OAuth via Supabase Auth
 
@@ -144,11 +225,18 @@ created_at
 
 | Route | File | What it does |
 |---|---|---|
-| `/` | `app/page.tsx` | Landing page with hero, features, pricing |
+| `/` | `app/page.tsx` | Landing page — clean minimal design, hero, features, pricing |
 | `/login` | `app/login/page.tsx` | Google OAuth sign-in |
 | `/auth/callback` | `app/auth/callback/route.ts` | Exchanges OAuth code for session cookie |
-| `/onboarding` | `app/onboarding/page.tsx` | 3-step form: name → country/employment → move date → generates checklist |
-| `/dashboard` | `app/dashboard/page.tsx` | Shows checklist with progress bar, category filters, task completion |
+| `/onboarding` | `app/onboarding/page.tsx` | 4-step form: name → country/employment → logistics (pets/shipping/allowance) → move date |
+| `/dashboard` | `app/dashboard/page.tsx` | Category-grouped checklist, expandable tasks, document upload per task |
+
+**Dashboard behaviour:**
+- Tasks grouped by category in fixed order (critical first)
+- Click any task to expand: shows full description, official resource link, document upload
+- Document upload via Supabase Storage — files attached to specific tasks
+- Sign out button in sticky header
+- Progress bar showing % of tasks completed
 
 **Lib files:**
 - `lib/supabase.ts` — Browser Supabase client (for auth)
@@ -159,106 +247,85 @@ created_at
 ### Deployment Pipeline
 
 ```
-You write code locally
-        │
-        ▼
 git push origin main
         │
-        ├──▶ Railway detects push → rebuilds backend Docker container
-        │         → runs: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-        │         → healthcheck hits /api/health
-        │         → goes live in ~90 seconds
+        ├──▶ Railway detects push → rebuilds backend
+        │         → uvicorn app.main:app --host 0.0.0.0 --port $PORT
+        │         → healthcheck: /api/health
         │
         └──▶ Vercel detects push → rebuilds Next.js frontend
-                  → goes live in ~60 seconds
 ```
 
 **Environment variables:**
-- Backend: stored in Railway Variables panel (never in git)
-- Frontend: stored in Vercel Environment Variables panel (never in git)
+- Backend (Railway): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, `ANTHROPIC_API_KEY`, `FRONTEND_URL`
+- Frontend (Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL`
+- Stripe keys are optional (not yet wired)
 
 ---
 
-### Auth Flow (End-to-End)
+### Auth Flow
 
 ```
 User clicks "Continue with Google"
-        │
-        ▼
-Supabase redirects to Google OAuth consent
-        │
-        ▼
-Google redirects to: /auth/callback?code=xxx
-        │
-        ▼
-Next.js route handler exchanges code for session
-        │
-        ▼
-User redirected to /onboarding
-        │
-        ▼
-Supabase session cookie set — user is authenticated
-        │
-        ▼
-Onboarding form → POST to FastAPI → Claude generates checklist
-        │
-        ▼
-User lands on /dashboard with their personalized plan
+        → Supabase Google OAuth
+        → /auth/callback exchanges code for session
+        → redirect to /onboarding
+        → 4-step form → POST to FastAPI → hardcoded critical tasks + Claude checklist generated
+        → redirect to /dashboard
 ```
-
----
-
-## What's Coming Next (Roadmap)
-
-### Milestone 2 — Polish & Payments (Week 2)
-
-- **Stripe billing:** Wire up Stripe Checkout for €3.99/mo subscription. Free users see checklist only; paid users unlock document hub + AI validation
-- **UI polish:** Improve visual design, mobile responsiveness, loading states, empty states
-- **Document upload:** Let users upload files (passport, contracts, etc) organized by task category — stored in Supabase Storage
-- **AI document validation:** User uploads a document → Claude reads it → flags if it looks wrong or incomplete
-
-### Milestone 3 — Smart Features (Week 3-4)
-
-- **Email reminders:** CRON job checks daily for overdue tasks → sends email via Resend
-- **Task dependencies:** Grey out tasks that can't be started yet (e.g. bank account blocked until BSN exists)
-- **Resource links:** Verified links to IND, gemeente, DigiD, bunq, Zilveren Kruis, etc
-- **Progress notifications:** "You're 60% done — here's what to do next"
-
-### Milestone 4 — Growth Features (Month 2)
-
-- **Housing aggregator:** Scrape Funda, Pararius — auto-generate family composition emails with attached documents, ready to send
-- **Moving company quotes:** Form that fires off quote requests to multiple container/moving companies
-- **Flight suggestions:** Integrating with a flights API — suggests optimal travel dates based on IND appointment timing
-- **Accommodation search:** Booking.com API integration for short-term housing on arrival
-- **Multi-language:** Dutch + English
-
-### Milestone 5 — B2B (Month 3+)
-
-- **White-label:** Relocation companies can brand the product as their own
-- **Admin dashboard:** Companies can see all their clients' progress
-- **Bulk onboarding:** Companies can invite multiple expats at once
-- **Affiliate revenue:** Moving companies and housing platforms pay to feature on the platform
 
 ---
 
 ## Current Status
 
-✅ Backend API live and healthy on Railway  
-✅ Frontend live on Vercel  
-✅ Google OAuth working end-to-end  
-✅ Onboarding flow working locally  
-⚠️ CORS fix being applied — Vercel → Railway calls being blocked (fix in progress)  
-🔲 Stripe not yet wired to paywalls  
-🔲 Document upload not yet built  
-🔲 Email reminders not yet built  
+✅ Backend live on Railway (FastAPI)
+✅ Frontend live on Vercel (Next.js)
+✅ Google OAuth working end-to-end
+✅ 4-step onboarding with logistics questions (pets, shipping, allowance)
+✅ Checklist generation: hardcoded critical tasks + Claude AI tasks
+✅ Dashboard: category sections, expandable tasks, document upload per task
+✅ Inter font, mobile-responsive, clean minimal UI
+⚠️ Supabase Storage bucket `documents` must be manually created with RLS policies
+🔲 Stripe billing not yet wired
+🔲 Email reminders not yet built
+🔲 Calendar integration (Google Cal / iCal for appointments)
+🔲 Admin portal
+🔲 Phase labels (pre-arrival / arrival / post-arrival) — needs DB column added
+
+---
+
+## Roadmap
+
+### Next — Milestone 2 (Stripe + Polish)
+- Stripe Checkout for €3.99/mo — free users see checklist only; paid users unlock document hub + AI validation
+- UI polish continued
+- Calendar integration: one-click add IND/VFS/gemeente appointments to Google Calendar or iCal
+
+### Milestone 3 — Smart Features
+- Email reminders via Resend (CRON job for overdue tasks)
+- Task dependencies (grey out tasks blocked by incomplete prerequisites)
+- Phase labels on dashboard (pre-arrival / arrival / post-arrival sections)
+- AI document validation: upload doc → Claude reads it → flags issues
+
+### Milestone 4 — Growth
+- Housing aggregator (Funda, Pararius scraping)
+- Moving company quote form
+- Flight suggestions based on IND appointment timing
+- Multi-language (Dutch + English)
+
+### Milestone 5 — B2B
+- White-label for relocation companies
+- Admin dashboard (client progress tracking)
+- Bulk onboarding
+- Affiliate revenue (moving companies, housing platforms)
 
 ---
 
 ## Repository Structure
 
 ```
-relocation-hub/                  ← GitHub: github.com/umvahed/relocation-hub
-├── backend/                     ← FastAPI app → Railway
+relocation-hub/
+├── backend/                     ← FastAPI → Railway
 │   ├── app/
 │   │   ├── main.py
 │   │   ├── config.py
@@ -266,7 +333,7 @@ relocation-hub/                  ← GitHub: github.com/umvahed/relocation-hub
 │   ├── requirements.txt
 │   ├── railway.toml
 │   └── .env                     ← local only, gitignored
-├── frontend/                    ← Next.js app → Vercel
+├── frontend/                    ← Next.js → Vercel
 │   ├── app/
 │   │   ├── page.tsx
 │   │   ├── login/
@@ -277,11 +344,7 @@ relocation-hub/                  ← GitHub: github.com/umvahed/relocation-hub
 │   │   ├── supabase.ts
 │   │   └── api.ts
 │   └── .env.local               ← local only, gitignored
+├── context.md                   ← this file
 ├── .gitignore
-├── LICENSE
 └── README.md
 ```
-
----
-
-Once the CORS fix deploys and you confirm the full flow works on the live Vercel URL, we move straight into Milestone 2: Stripe billing and document upload. That's what turns this from a demo into a product someone will pay for.
