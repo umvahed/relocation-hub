@@ -278,12 +278,16 @@ User clicks "Continue with Google"
 
 ## Current Status
 
-✅ Backend live on Railway (FastAPI)
-✅ Frontend live on Vercel (Next.js)
+✅ Backend live on Railway (FastAPI) — only service on Railway
+✅ Frontend live on Vercel (Next.js) — only frontend host, Railway frontend service deleted
 ✅ Google OAuth working end-to-end
 ✅ 4-step onboarding with logistics questions (pets, shipping, allowance)
-✅ Checklist generation: hardcoded critical tasks + Claude AI tasks
+✅ Checklist generation: hardcoded SA VFS prerequisites (priority 100) + SA document tasks (priority 90) + Claude AI tasks
 ✅ Dashboard: category sections, expandable tasks, document upload per task
+✅ Dashboard: non-critical sections locked (dimmed + pointer-events none) until all critical tasks completed
+✅ Claude prompt fixed: employer applies to IND (not user); blocked task list prevents duplication; "critical" category reserved for hardcoded tasks only
+✅ force-dynamic on dashboard, onboarding, login pages (prevents Supabase prerender error at build time)
+✅ Vercel cron keepalive — pings /api/health every 5 min to prevent Railway cold starts
 ✅ Inter font, mobile-responsive, clean minimal UI
 ⚠️ Supabase Storage bucket `documents` must be manually created with RLS policies
 🔲 Stripe billing not yet wired
@@ -325,26 +329,53 @@ User clicks "Continue with Google"
 
 ```
 relocation-hub/
-├── backend/                     ← FastAPI → Railway
+├── backend/                     ← FastAPI → Railway (only Railway service)
 │   ├── app/
-│   │   ├── main.py
+│   │   ├── main.py              # CORS allows Vercel origin + localhost
 │   │   ├── config.py
 │   │   └── routes/
+│   │       ├── health.py        # GET /api/health — also used by Vercel keepalive cron
+│   │       ├── auth.py
+│   │       ├── checklist.py     # SA_VFS_PREREQUISITES + SA_DOCUMENT_TASKS hardcoded
+│   │       └── documents.py
 │   ├── requirements.txt
 │   ├── railway.toml
 │   └── .env                     ← local only, gitignored
-├── frontend/                    ← Next.js → Vercel
+├── frontend/                    ← Next.js → Vercel (only frontend host)
 │   ├── app/
 │   │   ├── page.tsx
-│   │   ├── login/
-│   │   ├── onboarding/
-│   │   ├── dashboard/
-│   │   └── auth/callback/
+│   │   ├── login/               # force-dynamic
+│   │   ├── onboarding/          # force-dynamic
+│   │   ├── dashboard/           # force-dynamic; critical dependency lock
+│   │   ├── auth/callback/
+│   │   └── api/
+│   │       └── keepalive/       # GET — pings Railway /api/health (Vercel cron)
 │   ├── lib/
 │   │   ├── supabase.ts
 │   │   └── api.ts
+│   ├── vercel.json              # cron: /api/keepalive every 5 min
 │   └── .env.local               ← local only, gitignored
 ├── context.md                   ← this file
 ├── .gitignore
 └── README.md
 ```
+
+## Environment Variables
+
+**Railway (backend only):**
+```
+SUPABASE_URL
+SUPABASE_ANON_KEY
+SUPABASE_SERVICE_KEY
+ANTHROPIC_API_KEY
+FRONTEND_URL=https://relocation-hub.vercel.app
+```
+
+**Vercel (frontend only):**
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+NEXT_PUBLIC_API_URL=https://relocation-hub-production.up.railway.app
+```
+
+Note: `FRONTEND_URL` belongs in Railway only. `NEXT_PUBLIC_*` vars belong in Vercel only.
