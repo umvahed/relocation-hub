@@ -9,64 +9,94 @@ router = APIRouter()
 _supabase = None
 _claude = None
 
-# These are hardcoded — they are fixed legal requirements for every NL relocation.
-# They always appear first, before Claude-generated tasks, and all support document attachment.
-REQUIRED_DOCUMENT_TASKS = [
+# VFS appointment prerequisites (South Africa) — must be in hand before the VFS appointment.
+# These are the hard gate: nothing else in the relocation can proceed without the MVV sticker.
+SA_VFS_PREREQUISITES = [
     {
-        "title": "Check passport validity",
-        "description": "Your passport must be valid for at least 6 months beyond your intended stay in the Netherlands, with a minimum of 2 blank pages for visa stamps. Check the expiry date now. If renewal is needed, start immediately — South African passports take 4–8 weeks to renew at Home Affairs.",
+        "title": "Obtain IND approval letter from your employer (inwilligingsbrief)",
+        "description": "YOUR EMPLOYER applies to the IND on your behalf via the TEV procedure — you do not apply yourself. Once the IND approves, they issue the 'inwilligingsbrief' (approval letter) authorising your MVV. You cannot book a VFS appointment without this letter. Chase your employer's HR or immigration lawyer immediately to confirm the application has been submitted and get an estimated timeline (2–90 days depending on permit type).",
         "category": "critical",
-        "priority": 0,
-        "external_link": "https://www.dha.gov.za",
-    },
-    {
-        "title": "Obtain IND approval letter from employer",
-        "description": "Your employer must first apply for your residence permit (TEV procedure) through the IND before you can apply for the MVV. Once approved, the IND issues an approval letter authorising your MVV. You cannot book a VFS appointment without this letter. Chase your employer's HR or immigration lawyer for the timeline.",
-        "category": "critical",
-        "priority": 0,
+        "priority": 100,
         "external_link": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant",
     },
     {
-        "title": "Complete and sign MVV application form",
-        "description": "Download and complete the official MVV application form from the VFS Global Netherlands (South Africa) website. It must be signed in blue or black ink. Have this form ready before your VFS appointment — incomplete forms will result in rejection.",
+        "title": "Verify passport validity (6+ months, 2+ blank pages)",
+        "description": "Your passport must be valid for at least 6 months beyond your intended stay in the Netherlands and have a minimum of 2 blank pages for visa stamps. Check both right now — VFS will reject your application on the spot if either condition is not met. If your passport needs renewal, South African passports take 4–8 weeks at Home Affairs; start immediately.",
         "category": "critical",
-        "priority": 0,
+        "priority": 100,
+        "external_link": "https://www.dha.gov.za",
+    },
+    {
+        "title": "Complete and sign the MVV application form",
+        "description": "Download the official MVV application form from the VFS Global Netherlands (South Africa) website. Fill it in completely and sign it in blue or black ink. This form must be submitted at your VFS appointment — incomplete or unsigned forms result in immediate rejection. Do not use correction fluid; obtain a new form if you make an error.",
+        "category": "critical",
+        "priority": 100,
         "external_link": "https://www.vfsglobal.com/netherlands/southafrica/",
     },
     {
-        "title": "Get passport photos (Dutch ICAO requirements)",
-        "description": "You need recent passport photos complying with Dutch ICAO requirements: 35x45mm, plain white background, neutral expression, mouth closed, no glasses. Bring at least 2 original prints to your VFS appointment. Photos must be taken within the last 6 months.",
+        "title": "Prepare photocopy of the IND approval letter",
+        "description": "Once you receive the inwilligingsbrief from your employer, make a clear photocopy of the entire document. VFS requires both the original and a photocopy to be submitted at the appointment. Keep the original safe — it is the single most important document in your application and cannot be easily replaced.",
         "category": "critical",
-        "priority": 0,
+        "priority": 100,
+        "external_link": "https://www.vfsglobal.com/netherlands/southafrica/",
+    },
+    {
+        "title": "Get passport photos meeting Dutch ICAO requirements",
+        "description": "Obtain recent passport photos that comply with Dutch ICAO standards: 35x45mm, plain white background, neutral expression, mouth closed, no glasses, taken within the last 6 months. Bring at least 2 original colour prints to your VFS appointment. Have them taken at a professional photo studio that knows Dutch/EU requirements — selfie-style prints are rejected.",
+        "category": "critical",
+        "priority": 100,
         "external_link": "https://www.netherlandsworldwide.nl/dutch-passport-photos",
     },
     {
-        "title": "Pay VFS application fee and save proof of payment",
-        "description": "The VFS Global service fee must be paid before or at your appointment. The current fee is displayed on the VFS Netherlands South Africa page. Save and print your proof of payment — it is a required document at the VFS centre and your application will not be accepted without it.",
+        "title": "Pay VFS application fee and keep proof of payment",
+        "description": "Pay the VFS Global service fee in advance via the VFS website or at the centre on the day — check the current amount on the VFS Netherlands South Africa page as it changes. Save and print your proof of payment. VFS will not process your application without it. Keep a digital copy as backup.",
         "category": "critical",
-        "priority": 0,
+        "priority": 100,
         "external_link": "https://www.vfsglobal.com/netherlands/southafrica/",
     },
+]
+
+# SA document-gathering tasks — needed by the employer for the IND application.
+# Start these immediately; they take 6–10 weeks at Home Affairs.
+SA_DOCUMENT_TASKS = [
     {
         "title": "Obtain apostilled birth certificate",
-        "description": "Your original birth certificate must be apostilled by the Department of Home Affairs in South Africa. Submit your original certificate to a Home Affairs office or use an approved courier service. Processing typically takes 4–8 weeks. The IND requires the apostille for residence permit applications — do not delay.",
+        "description": "Your original birth certificate must be apostilled by the Department of Home Affairs. Submit your original (or certified copy) to a Home Affairs office or approved courier service. Processing takes 4–8 weeks — do not wait. The apostille is required by the IND for the TEV application your employer will submit on your behalf.",
         "category": "critical",
-        "priority": 0,
+        "priority": 90,
         "external_link": "https://www.dha.gov.za/index.php/civic-services/apostille-authentication",
     },
     {
-        "title": "Obtain apostilled police clearance certificate",
-        "description": "Apply for a Police Clearance Certificate (PCC) at your nearest SAPS Criminal Record Centre or online via the SAPS website. Once received, submit it to Home Affairs for apostilling. Allow 6–10 weeks total. The IND requires this for all adult applicants.",
+        "title": "Obtain apostilled police clearance certificate (SAPS)",
+        "description": "Apply for a Police Clearance Certificate at your nearest SAPS Criminal Record Centre or online via the SAPS eServices portal. Once received, submit it to Home Affairs for apostilling. Allow 6–10 weeks total. Required for all adult applicants by the IND. Start this process immediately as it is the most common cause of delays.",
         "category": "critical",
-        "priority": 0,
+        "priority": 90,
         "external_link": "https://www.saps.gov.za/services/crimrecordinfo.php",
     },
     {
         "title": "Apostille academic and professional qualifications",
-        "description": "Your highest qualification certificates must be authenticated and apostilled. In South Africa, submit originals to SAQA (South African Qualifications Authority) for evaluation, then to Home Affairs for apostilling. Required for Knowledge Migrant and other skilled work permit categories.",
+        "description": "Your highest-level qualification certificates must be authenticated and apostilled. Submit originals to SAQA (South African Qualifications Authority) for evaluation, then to Home Affairs for the apostille stamp. Required for Knowledge Migrant, Highly Skilled Migrant, and most work permit categories. Allow 6–10 weeks for the full process.",
         "category": "critical",
-        "priority": 0,
+        "priority": 90,
         "external_link": "https://www.saqa.org.za",
+    },
+]
+
+# Generic prerequisite for non-South Africa users
+GENERAL_CRITICAL_TASKS = [
+    {
+        "title": "Verify passport validity (6+ months, 2+ blank pages)",
+        "description": "Your passport must be valid for at least 6 months beyond your intended stay in the Netherlands and have a minimum of 2 blank pages for visa stamps. Verify both immediately. If renewal is needed, check processing times for your country and start right away.",
+        "category": "critical",
+        "priority": 100,
+        "external_link": None,
+    },
+    {
+        "title": "Confirm your employer has submitted the IND residence permit application",
+        "description": "For most work-related moves to the Netherlands, YOUR EMPLOYER submits the residence permit application to the IND on your behalf via the TEV or standard procedure. You do not apply yourself. Confirm with your HR or immigration lawyer that the application has been filed and obtain the expected IND decision timeline.",
+        "category": "critical",
+        "priority": 100,
+        "external_link": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant",
     },
 ]
 
@@ -113,6 +143,29 @@ async def generate_checklist(request: GenerateChecklistRequest):
 
         conditional_block = "\n".join(conditional_notes) if conditional_notes else ""
 
+        is_south_africa = request.origin_country.strip().lower() in ("south africa", "za")
+
+        # Build the already-hardcoded task list so Claude knows not to duplicate them
+        if is_south_africa:
+            already_covered = """
+ALREADY HANDLED — do NOT generate tasks for any of the following (they are hardcoded):
+- Passport validity check
+- IND approval letter / inwilligingsbrief
+- MVV application form
+- Photocopy of IND approval letter
+- Passport photos for VFS
+- VFS application fee / proof of payment
+- VFS appointment booking or attendance
+- Collecting passport with MVV sticker from VFS
+- Apostilled birth certificate
+- Police clearance certificate (SAPS)
+- Apostilled academic or professional qualifications"""
+        else:
+            already_covered = """
+ALREADY HANDLED — do NOT generate tasks for any of the following (they are hardcoded):
+- Passport validity check
+- IND residence permit application (employer submits this, not the user)"""
+
         prompt = f"""You are a senior relocation expert specialising in moves to the Netherlands. Generate a precise, correctly-sequenced relocation checklist for someone moving from {request.origin_country} to the Netherlands.
 
 User profile:
@@ -124,55 +177,47 @@ User profile:
 
 {conditional_block}
 
-CRITICAL SEQUENCING — tasks must appear in this exact order of priority:
+{already_covered}
 
-PHASE 1 — DOCUMENT PREPARATION (always first, before anything else):
-These are gating documents. Nothing else can proceed without them.
-1. Obtain apostilled birth certificate (original + apostille stamp from home country)
-2. Obtain apostilled marriage certificate (if applicable)
-3. Obtain police clearance certificate (apostilled — required by IND)
-4. Obtain and apostille academic/professional qualifications
-5. Prepare passport (valid 6+ months beyond intended stay, minimum 2 blank pages)
+IMPORTANT FACTS about moving to the Netherlands — your tasks must reflect these accurately:
+- The EMPLOYER (not the individual) submits the residence permit application to the IND via the TEV procedure. Do NOT generate a task telling the user to "apply for a residence permit" or "apply for an MVV" — these are done by the employer/sponsor.
+- The IND approval letter (inwilligingsbrief) is received by the employer and forwarded to the employee. The user waits for it.
+- The BSN (Burgerservicenummer) is issued automatically at gemeente registration — the user does not need to separately "apply for a BSN".
+- DigiD requires BSN and a Dutch address and takes ~5 days by post.
+- Health insurance (zorgverzekering) is mandatory and must be arranged within 4 months of gemeente registration; it is backdated to the registration date.
+- Do NOT include tasks already listed in the ALREADY HANDLED section above.
 
-PHASE 2 — VISA & IND (depends on Phase 1):
-6. Confirm employer is a recognised IND sponsor (check IND public register)
-7. Employer submits combined MVV + residence permit application (TEV procedure) to IND — this is done by the employer, not the individual
-8. Receive IND approval letter (MVV sticker authorisation) — wait time: 2-90 days depending on permit type
-9. Book VFS Global appointment to submit passport and biometrics (for {request.origin_country} — VFS centres in Pretoria and Cape Town)
-10. Attend VFS appointment: bring passport, IND approval letter, MVV application form, passport photo, proof of payment
-11. Collect passport with MVV sticker from VFS
+Generate tasks covering ONLY these phases (skip anything in the ALREADY HANDLED list):
 
-PHASE 3 — PRE-DEPARTURE LOGISTICS:
-12. Complete antecedents declaration form for accompanying family members (their residence permits processed after 3 months in NL)
-13. Book flight to Netherlands (MVV is valid for 90 days from issue — must enter within this window)
-14. Arrange temporary accommodation for first 1-3 months (short-stay apartment, serviced accommodation or Airbnb — do NOT commit to permanent housing before arriving)
-15. Notify home country bank of relocation, set up international transfer capability
-16. Sort logistics (container or luggage — based on profile)
+PHASE 3 — PRE-DEPARTURE LOGISTICS (before flying):
+- Book flight to Netherlands (MVV valid 90 days from issue — must enter within this window)
+- Arrange temporary accommodation for first 1-3 months (do NOT commit to permanent housing before arriving — Dutch rental market requires local presence)
+- Notify home country bank of move, arrange international transfer capability
+- Confirm employer 30% ruling application status (if applicable — highly skilled migrants only)
+- Antecedents declaration form for accompanying family members (their permits processed 3 months after arrival)
 
 PHASE 4 — ARRIVAL (first 2 weeks):
-17. Register at gemeente (municipal registration / inschrijving) — MUST happen within 5 days of establishing a residential address in NL
-18. Receive BSN number — issued at gemeente registration (this is the Dutch equivalent of a tax/ID number; required for everything below)
-19. Open Dutch bank account (bunq, ING, or Rabobank — all require BSN)
-20. Apply for DigiD (Dutch digital ID — requires BSN and Dutch address; takes ~5 days by post)
-21. Register with a Dutch GP (huisarts) — find one near your address via your health insurer's website
-22. Arrange Dutch health insurance / zorgverzekering (legally mandatory within 4 months of registering in NL; backdated to registration date)
+- Register at gemeente / inschrijving — MUST happen within 5 days of establishing a residential address (BSN issued here)
+- Open Dutch bank account (bunq or ING — requires BSN)
+- Apply for DigiD (requires BSN + Dutch address; ~5 days by post)
+- Register with a GP (huisarts)
+- Arrange zorgverzekering (mandatory health insurance — within 4 months of registration, backdated to registration date)
 
-PHASE 5 — SETTLING IN (weeks 2-8):
-23. Begin permanent housing search (Funda.nl, Pararius.nl) — only after understanding local rental market; Dutch landlords require proof of income, employer letter, and often 2 months deposit
-24. Understand Dutch rental rules: income must be 3-4x monthly rent; bidding is competitive; use a local makelaar (estate agent) for guidance
-25. Arrange contents insurance (inboedelverzekering)
-26. Exchange foreign driving licence for Dutch licence if eligible (within 6 months of registration at gemeente)
-27. Register children at school (basisschool) if applicable — contact local gemeente for school allocation
+PHASE 5 — SETTLING IN (weeks 2-8+):
+- Begin permanent housing search (Funda, Pararius — income must be 3-4x monthly rent; 2 months deposit typical)
+- Contents insurance (inboedelverzekering)
+- Exchange foreign driving licence for Dutch licence (within 6 months of gemeente registration)
+- Register children at school (basisschool) if applicable
+- Employment-specific tasks (payroll, 30% ruling, DigiD for tax portal)
 
 Return ONLY a JSON array. No other text. Each task must have:
-- title: string (concise, action-oriented — start with a verb)
-- description: string (3-4 sentences: what to do, why it matters, what documents/actions are needed, and any hard deadline or consequence of missing it)
-- category: one of [documents, visa, admin, employment, housing, banking, healthcare, transport, shipping, pets]
-- priority: integer 1-10 (10 = must happen first; documents and visa tasks = 9-10)
-- estimated_days: integer (days before move date to complete this; post-arrival tasks use negative values e.g. -7 = 7 days after arrival)
-- external_link: string or null (verified official URL — IND, VFS Global, DigiD, gemeente, Rijksoverheid only)
+- title: string (concise, action-oriented, starts with a verb)
+- description: string (3-4 sentences: what to do, why it matters, what is needed, and any hard deadline or consequence)
+- category: one of [visa, admin, employment, housing, banking, healthcare, transport, shipping, pets]
+- priority: integer 1-10 (10 = must happen soonest)
+- external_link: string or null (official URLs only — ind.nl, digid.nl, rijksoverheid.nl, government or bank sites)
 
-Generate 25-30 tasks. Return ONLY valid JSON array."""
+Generate 20-25 tasks. Return ONLY valid JSON array."""
 
         message = claude.messages.create(
             model="claude-sonnet-4-5",
@@ -190,16 +235,23 @@ Generate 25-30 tasks. Return ONLY valid JSON array."""
 
         valid_categories = {"critical", "visa", "admin", "employment", "housing", "banking", "healthcare", "transport", "shipping", "pets"}
 
-        # Critical tasks always come first — hardcoded, not AI-generated
+        # Hardcoded critical tasks — inserted first, before all Claude-generated tasks.
+        # SA users get VFS prerequisites (priority 100) + document tasks (priority 90).
+        # Other countries get the general prerequisites only.
+        if is_south_africa:
+            hardcoded = SA_VFS_PREREQUISITES + SA_DOCUMENT_TASKS
+        else:
+            hardcoded = GENERAL_CRITICAL_TASKS
+
         tasks_to_insert = [
             {**doc, "user_id": request.user_id, "status": "pending"}
-            for doc in REQUIRED_DOCUMENT_TASKS
+            for doc in hardcoded
         ]
 
-        # Claude-generated tasks appended after
+        # Claude-generated tasks — never in the "critical" category (that is hardcoded-only)
         for task in tasks:
             category = task.get("category", "admin")
-            if category not in valid_categories:
+            if category not in valid_categories or category == "critical":
                 category = "admin"
             tasks_to_insert.append({
                 "user_id": request.user_id,

@@ -91,6 +91,10 @@ export default function DashboardPage() {
   const progress = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'there'
 
+  const criticalTasks = tasks.filter(t => t.category === 'critical')
+  const criticalAllDone = criticalTasks.length === 0 || criticalTasks.every(t => t.status === 'completed')
+  const criticalRemaining = criticalTasks.filter(t => t.status !== 'completed').length
+
   const sections = SECTION_ORDER
     .map(cat => ({
       cat,
@@ -143,8 +147,10 @@ export default function DashboardPage() {
         </div>
 
         {/* Category sections */}
-        {sections.map(({ cat, meta, tasks: sectionTasks }) => (
-          <div key={cat}>
+        {sections.map(({ cat, meta, tasks: sectionTasks }) => {
+          const locked = cat !== 'critical' && !criticalAllDone
+          return (
+          <div key={cat} className={locked ? 'opacity-50 pointer-events-none select-none' : ''}>
             <div className="flex items-center gap-2 mb-3">
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${meta.color} ${meta.text}`}>
                 {meta.label}
@@ -152,6 +158,11 @@ export default function DashboardPage() {
               <span className="text-xs text-gray-400">
                 {sectionTasks.filter(t => t.status === 'completed').length}/{sectionTasks.length} done
               </span>
+              {locked && (
+                <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                  Complete {criticalRemaining} critical task{criticalRemaining !== 1 ? 's' : ''} first
+                </span>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -272,7 +283,8 @@ export default function DashboardPage() {
               })}
             </div>
           </div>
-        ))}
+          )
+        })}
 
       </div>
     </main>
