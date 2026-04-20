@@ -2,8 +2,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.config import settings
 from supabase import create_client
+from app.routes.notifications import notify_task_complete
 import anthropic
 import json
+from datetime import date
 
 router = APIRouter()
 _supabase = None
@@ -122,6 +124,21 @@ class GenerateChecklistRequest(BaseModel):
     shipping_type: str = "luggage_only"  # "container", "luggage_only"
     has_relocation_allowance: bool = False
 
+def _check_and_increment_usage(supabase, user_id: str):
+    today = date.today().isoformat()
+    result = supabase.table("api_usage").select("id, call_count").eq("user_id", user_id).eq("date", today).execute()
+    if result.data:
+        record = result.data[0]
+        if record["call_count"] >= settings.DAILY_AI_CALL_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Daily AI call limit of {settings.DAILY_AI_CALL_LIMIT} reached. Try again tomorrow."
+            )
+        supabase.table("api_usage").update({"call_count": record["call_count"] + 1, "updated_at": "now()"}).eq("id", record["id"]).execute()
+    else:
+        supabase.table("api_usage").insert({"user_id": user_id, "date": today, "call_count": 1}).execute()
+
+
 @router.post("/checklist/generate")
 async def generate_checklist(request: GenerateChecklistRequest):
     try:
@@ -130,6 +147,8 @@ async def generate_checklist(request: GenerateChecklistRequest):
         existing = supabase.table("tasks").select("id").eq("user_id", request.user_id).execute()
         if existing.data:
             return {"message": "Checklist already exists", "tasks": existing.data}
+
+        _check_and_increment_usage(supabase, request.user_id)
 
         conditional_notes = []
         if request.has_pets:
@@ -278,11 +297,28 @@ async def get_checklist(user_id: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/usage/{user_id}")
+async def get_usage(user_id: str):
+    try:
+        supabase = get_supabase()
+        today = date.today().isoformat()
+        result = supabase.table("api_usage").select("call_count").eq("user_id", user_id).eq("date", today).execute()
+        call_count = result.data[0]["call_count"] if result.data else 0
+        return {"call_count": call_count, "limit": settings.DAILY_AI_CALL_LIMIT, "date": today}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.patch("/checklist/task/{task_id}")
 async def update_task(task_id: str, status: str):
     try:
         supabase = get_supabase()
         result = supabase.table("tasks").update({"status": status}).eq("id", task_id).execute()
+        if status == "completed" and result.data:
+            task = result.data[0]
+            profile_res = supabase.table("profiles").select("full_name, contact_name, contact_email").eq("id", task["user_id"]).execute()
+            if profile_res.data:
+                notify_task_complete(task, profile_res.data[0])
         return {"message": "Task updated", "task": result.data}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

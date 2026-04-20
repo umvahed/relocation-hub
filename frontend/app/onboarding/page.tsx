@@ -23,6 +23,8 @@ export default function OnboardingPage() {
     has_pets: false,
     shipping_type: 'luggage_only',
     has_relocation_allowance: false,
+    contact_name: '',
+    contact_email: '',
   })
   const router = useRouter()
   const supabase = createClient()
@@ -48,6 +50,8 @@ export default function OnboardingPage() {
         full_name: form.full_name,
         origin_country: form.origin_country,
         move_date: form.move_date,
+        contact_name: form.contact_name || undefined,
+        contact_email: form.contact_email || undefined,
       })
 
       const checklistResult = await generateChecklist({
@@ -80,7 +84,7 @@ export default function OnboardingPage() {
 
         {/* Progress */}
         <div className="flex gap-2 mb-8">
-          {[1, 2, 3, 4].map(s => (
+          {[1, 2, 3, 4, 5].map(s => (
             <div key={s} className={`h-2 flex-1 rounded-full ${s <= step ? 'bg-indigo-600' : 'bg-gray-200'}`} />
           ))}
         </div>
@@ -199,7 +203,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 4 — Move date & generate */}
+        {/* Step 4 — Move date */}
         {step === 4 && (
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">When are you planning to move?</h2>
@@ -217,6 +221,39 @@ export default function OnboardingPage() {
                 ← Back
               </button>
               <button
+                onClick={() => setStep(5)}
+                className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition">
+                Continue →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5 — HR contact (optional) & generate */}
+        {step === 5 && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Do you have an HR or relocation contact?</h2>
+            <p className="text-gray-500 mb-6">They'll receive updates when you complete tasks. You can skip this.</p>
+            <input
+              type="text"
+              placeholder="Contact name (e.g. Sarah — HR)"
+              value={form.contact_name}
+              onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))}
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
+            />
+            <input
+              type="email"
+              placeholder="Contact email address"
+              value={form.contact_email}
+              onChange={e => setForm(f => ({ ...f, contact_email: e.target.value }))}
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-6"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setStep(4)}
+                className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition">
+                ← Back
+              </button>
+              <button
                 onClick={handleSubmit}
                 disabled={loading}
                 className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition disabled:opacity-50">
@@ -225,7 +262,7 @@ export default function OnboardingPage() {
             </div>
             {loading && (
               <p className="text-center text-sm text-indigo-600 mt-4 animate-pulse">
-                Claude is generating your personalised checklist...
+                We're generating your personalised checklist...
               </p>
             )}
           </div>

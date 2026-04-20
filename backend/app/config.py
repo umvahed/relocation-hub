@@ -9,7 +9,10 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_PUBLISHABLE_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    RESEND_API_KEY: Optional[str] = None
+    RESEND_FROM_EMAIL: str = "Relocation Hub <onboarding@resend.dev>"
     FRONTEND_URL: str = "http://localhost:3000"
+    DAILY_AI_CALL_LIMIT: int = 5
 
     class Config:
         env_file = ".env"

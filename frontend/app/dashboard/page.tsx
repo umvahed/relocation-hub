@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import { getChecklist, updateTask } from '@/lib/api'
+import { getChecklist, updateTask, getUsage, setDueDate } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 
 const SECTION_ORDER = ['critical', 'visa', 'admin', 'employment', 'housing', 'banking', 'healthcare', 'transport', 'shipping', 'pets']
@@ -27,6 +27,7 @@ export default function DashboardPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [taskDocs, setTaskDocs] = useState<Record<string, any[]>>({})
   const [uploading, setUploading] = useState<string | null>(null)
+  const [usage, setUsage] = useState<{ call_count: number; limit: number } | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -36,6 +37,7 @@ export default function DashboardPage() {
       setUser(data.user)
       const result = await getChecklist(data.user.id)
       setTasks(result.tasks || [])
+      getUsage(data.user.id).then(setUsage).catch(() => null)
       setLoading(false)
     })
   }, [])
@@ -78,9 +80,21 @@ export default function DashboardPage() {
     setUploading(null)
   }
 
+  const handleDueDateChange = async (taskId: string, due_date: string) => {
+    await setDueDate(taskId, due_date)
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, due_date } : t))
+  }
+
   const openFile = async (filePath: string) => {
     const { data } = await supabase.storage.from('documents').createSignedUrl(filePath, 3600)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }
+
+  const googleCalendarUrl = (task: any) => {
+    const title = encodeURIComponent(task.title)
+    const details = encodeURIComponent(task.description || '')
+    const date = task.due_date?.replace(/-/g, '') || ''
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&dates=${date}/${date}`
   }
 
   const signOut = async () => {
@@ -121,6 +135,35 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="hidden sm:block text-sm text-gray-400">Hi, {firstName}</span>
+            <button
+              onClick={() => router.push('/documents')}
+              className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Documents
+            </button>
+            {user && (
+              <a
+                href={`${process.env.NEXT_PUBLIC_API_URL}/api/calendar/${user.id}/feed.ics`}
+                className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Export calendar
+              </a>
+            )}
+            {usage && (
+              <span className={`hidden sm:block text-xs font-medium px-2.5 py-1 rounded-full ${
+                usage.call_count >= usage.limit
+                  ? 'bg-red-50 text-red-600'
+                  : usage.call_count >= usage.limit - 1
+                  ? 'bg-amber-50 text-amber-600'
+                  : 'bg-gray-100 text-gray-500'
+              }`}>
+                {usage.call_count}/{usage.limit} AI calls today
+              </span>
+            )}
             <button onClick={signOut} className="text-sm text-gray-500 hover:text-gray-800 transition font-medium">
               Sign out
             </button>
@@ -230,6 +273,40 @@ export default function DashboardPage() {
                             </svg>
                             Official resource
                           </a>
+                        )}
+
+                        {/* Due date */}
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Due date</span>
+                          <input
+                            type="date"
+                            value={task.due_date || ''}
+                            onChange={e => handleDueDateChange(task.id, e.target.value)}
+                            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                          />
+                          {task.due_date && (
+                            <button
+                              onClick={() => handleDueDateChange(task.id, '')}
+                              className="text-xs text-gray-400 hover:text-gray-600">
+                              Clear
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Calendar */}
+                        {task.due_date && (
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={googleCalendarUrl(task)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              Add to Google Calendar
+                            </a>
+                          </div>
                         )}
 
                         {/* Documents section */}

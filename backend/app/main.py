@@ -4,6 +4,10 @@ from app.config import settings
 from app.routes.health import router as health_router
 from app.routes.auth import router as auth_router
 from app.routes.checklist import router as checklist_router
+from app.routes.notifications import router as notifications_router
+from app.routes.reminders import router as reminders_router
+from app.routes.calendar import router as calendar_router
+from app.routes.documents import router as documents_router
 
 app = FastAPI(
     title="RelocationHub API",
@@ -25,6 +29,10 @@ app.add_middleware(
 app.include_router(health_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(checklist_router, prefix="/api")
+app.include_router(notifications_router, prefix="/api")
+app.include_router(reminders_router, prefix="/api")
+app.include_router(calendar_router, prefix="/api")
+app.include_router(documents_router, prefix="/api")
 
 @app.get("/")
 def root():

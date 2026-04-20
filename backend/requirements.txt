@@ -1,4 +1,5 @@
 annotated-doc==0.0.4
+resend
 annotated-types==0.7.0
 anthropic==0.95.0
 anyio==4.13.0

@@ -18,6 +18,8 @@ class OnboardingData(BaseModel):
     full_name: str
     origin_country: str
     move_date: str | None = None
+    contact_name: str | None = None
+    contact_email: str | None = None
 
 @router.post("/auth/onboard")
 async def onboard_user(data: OnboardingData):
@@ -30,6 +32,8 @@ async def onboard_user(data: OnboardingData):
             "origin_country": data.origin_country,
             "destination_country": "Netherlands",
             "move_date": data.move_date,
+            "contact_name": data.contact_name,
+            "contact_email": data.contact_email,
         }, on_conflict="id").execute()
 
         return {"message": "Profile upserted", "user_id": data.user_id}
