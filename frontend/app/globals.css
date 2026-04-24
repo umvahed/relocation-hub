@@ -9,3 +9,15 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+@keyframes confetti-float {
+  0%   { transform: translateY(0px) rotate(0deg) scale(1);   opacity: 1; }
+  80%  { opacity: 0.8; }
+  100% { transform: translateY(-140px) rotate(600deg) scale(0.2); opacity: 0; }
+}
+
+.confetti-piece {
+  animation: confetti-float 2.8s ease-out infinite;
+  pointer-events: none;
+  user-select: none;
+}

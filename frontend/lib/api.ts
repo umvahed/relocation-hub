@@ -66,6 +66,11 @@ export async function setDueDate(task_id: string, due_date: string) {
   return handleResponse(res)
 }
 
+export async function getProfile(user_id: string) {
+  const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`)
+  return handleResponse(res)
+}
+
 export async function getDocuments(user_id: string) {
   const res = await fetch(`${API_URL}/api/documents/${user_id}`)
   return handleResponse(res)

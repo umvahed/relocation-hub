@@ -286,6 +286,7 @@ User clicks "Continue with Google"
 ✅ Dashboard: category sections, expandable tasks, document upload per task
 ✅ Dashboard: non-critical sections locked (dimmed + pointer-events none) until all critical tasks completed
 ✅ Claude prompt fixed: employer applies to IND (not user); blocked task list prevents duplication; "critical" category reserved for hardcoded tasks only
+⚠️ Checklist generation is one-shot per user — if tasks already exist for a user, `/api/checklist/generate` returns early without regenerating. Changing onboarding answers after first generation has no effect on the task list. A "regenerate checklist" flow does not yet exist.
 ✅ force-dynamic on dashboard, onboarding, login pages (prevents Supabase prerender error at build time)
 ✅ Vercel cron keepalive — pings /api/health every 5 min to prevent Railway cold starts
 ✅ Inter font, mobile-responsive, clean minimal UI

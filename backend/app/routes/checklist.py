@@ -151,14 +151,34 @@ async def generate_checklist(request: GenerateChecklistRequest):
         _check_and_increment_usage(supabase, request.user_id)
 
         conditional_notes = []
+
+        # Pets
         if request.has_pets:
-            conditional_notes.append("- The user is bringing pets — include: EU pet passport or third-country health certificate, rabies vaccination and titre test (done 30+ days before travel), microchip registration, NVWA import notification, and airline pet policy research.")
+            conditional_notes.append("- The user IS bringing pets — include: EU pet passport or third-country health certificate, rabies vaccination and titre test (done 30+ days before travel), microchip registration, NVWA import notification, and airline pet policy research.")
+        else:
+            conditional_notes.append("- The user is NOT bringing pets — do NOT include any pet relocation tasks.")
+
+        # Shipping
         if request.shipping_type == "container":
             conditional_notes.append("- The user is shipping a container — include: packing inventory list, container/removal company booking, customs declaration (T2L form), port of entry clearance, Dutch customs (Douane) registration, and final delivery coordination.")
         else:
-            conditional_notes.append("- The user is bringing luggage only — include: deciding what to sell/store/donate, and checking airline baggage allowance and excess baggage costs.")
+            conditional_notes.append("- The user is bringing luggage only — include: deciding what to sell/store/donate, and checking airline baggage allowance and excess baggage costs. Do NOT include container shipping tasks.")
+
+        # Relocation allowance
         if request.has_relocation_allowance:
             conditional_notes.append("- The user has an employer relocation/housing allowance — include: confirming allowance amount and tax treatment (30% ruling interaction), keeping all receipts, and submitting expense claims to HR.")
+        else:
+            conditional_notes.append("- The user does NOT have an employer relocation allowance — do not include tasks about claiming or submitting relocation expenses to HR.")
+
+        # Employment type
+        if request.employment_type == "employed":
+            conditional_notes.append("- The user is moving for employment (salaried) — include 30% ruling enquiry if applicable (highly skilled migrant), payroll onboarding, and employment contract review. The employer submits the IND application.")
+        elif request.employment_type == "self_employed":
+            conditional_notes.append("- The user is self-employed/freelancing — include tasks for registering with KVK (Dutch Chamber of Commerce), obtaining a VAT number (BTW), and understanding ZZP tax obligations. Do NOT include employer-driven tasks like 30% ruling or TEV. The user will need to apply for a self-employment residence permit (zelfstandige) — note that the employer does NOT file on their behalf.")
+        elif request.employment_type == "student":
+            conditional_notes.append("- The user is moving as a student — include tasks for university/institution enrollment confirmation, student residence permit (applied for by the institution on their behalf), arranging student accommodation, and opening a student bank account. Do NOT include employment-related tasks like 30% ruling, payroll, or employer onboarding.")
+        elif request.employment_type == "family":
+            conditional_notes.append("- The user is moving for family reunification — include tasks for the family reunification residence permit (applied by the Dutch resident sponsor), obtaining an MVV if required, and registering at gemeente after arrival. Do NOT include employment or student-specific tasks.")
 
         conditional_block = "\n".join(conditional_notes) if conditional_notes else ""
 

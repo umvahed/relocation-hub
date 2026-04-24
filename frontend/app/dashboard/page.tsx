@@ -2,22 +2,90 @@
 export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import { getChecklist, updateTask, getUsage, setDueDate } from '@/lib/api'
+import { getChecklist, updateTask, getUsage, setDueDate, getProfile } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 
 const SECTION_ORDER = ['critical', 'visa', 'admin', 'employment', 'housing', 'banking', 'healthcare', 'transport', 'shipping', 'pets']
 
-const SECTION_META: Record<string, { label: string; color: string; text: string }> = {
-  critical:   { label: 'Critical — Required First', color: 'bg-rose-50',   text: 'text-rose-700'   },
-  visa:       { label: 'Visa & Immigration',         color: 'bg-red-50',    text: 'text-red-700'    },
-  admin:      { label: 'Administration',        color: 'bg-gray-100',   text: 'text-gray-700'   },
-  employment: { label: 'Employment',            color: 'bg-purple-50',  text: 'text-purple-700' },
-  housing:    { label: 'Housing',               color: 'bg-blue-50',    text: 'text-blue-700'   },
-  banking:    { label: 'Banking & Finance',     color: 'bg-emerald-50', text: 'text-emerald-700'},
-  healthcare: { label: 'Healthcare',            color: 'bg-pink-50',    text: 'text-pink-700'   },
-  transport:  { label: 'Transport',             color: 'bg-amber-50',   text: 'text-amber-700'  },
-  shipping:   { label: 'Shipping & Logistics',  color: 'bg-orange-50',  text: 'text-orange-700' },
-  pets:       { label: 'Pet Relocation',        color: 'bg-lime-50',    text: 'text-lime-700'   },
+const SECTION_META: Record<string, { label: string; color: string; text: string; border: string }> = {
+  critical:   { label: 'Critical — Required First', color: 'bg-rose-50',   text: 'text-rose-700',   border: 'border-rose-400'   },
+  visa:       { label: 'Visa & Immigration',         color: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-400'    },
+  admin:      { label: 'Administration',             color: 'bg-gray-100',  text: 'text-gray-700',   border: 'border-gray-400'   },
+  employment: { label: 'Employment',                 color: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-400' },
+  housing:    { label: 'Housing',                    color: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-400'   },
+  banking:    { label: 'Banking & Finance',          color: 'bg-emerald-50',text: 'text-emerald-700',border: 'border-emerald-400'},
+  healthcare: { label: 'Healthcare',                 color: 'bg-pink-50',   text: 'text-pink-700',   border: 'border-pink-400'   },
+  transport:  { label: 'Transport',                  color: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-400'  },
+  shipping:   { label: 'Shipping & Logistics',       color: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-400' },
+  pets:       { label: 'Pet Relocation',             color: 'bg-lime-50',   text: 'text-lime-700',   border: 'border-lime-400'   },
+}
+
+function CountdownBanner({ moveDate }: { moveDate: string }) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const move = new Date(moveDate); move.setHours(0, 0, 0, 0)
+  const daysLeft = Math.round((move.getTime() - today.getTime()) / 86400000)
+  const formattedDate = move.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  if (daysLeft < 0) {
+    return (
+      <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3.5 flex items-center gap-3">
+        <span className="text-xl flex-shrink-0">🌷</span>
+        <div>
+          <p className="text-sm font-semibold text-emerald-800">Welcome to the Netherlands!</p>
+          <p className="text-xs text-emerald-600 mt-0.5">
+            You moved {Math.abs(daysLeft)} day{Math.abs(daysLeft) !== 1 ? 's' : ''} ago — keep ticking off the list.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (daysLeft === 0) {
+    const pieces = ['🎉', '🇳🇱', '🌷', '✈️', '🎊', '🎈', '⭐', '🥳']
+    return (
+      <div className="relative overflow-hidden bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl px-5 py-6 text-white text-center">
+        {pieces.map((emoji, i) => (
+          <span
+            key={i}
+            className="confetti-piece absolute text-2xl"
+            style={{ left: `${5 + i * 12}%`, bottom: '8px', animationDelay: `${i * 0.35}s`, animationDuration: `${2.4 + (i % 3) * 0.4}s` }}
+          >
+            {emoji}
+          </span>
+        ))}
+        <p className="text-2xl font-bold mb-1">Today's the day! 🎉</p>
+        <p className="text-sm opacity-90">Welcome to the Netherlands — your new chapter starts now.</p>
+      </div>
+    )
+  }
+
+  const urgency = daysLeft <= 7 ? 'rose' : daysLeft <= 30 ? 'amber' : 'indigo'
+  const styles = {
+    rose:   'bg-rose-50 border-rose-200 text-rose-800',
+    amber:  'bg-amber-50 border-amber-200 text-amber-800',
+    indigo: 'bg-indigo-50 border-indigo-200 text-indigo-800',
+  }
+  const numStyles = {
+    rose:   'text-rose-600',
+    amber:  'text-amber-600',
+    indigo: 'text-indigo-600',
+  }
+
+  return (
+    <div className={`${styles[urgency]} border rounded-2xl px-4 py-3.5 flex items-center justify-between gap-4`}>
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="text-xl flex-shrink-0">✈️</span>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide opacity-60">Moving to the Netherlands</p>
+          <p className="text-sm font-medium truncate">{formattedDate}</p>
+        </div>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <p className={`text-3xl font-bold leading-none ${numStyles[urgency]}`}>{daysLeft}</p>
+        <p className="text-xs font-medium opacity-60 mt-0.5">day{daysLeft !== 1 ? 's' : ''} to go</p>
+      </div>
+    </div>
+  )
 }
 
 export default function DashboardPage() {
@@ -28,6 +96,7 @@ export default function DashboardPage() {
   const [taskDocs, setTaskDocs] = useState<Record<string, any[]>>({})
   const [uploading, setUploading] = useState<string | null>(null)
   const [usage, setUsage] = useState<{ call_count: number; limit: number } | null>(null)
+  const [profile, setProfile] = useState<{ move_date?: string } | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -38,6 +107,7 @@ export default function DashboardPage() {
       const result = await getChecklist(data.user.id)
       setTasks(result.tasks || [])
       getUsage(data.user.id).then(setUsage).catch(() => null)
+      getProfile(data.user.id).then(setProfile).catch(() => null)
       setLoading(false)
     })
   }, [])
@@ -173,6 +243,9 @@ export default function DashboardPage() {
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
 
+        {/* Move countdown */}
+        {profile?.move_date && <CountdownBanner moveDate={profile.move_date} />}
+
         {/* Progress */}
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
           <div className="flex justify-between items-center mb-3">
@@ -188,6 +261,18 @@ export default function DashboardPage() {
               style={{ width: `${progress}%` }}
             />
           </div>
+          {progress === 100 && (
+            <p className="text-xs text-emerald-600 font-medium mt-2">You're fully settled in — great work!</p>
+          )}
+          {progress >= 75 && progress < 100 && (
+            <p className="text-xs text-indigo-500 mt-2">Almost there — just a few tasks left.</p>
+          )}
+          {progress >= 50 && progress < 75 && (
+            <p className="text-xs text-indigo-500 mt-2">Halfway through your relocation plan.</p>
+          )}
+          {progress >= 25 && progress < 50 && (
+            <p className="text-xs text-gray-400 mt-2">Good start — keep the momentum going.</p>
+          )}
         </div>
 
         {/* Category sections */}
@@ -195,7 +280,7 @@ export default function DashboardPage() {
           const locked = cat !== 'critical' && !criticalAllDone
           return (
           <div key={cat} className={locked ? 'opacity-50 pointer-events-none select-none' : ''}>
-            <div className="flex items-center gap-2 mb-3">
+            <div className={`flex items-center gap-2 mb-3 border-l-4 ${meta.border} pl-3`}>
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${meta.color} ${meta.text}`}>
                 {meta.label}
               </span>
@@ -218,8 +303,8 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={task.id}
-                    className={`bg-white rounded-xl border transition-all ${
-                      expanded ? 'border-indigo-200 shadow-sm' : done ? 'border-gray-100 opacity-60' : 'border-gray-100 hover:border-gray-200'
+                    className={`rounded-xl border transition-all ${
+                      expanded ? 'bg-white border-indigo-200 shadow-sm' : done ? 'bg-emerald-50/40 border-emerald-100 opacity-70' : 'bg-white border-gray-100 hover:border-gray-200'
                     }`}>
 
                     {/* Task row */}

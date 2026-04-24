@@ -19,7 +19,7 @@ export default function Home() {
       </nav>
 
       {/* Hero */}
-      <section className="max-w-5xl mx-auto px-5 pt-20 pb-16 text-center">
+      <section className="bg-gradient-to-b from-indigo-50/60 to-white max-w-5xl mx-auto px-5 pt-20 pb-16 text-center rounded-3xl mt-4">
         <div className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 text-sm font-medium px-3 py-1 rounded-full mb-6">
           <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
           Built for expats moving to the Netherlands
@@ -50,23 +50,38 @@ export default function Home() {
               title: 'AI Checklist',
               desc: 'Personalised, correctly-sequenced checklist based on your country, visa type, and situation. MVV to BSN — nothing missed.',
               color: 'bg-indigo-50',
-              dot: 'bg-indigo-500',
+              iconColor: 'text-indigo-500',
+              icon: (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+              ),
             },
             {
               title: 'Document Hub',
               desc: 'Upload and organise all your documents in one place. AI checks them before you submit to IND or gemeente.',
               color: 'bg-emerald-50',
-              dot: 'bg-emerald-500',
+              iconColor: 'text-emerald-500',
+              icon: (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              ),
             },
             {
               title: 'Smart Reminders',
               desc: 'Get notified before deadlines. Track IND appointments, BSN registration, DigiD, and health insurance.',
               color: 'bg-amber-50',
-              dot: 'bg-amber-500',
+              iconColor: 'text-amber-500',
+              icon: (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              ),
             },
           ].map((f) => (
-            <div key={f.title} className={`${f.color} rounded-2xl p-6`}>
-              <div className={`w-2 h-2 rounded-full ${f.dot} mb-4`}></div>
+            <div key={f.title} className={`${f.color} rounded-2xl p-6 border border-black/5`}>
+              <div className={`${f.iconColor} mb-4`}>{f.icon}</div>
               <h3 className="text-base font-semibold text-gray-900 mb-2">{f.title}</h3>
               <p className="text-sm text-gray-600 leading-relaxed">{f.desc}</p>
             </div>
