@@ -51,3 +51,29 @@ async def get_profile(user_id: str):
         return result.data[0]
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/auth/profile/{user_id}")
+async def delete_account(user_id: str):
+    try:
+        supabase = get_supabase()
+
+        # Delete storage files first
+        docs = supabase.table("documents").select("file_path").eq("user_id", user_id).execute()
+        if docs.data:
+            paths = [d["file_path"] for d in docs.data if d.get("file_path")]
+            if paths:
+                supabase.storage.from_("documents").remove(paths)
+
+        # Delete all user data in order
+        supabase.table("documents").delete().eq("user_id", user_id).execute()
+        supabase.table("tasks").delete().eq("user_id", user_id).execute()
+        supabase.table("api_usage").delete().eq("user_id", user_id).execute()
+        supabase.table("profiles").delete().eq("id", user_id).execute()
+
+        # Delete auth user (requires service key)
+        supabase.auth.admin.delete_user(user_id)
+
+        return {"message": "Account deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

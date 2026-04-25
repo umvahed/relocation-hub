@@ -1,8 +1,8 @@
 'use client'
 export const dynamic = 'force-dynamic'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { getChecklist, updateTask, getUsage, setDueDate, getProfile } from '@/lib/api'
+import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 
 const SECTION_ORDER = ['critical', 'visa', 'admin', 'employment', 'housing', 'banking', 'healthcare', 'transport', 'shipping', 'pets']
@@ -96,7 +96,11 @@ export default function DashboardPage() {
   const [taskDocs, setTaskDocs] = useState<Record<string, any[]>>({})
   const [uploading, setUploading] = useState<string | null>(null)
   const [usage, setUsage] = useState<{ call_count: number; limit: number } | null>(null)
-  const [profile, setProfile] = useState<{ move_date?: string } | null>(null)
+  const [profile, setProfile] = useState<{ move_date?: string; full_name?: string; contact_name?: string; contact_email?: string } | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const settingsRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -172,6 +176,30 @@ export default function DashboardPage() {
     router.push('/')
   }
 
+  const handleDeleteAccount = async () => {
+    if (!user) return
+    setDeletingAccount(true)
+    try {
+      await deleteAccount(user.id)
+      await supabase.auth.signOut()
+      router.push('/')
+    } catch {
+      setDeletingAccount(false)
+      setDeleteConfirm(false)
+    }
+  }
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setShowSettings(false)
+        setDeleteConfirm(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   const completed = tasks.filter(t => t.status === 'completed').length
   const progress = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'there'
@@ -203,8 +231,7 @@ export default function DashboardPage() {
           <div className="text-base font-semibold tracking-tight text-gray-900">
             Relocation<span className="text-indigo-600">Hub</span>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="hidden sm:block text-sm text-gray-400">Hi, {firstName}</span>
+          <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/documents')}
               className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
@@ -225,18 +252,114 @@ export default function DashboardPage() {
             )}
             {usage && (
               <span className={`hidden sm:block text-xs font-medium px-2.5 py-1 rounded-full ${
-                usage.call_count >= usage.limit
-                  ? 'bg-red-50 text-red-600'
-                  : usage.call_count >= usage.limit - 1
-                  ? 'bg-amber-50 text-amber-600'
+                usage.call_count >= usage.limit ? 'bg-red-50 text-red-600'
+                  : usage.call_count >= usage.limit - 1 ? 'bg-amber-50 text-amber-600'
                   : 'bg-gray-100 text-gray-500'
               }`}>
-                {usage.call_count}/{usage.limit} AI calls today
+                {usage.call_count}/{usage.limit} AI calls
               </span>
             )}
-            <button onClick={signOut} className="text-sm text-gray-500 hover:text-gray-800 transition font-medium">
-              Sign out
-            </button>
+
+            {/* Settings menu */}
+            <div className="relative" ref={settingsRef}>
+              <button
+                onClick={() => { setShowSettings(s => !s); setDeleteConfirm(false) }}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition ${showSettings ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+
+              {showSettings && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 z-30 overflow-hidden">
+
+                  {/* User */}
+                  <div className="px-4 pt-4 pb-3 border-b border-gray-50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-sm font-bold text-indigo-600 flex-shrink-0">
+                        {firstName[0]?.toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{profile?.full_name || firstName}</p>
+                        <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Profile details */}
+                  <div className="px-4 py-3 border-b border-gray-50 space-y-2">
+                    {profile?.move_date ? (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500">Moving date</span>
+                        <span className="text-xs font-medium text-gray-700">
+                          {new Date(profile.move_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-amber-600">No move date set — expand a task to add due dates.</p>
+                    )}
+                    {profile?.contact_name && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500">HR contact</span>
+                        <span className="text-xs font-medium text-gray-700 truncate ml-4 max-w-[160px]">{profile.contact_name}</span>
+                      </div>
+                    )}
+                    {profile?.contact_email && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500">Contact email</span>
+                        <span className="text-xs font-medium text-gray-700 truncate ml-4 max-w-[160px]">{profile.contact_email}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Support + sign out */}
+                  <div className="px-4 py-3 border-b border-gray-50 space-y-2">
+                    <a href="mailto:support@relocationhub.app"
+                      className="flex items-center gap-2 text-xs text-gray-500 hover:text-indigo-600 transition">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      support@relocationhub.app
+                    </a>
+                    <button onClick={signOut}
+                      className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-800 transition w-full text-left">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Sign out
+                    </button>
+                  </div>
+
+                  {/* Delete account */}
+                  <div className="px-4 py-3">
+                    {!deleteConfirm ? (
+                      <button onClick={() => setDeleteConfirm(true)}
+                        className="flex items-center gap-2 text-xs text-red-400 hover:text-red-600 transition w-full text-left">
+                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete account
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs text-red-600 font-medium">Permanently deletes all your data. Cannot be undone.</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => setDeleteConfirm(false)}
+                            className="flex-1 text-xs py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition">
+                            Cancel
+                          </button>
+                          <button onClick={handleDeleteAccount} disabled={deletingAccount}
+                            className="flex-1 text-xs py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition">
+                            {deletingAccount ? 'Deleting…' : 'Yes, delete'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>

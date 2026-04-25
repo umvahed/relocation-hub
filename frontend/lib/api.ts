@@ -71,6 +71,11 @@ export async function getProfile(user_id: string) {
   return handleResponse(res)
 }
 
+export async function deleteAccount(user_id: string) {
+  const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`, { method: 'DELETE' })
+  return handleResponse(res)
+}
+
 export async function getDocuments(user_id: string) {
   const res = await fetch(`${API_URL}/api/documents/${user_id}`)
   return handleResponse(res)

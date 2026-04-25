@@ -125,6 +125,9 @@ export default function Home() {
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2 text-sm text-gray-400">
           <span>Relocation<span className="text-indigo-600">Hub</span></span>
           <span>Built for expats moving to the Netherlands</span>
+          <a href="mailto:support@relocationhub.app" className="hover:text-indigo-600 transition">
+            support@relocationhub.app
+          </a>
         </div>
       </footer>
 

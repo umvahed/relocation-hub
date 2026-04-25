@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import { onboardUser, generateChecklist } from '@/lib/api'
+import { onboardUser, generateChecklist, getChecklist } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 
 const COUNTRIES = [
@@ -30,11 +30,11 @@ export default function OnboardingPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        router.push('/login')
-        return
-      }
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) { router.push('/login'); return }
+      // Already onboarded — skip the form
+      const existing = await getChecklist(data.user.id).catch(() => null)
+      if (existing?.tasks?.length > 0) { router.push('/dashboard'); return }
       setUser(data.user)
       setForm(f => ({ ...f, full_name: data.user.user_metadata?.full_name || '' }))
     })
@@ -211,10 +211,11 @@ export default function OnboardingPage() {
             <input
               type="date"
               value={form.move_date}
+              min={new Date().toISOString().split('T')[0]}
               onChange={e => setForm(f => ({ ...f, move_date: e.target.value }))}
               className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
             />
-            <p className="text-sm text-gray-400 mb-6">Don't know yet? You can skip this and update later.</p>
+            <p className="text-sm text-gray-400 mb-6">Don't know yet? Skip this — you can set it from your dashboard later.</p>
             <div className="flex gap-3">
               <button onClick={() => setStep(3)}
                 className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition">
