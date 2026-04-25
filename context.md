@@ -225,18 +225,28 @@ created_at
 
 | Route | File | What it does |
 |---|---|---|
-| `/` | `app/page.tsx` | Landing page — clean minimal design, hero, features, pricing |
-| `/login` | `app/login/page.tsx` | Google OAuth sign-in |
-| `/auth/callback` | `app/auth/callback/route.ts` | Exchanges OAuth code for session cookie |
-| `/onboarding` | `app/onboarding/page.tsx` | 4-step form: name → country/employment → logistics (pets/shipping/allowance) → move date |
-| `/dashboard` | `app/dashboard/page.tsx` | Category-grouped checklist, expandable tasks, document upload per task |
+| `/` | `app/page.tsx` | Landing page — hero gradient, feature icons, pricing, support email in footer |
+| `/login` | `app/login/page.tsx` | Sign in / Create account tabs (email+password) + Google OAuth; forgot password flow |
+| `/auth/callback` | `app/auth/callback/route.ts` | Exchanges code for session; routes to /dashboard (existing user) or /onboarding (new user) |
+| `/auth/reset-password` | `app/auth/reset-password/page.tsx` | Handles PKCE + implicit password reset token; lets user set new password |
+| `/onboarding` | `app/onboarding/page.tsx` | 5-step form; guards against already-onboarded users (redirects to dashboard) |
+| `/dashboard` | `app/dashboard/page.tsx` | Checklist, countdown banner, settings gear menu, delete account |
+| `/documents` | `app/documents/page.tsx` | All uploaded documents grouped by category |
 
 **Dashboard behaviour:**
-- Tasks grouped by category in fixed order (critical first)
-- Click any task to expand: shows full description, official resource link, document upload
-- Document upload via Supabase Storage — files attached to specific tasks
-- Sign out button in sticky header
-- Progress bar showing % of tasks completed
+- Tasks grouped by category in fixed order (critical first) with colour-coded left-border accents
+- Sections locked (dimmed) until all critical tasks are ticked off
+- Click any task to expand: description, official link, due date picker, Google Calendar add, document upload
+- Move-date countdown banner: urgency colour shifts (indigo → amber → rose), celebration state on move day
+- Progress bar with milestone messages at 25 / 50 / 75 / 100%
+- Settings gear menu (top-right): profile info, HR contact, support email, sign out, delete account (two-step confirm)
+
+**Auth flows:**
+- Google OAuth → `/auth/callback` → dashboard or onboarding
+- Email sign-up → Supabase verification email → `/auth/callback` → onboarding
+- Email sign-in → profile check → dashboard or onboarding
+- Forgot password → reset email → `/auth/reset-password` → new password form → dashboard
+- Returning users always land on `/dashboard` (callback + onboarding guard both check for existing profile/tasks)
 
 **Lib files:**
 - `lib/supabase.ts` — Browser Supabase client (for auth)
@@ -266,12 +276,20 @@ git push origin main
 ### Auth Flow
 
 ```
-User clicks "Continue with Google"
-        → Supabase Google OAuth
-        → /auth/callback exchanges code for session
-        → redirect to /onboarding
-        → 4-step form → POST to FastAPI → hardcoded critical tasks + Claude checklist generated
-        → redirect to /dashboard
+New user (Google):
+  Sign in with Google → /auth/callback → no profile found → /onboarding
+  → 5-step form → POST /api/auth/onboard + POST /api/checklist/generate → /dashboard
+
+New user (email):
+  Create account → Supabase sends verification email → user clicks link
+  → /auth/callback → no profile found → /onboarding → same as above
+
+Returning user (any method):
+  Sign in → /auth/callback (or browser client) → profile found → /dashboard
+
+Password reset:
+  Forgot password → reset email → /auth/reset-password?code=xxx
+  → exchangeCodeForSession → new password form → /dashboard
 ```
 
 ---
@@ -280,22 +298,30 @@ User clicks "Continue with Google"
 
 ✅ Backend live on Railway (FastAPI) — only service on Railway
 ✅ Frontend live on Vercel (Next.js) — only frontend host, Railway frontend service deleted
-✅ Google OAuth working end-to-end
-✅ 4-step onboarding with logistics questions (pets, shipping, allowance)
+✅ Google OAuth + email/password auth (sign up, sign in, forgot password, reset password)
+✅ Auth callback smart-routes: returning users → dashboard, new users → onboarding
+✅ Onboarding guards against re-entry (already-onboarded users skip to dashboard)
+✅ Move date validation: min=today enforced on the date input
+✅ 5-step onboarding with logistics questions (pets, shipping, allowance, HR contact)
 ✅ Checklist generation: hardcoded SA VFS prerequisites (priority 100) + SA document tasks (priority 90) + Claude AI tasks
-✅ Dashboard: category sections, expandable tasks, document upload per task
-✅ Dashboard: non-critical sections locked (dimmed + pointer-events none) until all critical tasks completed
-✅ Claude prompt fixed: employer applies to IND (not user); blocked task list prevents duplication; "critical" category reserved for hardcoded tasks only
-⚠️ Checklist generation is one-shot per user — if tasks already exist for a user, `/api/checklist/generate` returns early without regenerating. Changing onboarding answers after first generation has no effect on the task list. A "regenerate checklist" flow does not yet exist.
-✅ force-dynamic on dashboard, onboarding, login pages (prevents Supabase prerender error at build time)
+✅ Claude prompt: explicit conditional notes for all 4 employment types, has_pets false guard, shipping/allowance false-case guards
+✅ Dashboard: category sections with left-border colour accents, expandable tasks, document upload per task
+✅ Dashboard: non-critical sections locked until all critical tasks completed
+✅ Dashboard: move-date countdown banner (urgency colours + celebration state on move day)
+✅ Dashboard: progress bar with milestone messages at 25/50/75/100%
+✅ Dashboard: settings gear menu — profile info, HR contact, support email, sign out, delete account
+✅ Delete account: wipes tasks, documents (storage + DB), api_usage, profile, and auth user
+✅ Support email (support@relocationhub.app) in footer and settings menu
+✅ force-dynamic on all pages that touch Supabase
 ✅ Vercel cron keepalive — pings /api/health every 5 min to prevent Railway cold starts
-✅ Inter font, mobile-responsive, clean minimal UI
+⚠️ Checklist is one-shot per user — changing onboarding answers after generation has no effect. No regenerate flow yet.
 ⚠️ Supabase Storage bucket `documents` must be manually created with RLS policies
 🔲 Stripe billing not yet wired
 🔲 Email reminders not yet built
-🔲 Calendar integration (Google Cal / iCal for appointments)
+🔲 /auth/reset-password needs `https://relocation-hub.vercel.app/auth/reset-password` added to Supabase Redirect URLs allowlist
+🔲 Calendar integration (Google Cal / iCal) — iCal feed exists, one-click Google Cal add exists per task
 🔲 Admin portal
-🔲 Phase labels (pre-arrival / arrival / post-arrival) — needs DB column added
+🔲 Phase labels (pre-arrival / arrival / post-arrival)
 
 ---
 
