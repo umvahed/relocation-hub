@@ -123,13 +123,13 @@ export default function DocumentsPage() {
   const isPaid = profile?.tier === 'paid'
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
       <p className="text-sm text-indigo-600 animate-pulse font-medium">Loading documents...</p>
     </div>
   )
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {consentPending && user && (
         <AiConsentModal
           userId={user.id}
@@ -138,46 +138,46 @@ export default function DocumentsPage() {
         />
       )}
 
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
+      <header className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3.5 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-500 hover:text-gray-800 transition font-medium">
+            <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition font-medium">
               ← Dashboard
             </button>
-            <div className="text-base font-semibold tracking-tight text-gray-900">
+            <div className="text-base font-semibold tracking-tight text-gray-900 dark:text-white">
               Relocation<span className="text-indigo-600">Hub</span>
-              <span className="text-gray-400 font-normal ml-2 text-sm">/ Documents</span>
+              <span className="text-gray-400 dark:text-gray-500 font-normal ml-2 text-sm">/ Documents</span>
             </div>
           </div>
-          <span className="text-xs text-gray-400">{docs.length} file{docs.length !== 1 ? 's' : ''}</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">{docs.length} file{docs.length !== 1 ? 's' : ''}</span>
         </div>
       </header>
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
         {!isPaid && docs.length > 0 && (
-          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3.5 flex items-center gap-3">
+          <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-2xl px-4 py-3.5 flex items-center gap-3">
             <span className="text-xl flex-shrink-0">✨</span>
             <div>
-              <p className="text-sm font-semibold text-indigo-800">Unlock AI document validation</p>
-              <p className="text-xs text-indigo-600 mt-0.5">Upgrade to paid plan to validate documents against IND 2025 requirements. <span className="font-medium">Coming soon.</span></p>
+              <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">Unlock AI document validation</p>
+              <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">Upgrade to paid plan to validate documents against IND 2025 requirements. <span className="font-medium">Coming soon.</span></p>
             </div>
           </div>
         )}
 
         {docs.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-12 text-center">
             <div className="text-4xl mb-3">📁</div>
-            <p className="text-gray-500 text-sm">No documents uploaded yet.</p>
-            <p className="text-gray-400 text-xs mt-1">Attach files to tasks from your dashboard.</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">No documents uploaded yet.</p>
+            <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">Attach files to tasks from your dashboard.</p>
           </div>
         ) : (
           Object.entries(grouped).map(([category, categoryDocs]) => (
             <div key={category}>
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 capitalize">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 capitalize">
                   {category}
                 </span>
-                <span className="text-xs text-gray-400">{categoryDocs.length} file{categoryDocs.length !== 1 ? 's' : ''}</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">{categoryDocs.length} file{categoryDocs.length !== 1 ? 's' : ''}</span>
               </div>
               <div className="space-y-2">
                 {categoryDocs.map(doc => {
@@ -185,13 +185,13 @@ export default function DocumentsPage() {
                   const canValidate = isPaid && VALIDATABLE_TYPES.has(doc.mime_type)
                   const isValidating = validating === doc.id
                   return (
-                    <div key={doc.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3 space-y-2">
+                    <div key={doc.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 px-4 py-3 space-y-2">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
                           <span className="text-xl flex-shrink-0">{MIME_ICONS[doc.mime_type] || '📎'}</span>
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{doc.file_name}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{doc.file_name}</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                               {formatBytes(doc.file_size)} · {formatDate(doc.created_at)}
                             </p>
                           </div>
@@ -201,20 +201,20 @@ export default function DocumentsPage() {
                             <button
                               onClick={() => triggerValidation(doc.id)}
                               disabled={isValidating}
-                              className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition px-3 py-1.5 rounded-lg hover:bg-indigo-50 disabled:opacity-40"
+                              className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition px-3 py-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 disabled:opacity-40"
                             >
                               {isValidating ? 'Validating…' : validation ? 'Re-validate' : 'Validate'}
                             </button>
                           )}
                           <button
                             onClick={() => openFile(doc.file_path)}
-                            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition px-3 py-1.5 rounded-lg hover:bg-indigo-50">
+                            className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition px-3 py-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30">
                             View
                           </button>
                           <button
                             onClick={() => handleDelete(doc.id)}
                             disabled={deleting === doc.id}
-                            className="text-xs font-medium text-red-400 hover:text-red-600 transition px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-40">
+                            className="text-xs font-medium text-red-400 dark:text-red-500 hover:text-red-600 dark:hover:text-red-400 transition px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40">
                             {deleting === doc.id ? '...' : 'Delete'}
                           </button>
                         </div>

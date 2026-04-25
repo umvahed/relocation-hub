@@ -80,20 +80,20 @@ export default function LoginPage() {
     setLoading(false)
   }
 
-  const inputClass = 'w-full border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500'
+  const inputClass = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500'
   const primaryBtn = 'w-full bg-indigo-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50'
 
   // ── Check your email ──────────────────────────────────────────────
   if (mode === 'check-email') {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl p-8 shadow-lg w-full max-w-md text-center">
+      <main className="min-h-screen bg-gradient-to-br from-blue-50 dark:from-gray-900 to-indigo-100 dark:to-gray-800 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg w-full max-w-md text-center">
           <div className="text-4xl mb-3">✉️</div>
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Check your email</h1>
-          <p className="text-sm text-gray-500 mb-1">We sent a link to</p>
-          <p className="text-sm font-semibold text-gray-800 mb-4">{email}</p>
-          <p className="text-sm text-gray-500 mb-6">Click it to continue. Check your spam folder if it doesn't arrive within a minute.</p>
-          <button onClick={() => reset('signin')} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Check your email</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">We sent a link to</p>
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">{email}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Click it to continue. Check your spam folder if it doesn't arrive within a minute.</p>
+          <button onClick={() => reset('signin')} className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium transition">
             ← Back to sign in
           </button>
         </div>
@@ -104,16 +104,16 @@ export default function LoginPage() {
   // ── Forgot password ───────────────────────────────────────────────
   if (mode === 'forgot') {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl p-8 shadow-lg w-full max-w-md">
-          <button onClick={() => reset('signin')} className="text-xs text-gray-400 hover:text-gray-600 transition mb-5 flex items-center gap-1">
+      <main className="min-h-screen bg-gradient-to-br from-blue-50 dark:from-gray-900 to-indigo-100 dark:to-gray-800 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg w-full max-w-md">
+          <button onClick={() => reset('signin')} className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition mb-5 flex items-center gap-1">
             ← Back to sign in
           </button>
           <div className="text-3xl mb-3">🔑</div>
-          <h1 className="text-xl font-bold text-gray-900 mb-1">Reset your password</h1>
-          <p className="text-sm text-gray-500 mb-6">Enter your email and we'll send a reset link.</p>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Reset your password</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Enter your email and we'll send a reset link.</p>
 
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-2.5 mb-4">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl px-4 py-2.5 mb-4">{error}</p>}
 
           <form onSubmit={handleForgotPassword} className="space-y-3">
             <input type="email" placeholder="Email address" value={email}
@@ -129,29 +129,29 @@ export default function LoginPage() {
 
   // ── Sign in / Sign up ─────────────────────────────────────────────
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl p-8 shadow-lg w-full max-w-md">
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 dark:from-gray-900 to-indigo-100 dark:to-gray-800 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg w-full max-w-md">
 
         <div className="text-center mb-6">
           <div className="text-3xl mb-2">🇳🇱</div>
-          <h1 className="text-xl font-bold text-gray-900">Welcome to RelocationHub</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Welcome to RelocationHub</h1>
         </div>
 
         {/* Tabs */}
-        <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
+        <div className="flex bg-gray-100 dark:bg-gray-700 rounded-xl p-1 mb-6">
           <button
             onClick={() => reset('signin')}
-            className={`flex-1 text-sm font-medium py-2 rounded-lg transition ${mode === 'signin' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            className={`flex-1 text-sm font-medium py-2 rounded-lg transition ${mode === 'signin' ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
             Sign in
           </button>
           <button
             onClick={() => reset('signup')}
-            className={`flex-1 text-sm font-medium py-2 rounded-lg transition ${mode === 'signup' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            className={`flex-1 text-sm font-medium py-2 rounded-lg transition ${mode === 'signup' ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
             Create account
           </button>
         </div>
 
-        {error && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-2.5 mb-4">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl px-4 py-2.5 mb-4">{error}</p>}
 
         <form onSubmit={mode === 'signin' ? handleSignIn : handleSignUp} className="space-y-3">
           <input type="email" placeholder="Email address" value={email}
@@ -170,25 +170,25 @@ export default function LoginPage() {
 
         {mode === 'signin' && (
           <button onClick={() => reset('forgot')}
-            className="text-xs text-gray-400 hover:text-indigo-600 transition mt-3 block w-full text-center">
+            className="text-xs text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition mt-3 block w-full text-center">
             Forgot password?
           </button>
         )}
 
         {/* Divider */}
         <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-xs text-gray-400">or</span>
-          <div className="flex-1 h-px bg-gray-200" />
+          <div className="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
+          <span className="text-xs text-gray-400 dark:text-gray-500">or</span>
+          <div className="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
         </div>
 
         <button onClick={handleGoogleLogin}
-          className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-xl py-3 px-6 hover:bg-gray-50 transition text-sm font-medium text-gray-700">
+          className="w-full flex items-center justify-center gap-3 border border-gray-300 dark:border-gray-600 rounded-xl py-3 px-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition text-sm font-medium text-gray-700 dark:text-gray-200">
           <GoogleIcon />
           Continue with Google
         </button>
 
-        <p className="text-xs text-gray-400 mt-5 text-center">
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-5 text-center">
           By continuing, you agree to our Terms of Service and Privacy Policy.
         </p>
       </div>

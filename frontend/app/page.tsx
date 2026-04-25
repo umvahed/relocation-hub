@@ -2,12 +2,12 @@ import Link from 'next/link'
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-white dark:bg-gray-900">
 
       {/* Nav */}
-      <nav className="border-b border-gray-100">
+      <nav className="border-b border-gray-100 dark:border-gray-800">
         <div className="max-w-5xl mx-auto px-5 py-4 flex justify-between items-center">
-          <div className="text-lg font-semibold tracking-tight text-gray-900">
+          <div className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
             Relocation<span className="text-indigo-600">Hub</span>
           </div>
           <Link
@@ -19,17 +19,17 @@ export default function Home() {
       </nav>
 
       {/* Hero */}
-      <section className="bg-gradient-to-b from-indigo-50/60 to-white max-w-5xl mx-auto px-5 pt-20 pb-16 text-center rounded-3xl mt-4">
-        <div className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 text-sm font-medium px-3 py-1 rounded-full mb-6">
+      <section className="bg-gradient-to-b from-indigo-50/60 dark:from-indigo-950/30 to-white dark:to-gray-900 max-w-5xl mx-auto px-5 pt-20 pb-16 text-center rounded-3xl mt-4">
+        <div className="inline-flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-sm font-medium px-3 py-1 rounded-full mb-6">
           <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
           Built for expats moving to the Netherlands
         </div>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 leading-tight tracking-tight mb-5">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 dark:text-white leading-tight tracking-tight mb-5">
           {"Your move to the Netherlands, "}
           <br className="hidden sm:block" />
           <span className="text-indigo-600">organised in minutes.</span>
         </h1>
-        <p className="text-lg text-gray-500 mb-8 max-w-xl mx-auto leading-relaxed">
+        <p className="text-lg text-gray-500 dark:text-gray-400 mb-8 max-w-xl mx-auto leading-relaxed">
           AI-generated checklist, document hub, and step-by-step guidance — from MVV visa to your first day at work.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -39,7 +39,7 @@ export default function Home() {
             Start your relocation plan →
           </Link>
         </div>
-        <p className="text-sm text-gray-400 mt-4">Free to start · No credit card required</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500 mt-4">Free to start · No credit card required</p>
       </section>
 
       {/* Features */}
@@ -49,7 +49,7 @@ export default function Home() {
             {
               title: 'AI Checklist',
               desc: 'Personalised, correctly-sequenced checklist based on your country, visa type, and situation. MVV to BSN — nothing missed.',
-              color: 'bg-indigo-50',
+              color: 'bg-indigo-50 dark:bg-indigo-950/50',
               iconColor: 'text-indigo-500',
               icon: (
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
@@ -60,7 +60,7 @@ export default function Home() {
             {
               title: 'Document Hub',
               desc: 'Upload and organise all your documents in one place. AI checks them before you submit to IND or gemeente.',
-              color: 'bg-emerald-50',
+              color: 'bg-emerald-50 dark:bg-emerald-950/50',
               iconColor: 'text-emerald-500',
               icon: (
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
@@ -71,7 +71,7 @@ export default function Home() {
             {
               title: 'Smart Reminders',
               desc: 'Get notified before deadlines. Track IND appointments, BSN registration, DigiD, and health insurance.',
-              color: 'bg-amber-50',
+              color: 'bg-amber-50 dark:bg-amber-950/50',
               iconColor: 'text-amber-500',
               icon: (
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
@@ -80,24 +80,24 @@ export default function Home() {
               ),
             },
           ].map((f) => (
-            <div key={f.title} className={`${f.color} rounded-2xl p-6 border border-black/5`}>
+            <div key={f.title} className={`${f.color} rounded-2xl p-6 border border-black/5 dark:border-white/5`}>
               <div className={`${f.iconColor} mb-4`}>{f.icon}</div>
-              <h3 className="text-base font-semibold text-gray-900 mb-2">{f.title}</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">{f.desc}</p>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">{f.title}</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* Pricing */}
-      <section className="bg-gray-50 py-16 px-5">
-        <div className="max-w-sm mx-auto bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
-          <div className="text-xs font-semibold tracking-widest text-indigo-600 uppercase mb-4">Pricing</div>
+      <section className="bg-gray-50 dark:bg-gray-800/50 py-16 px-5">
+        <div className="max-w-sm mx-auto bg-white dark:bg-gray-800 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-sm">
+          <div className="text-xs font-semibold tracking-widest text-indigo-600 dark:text-indigo-400 uppercase mb-4">Pricing</div>
           <div className="flex items-end gap-1 mb-1">
-            <span className="text-5xl font-bold text-gray-900">€3.99</span>
-            <span className="text-gray-400 mb-1.5">/month</span>
+            <span className="text-5xl font-bold text-gray-900 dark:text-white">€3.99</span>
+            <span className="text-gray-400 dark:text-gray-500 mb-1.5">/month</span>
           </div>
-          <p className="text-sm text-gray-500 mb-6">Everything you need until you're settled.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Everything you need until you're settled.</p>
           <ul className="space-y-3 mb-7">
             {[
               'AI-generated relocation checklist',
@@ -106,7 +106,7 @@ export default function Home() {
               'Email reminders & deadline tracking',
               'Official NL government resource links',
             ].map((item) => (
-              <li key={item} className="flex items-start gap-2.5 text-sm text-gray-700">
+              <li key={item} className="flex items-start gap-2.5 text-sm text-gray-700 dark:text-gray-200">
                 <span className="text-emerald-500 font-bold mt-0.5">✓</span>
                 {item}
               </li>
@@ -121,11 +121,11 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-gray-100 py-6 px-5">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2 text-sm text-gray-400">
+      <footer className="border-t border-gray-100 dark:border-gray-800 py-6 px-5">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
           <span>Relocation<span className="text-indigo-600">Hub</span></span>
           <span>Built for expats moving to the Netherlands</span>
-          <a href="mailto:support@relocationhub.app" className="hover:text-indigo-600 transition">
+          <a href="mailto:support@relocationhub.app" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">
             support@relocationhub.app
           </a>
         </div>
