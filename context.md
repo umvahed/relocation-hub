@@ -11,11 +11,11 @@
 **Revenue model:**
 - Direct: €3.99/mo per user (self-serve, Stripe subscription)
 - Future B2B: white-label licensing to relocation companies
-- Future affiliate: moving companies, container shippers, flight aggregators paying to appear on the platform
+- Future affiliate: moving companies, container shippers, flight aggregators
 
 ---
 
-## What's Been Built So Far
+## What's Been Built
 
 ### Architecture Overview
 
@@ -31,7 +31,7 @@
                               │                         │                  │
                      ┌────────▼───────┐      ┌──────────▼──────┐  ┌───────▼──────┐
                      │   Supabase     │      │  Anthropic API  │  │   Stripe     │
-                     │  (Postgres +   │      │  (Claude AI)    │  │  (Payments)  │
+                     │  (Postgres +   │      │  (Claude AI)    │  │  (not wired) │
                      │   Auth +       │      └─────────────────┘  └──────────────┘
                      │   Storage)     │
                      └────────────────┘
@@ -48,61 +48,59 @@
 **Stack:**
 - FastAPI + Uvicorn
 - Supabase Python client (database + auth)
-- Anthropic Python SDK (Claude AI — claude-sonnet-4-5)
-- Stripe Python SDK (payments, not yet wired to routes)
-- Pydantic v2 + pydantic-settings (config + validation)
+- Anthropic Python SDK — `claude-sonnet-4-5` for checklist, `claude-sonnet-4-6` for validation + risk score
+- Pydantic v2 + pydantic-settings
 
 **Files:**
 ```
 backend/
 ├── app/
-│   ├── main.py          # App entrypoint, CORS middleware, route registration
-│   ├── config.py        # Environment variable loading via pydantic-settings
+│   ├── main.py           # App entrypoint, CORS middleware, route registration
+│   ├── config.py         # Env vars: SUPABASE_*, ANTHROPIC_API_KEY, FRONTEND_URL,
+│   │                     #   DAILY_AI_CALL_LIMIT=5, DAILY_VALIDATION_LIMIT=10,
+│   │                     #   DAILY_RISK_SCORE_LIMIT=3, ADMIN_SECRET, MAX_VALIDATION_FILE_SIZE
 │   └── routes/
-│       ├── health.py    # GET /api/health — Railway healthcheck endpoint
-│       ├── auth.py      # POST /api/auth/onboard, GET /api/auth/profile/{id}, DELETE /api/auth/profile/{id}
-│       ├── checklist.py # POST /api/checklist/generate, GET, PATCH, GET /api/usage/{user_id}
-│       ├── documents.py # GET /api/documents/{user_id}, DELETE /api/documents/{document_id}
-│       ├── validation.py   # (planned) POST /api/documents/{id}/validate, GET validation result
-│       └── risk_score.py   # (planned) POST /api/risk-score/compute, GET /api/risk-score/{user_id}
-├── requirements.txt     # All Python dependencies pinned
-├── railway.toml         # Railway deployment config (start command, healthcheck)
-└── .env                 # Local only — never committed (in .gitignore)
+│       ├── health.py         # GET /api/health
+│       ├── auth.py           # onboard, get profile, consent PATCH, admin tier grant, delete account
+│       ├── checklist.py      # generate, get, update task, usage endpoint; _check_and_increment_usage(call_type)
+│       ├── documents.py      # list, delete documents
+│       ├── validation.py     # POST validate, GET validation result
+│       ├── risk_score.py     # POST compute, GET risk score
+│       ├── notifications.py  # email notifications (Resend) — needs audit
+│       ├── reminders.py      # task reminders — needs audit
+│       └── calendar.py       # iCal feed
+├── requirements.txt
+├── railway.toml
+└── .env                  ← local only, gitignored
 ```
 
-**API endpoints live today:**
+**API endpoints:**
 
 | Method | Endpoint | What it does |
 |---|---|---|
 | GET | `/api/health` | Railway healthcheck |
-| POST | `/api/auth/onboard` | Creates user profile in Supabase |
-| GET | `/api/auth/profile/{user_id}` | Fetches user profile |
-| DELETE | `/api/auth/profile/{user_id}` | Deletes account + cascades to all user data |
-| PATCH | `/api/auth/profile/{user_id}/consent` | (planned) Set/withdraw AI validation consent |
-| POST | `/api/admin/grant-paid-tier` | (planned) Manually grant paid tier pre-Stripe (X-Admin-Secret) |
-| POST | `/api/checklist/generate` | Inserts hardcoded critical tasks + calls Claude for remaining tasks |
-| GET | `/api/checklist/{user_id}` | Returns all tasks for a user |
-| PATCH | `/api/checklist/task/{task_id}` | Updates a task status (pending/completed) |
-| GET | `/api/usage/{user_id}` | Returns daily AI call counts per type (checklist/validation/risk_score) |
-| GET | `/api/documents/{user_id}` | Lists uploaded documents |
-| DELETE | `/api/documents/{document_id}` | Deletes document from storage + DB |
-| POST | `/api/documents/{document_id}/validate` | (planned) AI validation via Claude |
-| GET | `/api/documents/{document_id}/validation` | (planned) Get latest validation result |
-| POST | `/api/risk-score/compute` | (planned) Compute + cache risk score |
-| GET | `/api/risk-score/{user_id}` | (planned) Get cached risk score |
+| POST | `/api/auth/onboard` | Creates/upserts user profile |
+| GET | `/api/auth/profile/{user_id}` | Fetches full profile (incl. tier, consent) |
+| PATCH | `/api/auth/profile/{user_id}/consent` | Set/withdraw AI validation consent |
+| POST | `/api/admin/grant-paid-tier` | Manually grant paid tier (X-Admin-Secret header) |
+| DELETE | `/api/auth/profile/{user_id}` | Full account deletion (cascades all data incl. risk_scores) |
+| POST | `/api/checklist/generate` | Hardcoded critical tasks + Claude AI tasks |
+| GET | `/api/checklist/{user_id}` | All tasks for user |
+| PATCH | `/api/checklist/task/{task_id}` | Update task status |
+| GET | `/api/usage/{user_id}` | Daily call counts per type: checklist/validation/risk_score |
+| GET | `/api/documents/{user_id}` | List uploaded documents |
+| DELETE | `/api/documents/{document_id}` | Delete document from storage + DB |
+| POST | `/api/documents/{document_id}/validate` | AI validation (paid + consent gated) |
+| GET | `/api/documents/{document_id}/validation` | Get latest validation result |
+| POST | `/api/risk-score/compute` | Compute + upsert risk score (paid + consent gated) |
+| GET | `/api/risk-score/{user_id}` | Get cached risk score |
 | GET | `/api/calendar/{user_id}/feed.ics` | iCal feed for deadline tasks |
 
-**Checklist generation logic:**
-1. Always inserts 8 hardcoded `critical` category tasks first (see below)
-2. Calls Claude to generate 25-30 additional tasks covering visa, admin, housing, banking, etc.
-3. Claude tasks with unrecognised categories default to `admin`
-4. All tasks stored in Supabase `tasks` table
-
-**Onboarding inputs passed to Claude:**
-- `origin_country`, `employment_type`, `move_date`
-- `has_pets` (bool) — adds pet import/vet tasks if true
-- `shipping_type` (`container` or `luggage_only`) — adds container/customs tasks if container
-- `has_relocation_allowance` (bool) — adds allowance/tax tasks if true
+**Rate limits (per day, per user):**
+- Checklist: 5 calls (`DAILY_AI_CALL_LIMIT`)
+- Validation: 10 calls (`DAILY_VALIDATION_LIMIT`)
+- Risk score: 3 calls (`DAILY_RISK_SCORE_LIMIT`)
+- Tracked in `api_usage` with `call_type` column; UNIQUE(user_id, date, call_type)
 
 ---
 
@@ -110,197 +108,124 @@ backend/
 
 | Category | Label | Notes |
 |---|---|---|
-| `critical` | Critical — Required First | Always shown first. Hardcoded. Priority 0. |
-| `visa` | Visa & Immigration | MVV, VFS appointment, IND |
-| `admin` | Administration | BSN, DigiD, gemeente, SARS notification |
-| `employment` | Employment | Contract, 30% ruling, employer tasks |
-| `housing` | Housing | Temp accommodation first, then permanent |
-| `banking` | Banking & Finance | bunq, ING, international transfers |
-| `healthcare` | Healthcare | Zorgverzekering, huisarts registration |
-| `transport` | Transport | Driving licence exchange, OV-chipkaart |
-| `shipping` | Shipping & Logistics | Container or luggage tasks |
+| `critical` | Critical — Required First | Hardcoded. Priority 100/90. Never Claude-generated. |
+| `visa` | Visa & Immigration | |
+| `admin` | Administration | BSN, DigiD, gemeente |
+| `employment` | Employment | Contract, 30% ruling |
+| `housing` | Housing | Temp first, then permanent |
+| `banking` | Banking & Finance | |
+| `healthcare` | Healthcare | Zorgverzekering, huisarts |
+| `transport` | Transport | Driving licence exchange |
+| `shipping` | Shipping & Logistics | Container or luggage |
 | `pets` | Pet Relocation | Only shown if user has pets |
-
-**Critical tasks (hardcoded, always present, priority 0):**
-1. Check passport validity (valid 6+ months, 2 blank pages)
-2. Obtain IND approval letter from employer (TEV procedure)
-3. Complete and sign MVV application form (VFS Global)
-4. Get passport photos (Dutch ICAO: 35x45mm, white background)
-5. Pay VFS application fee and save proof of payment
-6. Obtain apostilled birth certificate (Home Affairs SA)
-7. Obtain apostilled police clearance certificate (SAPS + Home Affairs)
-8. Apostille academic and professional qualifications (SAQA + Home Affairs)
-
-These tasks always appear first, support document attachment, and cannot be overridden by Claude.
-
----
-
-### Correct Relocation Process (South Africa → Netherlands)
-
-This is the real-world sequence that the product must reflect:
-
-**PHASE 1 — Document preparation (must happen before anything else):**
-- Apostilled birth certificate, marriage cert (if applicable), police clearance, qualifications
-- Valid passport (6+ months validity, 2 blank pages)
-- All documents from Home Affairs SA — allow 6-10 weeks
-
-**PHASE 2 — Visa & IND:**
-- Employer applies to IND for TEV (combined MVV + residence permit) — NOT the individual
-- IND approval letter received (2–90 days depending on permit type)
-- Book VFS Global appointment (Pretoria or Cape Town)
-- Attend VFS: passport + IND approval letter + signed MVV form + photos + proof of payment
-- Collect passport with MVV sticker
-- Family members: complete antecedents declaration form — their permits processed 3 months after arrival
-
-**PHASE 3 — Pre-departure logistics:**
-- Book flight (MVV valid 90 days from issue — must enter NL within this window)
-- Arrange temporary accommodation (Airbnb, short-stay, serviced apt) — do NOT commit to permanent housing yet
-- Notify SA bank, arrange international transfers
-- Container shipping or luggage decisions
-
-**PHASE 4 — Arrival (first 2 weeks):**
-- Register at gemeente within 5 days of establishing address
-- BSN issued at gemeente registration
-- Open Dutch bank account (bunq/ING — requires BSN)
-- Apply for DigiD (requires BSN, takes ~5 days by post)
-- Register with a huisarts (GP)
-- Arrange zorgverzekering (mandatory within 4 months, backdated to registration)
-
-**PHASE 5 — Settling in:**
-- Begin permanent housing search (Funda, Pararius) — income must be 3-4x monthly rent
-- Understand Dutch rental market: deposit, bidding, makelaar
-- Contents insurance (inboedelverzekering)
-- Driving licence exchange (within 6 months of gemeente registration)
-- School registration for children
 
 ---
 
 ### Database (Supabase — PostgreSQL)
 
-**Tables:**
-
-**`profiles`** — One row per user, linked to Supabase Auth
+**`profiles`**
 ```sql
 id (UUID, FK to auth.users)
-email, full_name
-origin_country, destination_country (default: Netherlands)
-employment_type, move_date
-has_pets, shipping_type, has_relocation_allowance
+email, full_name, origin_country, destination_country, employment_type
+move_date, has_pets, shipping_type, has_relocation_allowance
 contact_name, contact_email
-is_paid (boolean — legacy, superseded by tier)
-tier ('free' | 'paid', default 'free')       ← paywall gating
+tier ('free' | 'paid', default 'free')
 tier_granted_at (timestamptz)
-ai_validation_consent (boolean, default false) ← GDPR consent
+ai_validation_consent (boolean, default false)
 ai_validation_consent_at (timestamptz)
 stripe_customer_id, stripe_subscription_id
 created_at, updated_at
 ```
 
-**`tasks`** — Checklist items
+**`tasks`**
 ```sql
-id (UUID)
-user_id (FK to profiles)
-title, description
+id, user_id, title, description
 category (critical/visa/admin/employment/housing/banking/healthcare/transport/shipping/pets)
-status (pending/completed)
-priority (0 = critical prerequisite, 1-10 = Claude-generated priority)
-depends_on (UUID array — future dependency logic)
-due_date, reminder_sent_at, external_link
+status (pending/completed), priority (100/90 = hardcoded critical, 1-10 = Claude)
+due_date, reminder_sent_at, external_link, depends_on
 created_at, updated_at
 ```
 
-**`documents`** — User-uploaded files, attached per task
+**`documents`**
 ```sql
-id (UUID)
-user_id (FK to profiles)
-task_id (FK to tasks, nullable)
-file_name, file_path, file_size, mime_type
-category
-created_at
+id, user_id, task_id (nullable), file_name, file_path, file_size, mime_type, category, created_at
 ```
 
-**`document_validations`** — AI validation results (planned; no raw file content stored)
+**`document_validations`** — AI results only, no raw file content
 ```sql
-id (UUID)
-document_id (UUID, FK to documents ON DELETE CASCADE)
-user_id (UUID)
-status ('pass' | 'warn' | 'fail')
-summary (text — no PII)
-issues (jsonb array: severity, field, message, action)
-model_version (text)
-validated_at (timestamptz)
+id, document_id (FK → documents ON DELETE CASCADE), user_id
+status ('pass' | 'warn' | 'fail'), summary (no PII)
+issues (jsonb: [{severity, field, message, action}])
+model_version, validated_at
 ```
 
-**`risk_scores`** — Cached relocation risk score per user (planned)
+**`risk_scores`** — one row per user, upserted on recompute
 ```sql
-id (UUID)
-user_id (UUID UNIQUE — one row per user, upserted on recompute)
-score (integer 0-100)
-risk_level ('low' | 'med' | 'high')
-risk_items (jsonb array: rank, category, title, detail, action)
-dimension_scores (jsonb: critical_completion, timeline_feasibility, document_readiness, profile_completeness)
-computed_at (timestamptz)
+id, user_id (UNIQUE), score (0-100), risk_level ('low' | 'med' | 'high')
+risk_items (jsonb: [{rank, category, title, detail, action}])
+dimension_scores (jsonb: {critical_completion, timeline_feasibility, document_readiness, profile_completeness})
+computed_at
 ```
 
-**`api_usage`** — Daily Claude API call tracking
+**`api_usage`**
 ```sql
-id (UUID)
-user_id (UUID)
-date (date)
-call_count (integer)
-call_type ('checklist' | 'validation' | 'risk_score') ← separate limits per type
+id, user_id, date, call_count, call_type ('checklist' | 'validation' | 'risk_score')
+UNIQUE(user_id, date, call_type)
 ```
 
-**Supabase Storage:** `documents` bucket (private). RLS policies restrict access to own folder (`{user_id}/{task_id}/...`).
+**Migrations:**
+- `001_phase1_engagement.sql` — api_usage, contact columns, reminder_sent_at
+- `002_document_validation_risk_score.sql` — document_validations, risk_scores, profiles tier/consent columns, api_usage call_type
 
-**Row Level Security (RLS)** is enabled on all three tables.
+**Supabase Storage:** `documents` bucket (private). RLS policies restrict to own folder.
 
 ---
 
 ### Frontend (Next.js 16 — TypeScript)
 
 **Location:** `relocation-hub/frontend/`
-**Deployed:** Vercel, auto-deploys on every `git push` to `main`
+**Deployed:** Vercel, auto-deploys on `git push` to `main`
 **Live URL:** `https://relocation-hub.vercel.app`
 
-**Stack:**
-- Next.js 16 (App Router)
-- TypeScript
-- Tailwind CSS v4
-- Inter font (Google Fonts)
-- Supabase SSR client (`@supabase/ssr`)
-- Google OAuth via Supabase Auth
+**Stack:** Next.js 16 (App Router), TypeScript, Tailwind CSS v4, Supabase SSR client
 
-**Pages built:**
+**Pages:**
 
 | Route | File | What it does |
 |---|---|---|
-| `/` | `app/page.tsx` | Landing page — hero gradient, feature icons, pricing, support email in footer |
-| `/login` | `app/login/page.tsx` | Sign in / Create account tabs (email+password) + Google OAuth; forgot password flow |
-| `/auth/callback` | `app/auth/callback/route.ts` | Exchanges code for session; routes to /dashboard (existing user) or /onboarding (new user) |
-| `/auth/reset-password` | `app/auth/reset-password/page.tsx` | Handles PKCE + implicit password reset token; lets user set new password |
-| `/onboarding` | `app/onboarding/page.tsx` | 5-step form; guards against already-onboarded users (redirects to dashboard) |
-| `/dashboard` | `app/dashboard/page.tsx` | Checklist, countdown banner, settings gear menu, delete account |
-| `/documents` | `app/documents/page.tsx` | All uploaded documents grouped by category |
+| `/` | `app/page.tsx` | Landing page |
+| `/login` | `app/login/page.tsx` | Email+password + Google OAuth + forgot password |
+| `/auth/callback` | `app/auth/callback/route.ts` | Smart routing: profile found → dashboard, no profile → onboarding |
+| `/auth/reset-password` | `app/auth/reset-password/page.tsx` | PKCE + implicit password reset |
+| `/onboarding` | `app/onboarding/page.tsx` | 5-step form; guards re-entry |
+| `/dashboard` | `app/dashboard/page.tsx` | Checklist, countdown banner, RiskScoreWidget, settings, delete account |
+| `/documents` | `app/documents/page.tsx` | Documents grouped by category, ValidationBadge, Validate button |
 
-**Dashboard behaviour:**
-- Tasks grouped by category in fixed order (critical first) with colour-coded left-border accents
-- Sections locked (dimmed) until all critical tasks are ticked off
-- Click any task to expand: description, official link, due date picker, Google Calendar add, document upload
-- Move-date countdown banner: urgency colour shifts (indigo → amber → rose), celebration state on move day
-- Progress bar with milestone messages at 25 / 50 / 75 / 100%
-- Settings gear menu (top-right): profile info, HR contact, support email, sign out, delete account (two-step confirm)
+**Components (`app/components/`):**
 
-**Auth flows:**
-- Google OAuth → `/auth/callback` → dashboard or onboarding
-- Email sign-up → Supabase verification email → `/auth/callback` → onboarding
-- Email sign-in → profile check → dashboard or onboarding
-- Forgot password → reset email → `/auth/reset-password` → new password form → dashboard
-- Returning users always land on `/dashboard` (callback + onboarding guard both check for existing profile/tasks)
+| File | Purpose |
+|---|---|
+| `AiConsentModal.tsx` | GDPR consent modal (not dismissable via Escape/backdrop); loading state during PATCH |
+| `ValidationBadge.tsx` | Pill badge (pass/warn/fail) + expandable issues list |
+| `RiskScoreWidget.tsx` | Score card: progress bar + risk level + dimension breakdown + top risk items + Refresh |
 
 **Lib files:**
-- `lib/supabase.ts` — Browser Supabase client (for auth)
-- `lib/api.ts` — All fetch calls to the FastAPI backend
+- `lib/supabase.ts` — Browser Supabase client
+- `lib/api.ts` — All fetch calls to FastAPI backend (incl. validateDocument, computeRiskScore, updateConsent, getRiskScore + full TypeScript types)
+
+---
+
+### GDPR / Document Validation Rules
+
+- Document bytes fetched into Railway RAM → sent to Claude → immediately discarded. Never written to disk, never logged.
+- Only validation results (JSON) stored — no raw content.
+- Explicit consent required before first AI call. Stored as `profiles.ai_validation_consent` + `ai_validation_consent_at`.
+- Consent withdrawable from settings menu (dashboard).
+- `document_validations` has CASCADE on `documents.id` — deleting a doc auto-deletes its validation.
+- `delete_account` explicitly deletes `risk_scores` row.
+- Exception handlers log only `document_id`, never file content.
+- Supported MIME types: `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `application/pdf`. Word/DOCX → 422.
+- Legal basis: Article 6(1)(b) GDPR — contract performance.
 
 ---
 
@@ -309,113 +234,72 @@ call_type ('checklist' | 'validation' | 'risk_score') ← separate limits per ty
 ```
 git push origin main
         │
-        ├──▶ Railway detects push → rebuilds backend
-        │         → uvicorn app.main:app --host 0.0.0.0 --port $PORT
-        │         → healthcheck: /api/health
+        ├──▶ Railway → rebuilds backend → uvicorn app.main:app
         │
-        └──▶ Vercel detects push → rebuilds Next.js frontend
+        └──▶ Vercel → rebuilds Next.js frontend
 ```
 
 **Environment variables:**
-- Backend (Railway): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, `ANTHROPIC_API_KEY`, `FRONTEND_URL`, `ADMIN_SECRET`
-- Frontend (Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL`
-- Stripe keys are optional (not yet wired)
-- `ADMIN_SECRET`: Railway only — used by `POST /api/admin/grant-paid-tier` to manually set tier='paid' pre-Stripe
 
----
-
-### Auth Flow
-
+Railway (backend):
 ```
-New user (Google):
-  Sign in with Google → /auth/callback → no profile found → /onboarding
-  → 5-step form → POST /api/auth/onboard + POST /api/checklist/generate → /dashboard
+SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY
+ANTHROPIC_API_KEY
+FRONTEND_URL=https://relocation-hub.vercel.app
+ADMIN_SECRET=<random string>
+```
 
-New user (email):
-  Create account → Supabase sends verification email → user clicks link
-  → /auth/callback → no profile found → /onboarding → same as above
-
-Returning user (any method):
-  Sign in → /auth/callback (or browser client) → profile found → /dashboard
-
-Password reset:
-  Forgot password → reset email → /auth/reset-password?code=xxx
-  → exchangeCodeForSession → new password form → /dashboard
+Vercel (frontend):
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+NEXT_PUBLIC_API_URL=https://relocation-hub-production.up.railway.app
 ```
 
 ---
 
 ## Current Status
 
-✅ Backend live on Railway (FastAPI) — only service on Railway
-✅ Frontend live on Vercel (Next.js) — only frontend host, Railway frontend service deleted
 ✅ Google OAuth + email/password auth (sign up, sign in, forgot password, reset password)
-✅ Auth callback smart-routes: returning users → dashboard, new users → onboarding
-✅ Onboarding guards against re-entry (already-onboarded users skip to dashboard)
-✅ Move date validation: min=today enforced on the date input
 ✅ 5-step onboarding with logistics questions (pets, shipping, allowance, HR contact)
-✅ Checklist generation: hardcoded SA VFS prerequisites (priority 100) + SA document tasks (priority 90) + Claude AI tasks
-✅ Claude prompt: explicit conditional notes for all 4 employment types, has_pets false guard, shipping/allowance false-case guards
-✅ Dashboard: category sections with left-border colour accents, expandable tasks, document upload per task
-✅ Dashboard: non-critical sections locked until all critical tasks completed
-✅ Dashboard: move-date countdown banner (urgency colours + celebration state on move day)
-✅ Dashboard: progress bar with milestone messages at 25/50/75/100%
-✅ Dashboard: settings gear menu — profile info, HR contact, support email, sign out, delete account
-✅ Delete account: wipes tasks, documents (storage + DB), api_usage, profile, and auth user
-✅ Support email (support@relocationhub.app) in footer and settings menu
-✅ force-dynamic on all pages that touch Supabase
-✅ Vercel cron keepalive — pings /api/health every 5 min to prevent Railway cold starts
-✅ iCal feed (GET /api/calendar/{user_id}/feed.ics) + per-task Google Calendar add button
-✅ Document list + delete (GET/DELETE /api/documents/*)
-✅ Per-user daily AI call limit tracked in api_usage table
-⚠️ Checklist is one-shot per user — changing onboarding answers after generation has no effect. No regenerate flow yet.
-⚠️ Supabase Storage bucket `documents` must be manually created with RLS policies
-🔲 Document AI Validation — Claude reads uploaded docs, flags IND issues (see PLAN.md)
-🔲 Relocation Risk Score — 0-100 score + top risk items (see PLAN.md)
-🔲 IND Processing Time Intelligence
+✅ AI checklist generation: hardcoded SA VFS tasks + Claude-generated tasks
+✅ Dashboard: category sections, dependency lock, countdown banner, progress bar, settings menu
+✅ Document upload per task (Supabase Storage)
+✅ Document list page (`/documents`)
+✅ iCal feed + per-task Google Calendar add button
+✅ Delete account (cascades all data)
+✅ **Document AI Validation** — Claude validates against IND 2025 rules, GDPR-compliant, paid tier gated
+✅ **Relocation Risk Score** — 0–100 across 4 dimensions, Claude risk items, dashboard widget
+✅ Paid tier system: `profiles.tier`, admin grant endpoint, consent modal, consent withdrawal
+✅ Per-type rate limiting (checklist / validation / risk_score)
+⚠️ Checklist is one-shot — no regenerate flow. Changing onboarding answers after generation has no effect.
 🔲 Stripe billing
-🔲 Email reminders (Resend)
-🔲 HR contact notifications (Resend)
-🔲 /auth/reset-password needs `https://relocation-hub.vercel.app/auth/reset-password` added to Supabase Redirect URLs allowlist
-🔲 Admin portal
-🔲 Phase labels (pre-arrival / arrival / post-arrival)
+🔲 Email reminders (Resend) — `reminders.py` exists, needs audit
+🔲 HR contact notifications (Resend) — `notifications.py` exists, needs audit
+🔲 Checklist regeneration endpoint
 
 ---
 
 ## Roadmap
 
-### Phase 1 — Premium AI features (active — see PLAN.md)
+### Phase 1 — Premium AI features ✅ COMPLETE
+1. ✅ Document AI Validation
+2. ✅ Relocation Risk Score
 
-1. **Document AI Validation** — upload passport/contract/degree, Claude validates against IND 2025 requirements and flags specific issues. GDPR-compliant (consent modal, no raw content stored, CASCADE deletes). Gated behind paid tier.
-2. **Relocation Risk Score** — 0-100 score across 4 weighted dimensions. Python calculates scores; Claude generates human-readable risk items. Refreshable widget on dashboard.
-3. **IND Processing Time Intelligence** — crowdsource/scrape real IND processing times; alert users if their move deadline is at risk.
+### Phase 2 — Engagement layer (next)
+1. Audit `notifications.py`, `reminders.py`, `calendar.py` — determine what's wired vs. missing
+2. Email reminders — per-task due dates, configurable cadence via Resend
+3. HR/consultant contact notifications — task completion alerts + weekly digest (key differentiator)
+4. Checklist regeneration — `/api/checklist/regenerate` (delete + regenerate from updated profile)
 
-### Phase 2 — Monetisation
-
-- Stripe Checkout for €3.99/mo — free: checklist only; paid: AI validation + risk score + reminders
-- Pre-Stripe: tier manually granted via `POST /api/admin/grant-paid-tier` (ADMIN_SECRET env var on Railway)
-- Stripe webhook on `checkout.session.completed` sets `profiles.tier = 'paid'`
-
-### Phase 3 — Engagement layer
-
-- Email reminders via Resend (per-task due dates, configurable cadence)
-- HR/consultant contact notifications — task completion alerts + weekly digest
-- Phase labels on dashboard (pre-arrival / arrival / post-arrival sections)
+### Phase 3 — Monetisation
+- Stripe Checkout €3.99/mo
+- Webhook on `checkout.session.completed` → `profiles.tier = 'paid'`
+- No frontend/backend guard changes needed (402 handling already in place)
 
 ### Phase 4 — B2B white-label
-
 - HR/Company Portal: companies pay per-employee; HR sees all relocatees' progress
-- Admin dashboard: consultant sees assigned users, sets reminders, annotates tasks
-- Bulk onboarding
-- Sold to relocation agencies and corporate HR teams
-
-### Future ideas (evaluated, not scheduled)
-
-- Housing aggregator (Funda, Pararius scraping) + neighbourhood recommendations
-- Moving company quote form + flight suggestions
-- WhatsApp nudge bot — proactive task reminders via WhatsApp API
-- Multi-language (Dutch + English)
-- Affiliate revenue (moving companies, housing platforms)
+- Admin dashboard, bulk onboarding, task annotation
 
 ---
 
@@ -423,54 +307,43 @@ Password reset:
 
 ```
 relocation-hub/
-├── backend/                     ← FastAPI → Railway (only Railway service)
+├── backend/
 │   ├── app/
-│   │   ├── main.py              # CORS allows Vercel origin + localhost
+│   │   ├── main.py
 │   │   ├── config.py
 │   │   └── routes/
-│   │       ├── health.py        # GET /api/health — also used by Vercel keepalive cron
-│   │       ├── auth.py
-│   │       ├── checklist.py     # SA_VFS_PREREQUISITES + SA_DOCUMENT_TASKS hardcoded
-│   │       └── documents.py
+│   │       ├── health.py
+│   │       ├── auth.py          # consent PATCH + admin tier grant added
+│   │       ├── checklist.py     # _check_and_increment_usage(call_type) + usage breakdown
+│   │       ├── documents.py
+│   │       ├── validation.py    # Document AI Validation
+│   │       ├── risk_score.py    # Relocation Risk Score
+│   │       ├── notifications.py # needs audit
+│   │       ├── reminders.py     # needs audit
+│   │       └── calendar.py
 │   ├── requirements.txt
-│   ├── railway.toml
-│   └── .env                     ← local only, gitignored
-├── frontend/                    ← Next.js → Vercel (only frontend host)
+│   └── railway.toml
+├── frontend/
 │   ├── app/
 │   │   ├── page.tsx
-│   │   ├── login/               # force-dynamic
-│   │   ├── onboarding/          # force-dynamic
-│   │   ├── dashboard/           # force-dynamic; critical dependency lock
+│   │   ├── login/
+│   │   ├── onboarding/
+│   │   ├── dashboard/
+│   │   ├── documents/
 │   │   ├── auth/callback/
-│   │   └── api/
-│   │       └── keepalive/       # GET — pings Railway /api/health (Vercel cron)
+│   │   ├── components/
+│   │   │   ├── AiConsentModal.tsx
+│   │   │   ├── ValidationBadge.tsx
+│   │   │   └── RiskScoreWidget.tsx
+│   │   └── api/keepalive/
 │   ├── lib/
 │   │   ├── supabase.ts
 │   │   └── api.ts
-│   ├── vercel.json              # cron: /api/keepalive every 5 min
-│   └── .env.local               ← local only, gitignored
-├── PLAN.md                      ← active implementation plan (Document AI Validation + Risk Score)
-├── context.md                   ← this file
-├── .gitignore
-└── README.md
+│   └── vercel.json              # cron: /api/keepalive every 5 min
+├── supabase/migrations/
+│   ├── 001_phase1_engagement.sql
+│   └── 002_document_validation_risk_score.sql
+├── PLAN.md
+├── CLAUDE.md
+└── context.md
 ```
-
-## Environment Variables
-
-**Railway (backend only):**
-```
-SUPABASE_URL
-SUPABASE_ANON_KEY
-SUPABASE_SERVICE_KEY
-ANTHROPIC_API_KEY
-FRONTEND_URL=https://relocation-hub.vercel.app
-```
-
-**Vercel (frontend only):**
-```
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-NEXT_PUBLIC_API_URL=https://relocation-hub-production.up.railway.app
-```
-
-Note: `FRONTEND_URL` belongs in Railway only. `NEXT_PUBLIC_*` vars belong in Vercel only.
