@@ -124,19 +124,32 @@ class GenerateChecklistRequest(BaseModel):
     shipping_type: str = "luggage_only"  # "container", "luggage_only"
     has_relocation_allowance: bool = False
 
-def _check_and_increment_usage(supabase, user_id: str):
+def _check_and_increment_usage(supabase, user_id: str, call_type: str = "checklist"):
     today = date.today().isoformat()
-    result = supabase.table("api_usage").select("id, call_count").eq("user_id", user_id).eq("date", today).execute()
+    limit_map = {
+        "checklist": settings.DAILY_AI_CALL_LIMIT,
+        "validation": settings.DAILY_VALIDATION_LIMIT,
+        "risk_score": settings.DAILY_RISK_SCORE_LIMIT,
+    }
+    limit = limit_map.get(call_type, settings.DAILY_AI_CALL_LIMIT)
+    result = (
+        supabase.table("api_usage")
+        .select("id, call_count")
+        .eq("user_id", user_id)
+        .eq("date", today)
+        .eq("call_type", call_type)
+        .execute()
+    )
     if result.data:
         record = result.data[0]
-        if record["call_count"] >= settings.DAILY_AI_CALL_LIMIT:
+        if record["call_count"] >= limit:
             raise HTTPException(
                 status_code=429,
-                detail=f"Daily AI call limit of {settings.DAILY_AI_CALL_LIMIT} reached. Try again tomorrow."
+                detail=f"Daily {call_type} limit of {limit} reached. Try again tomorrow."
             )
         supabase.table("api_usage").update({"call_count": record["call_count"] + 1, "updated_at": "now()"}).eq("id", record["id"]).execute()
     else:
-        supabase.table("api_usage").insert({"user_id": user_id, "date": today, "call_count": 1}).execute()
+        supabase.table("api_usage").insert({"user_id": user_id, "date": today, "call_count": 1, "call_type": call_type}).execute()
 
 
 @router.post("/checklist/generate")
@@ -322,9 +335,17 @@ async def get_usage(user_id: str):
     try:
         supabase = get_supabase()
         today = date.today().isoformat()
-        result = supabase.table("api_usage").select("call_count").eq("user_id", user_id).eq("date", today).execute()
-        call_count = result.data[0]["call_count"] if result.data else 0
-        return {"call_count": call_count, "limit": settings.DAILY_AI_CALL_LIMIT, "date": today}
+        result = supabase.table("api_usage").select("call_count, call_type").eq("user_id", user_id).eq("date", today).execute()
+        counts = {row["call_type"]: row["call_count"] for row in result.data}
+        return {
+            "checklist_calls": counts.get("checklist", 0),
+            "checklist_limit": settings.DAILY_AI_CALL_LIMIT,
+            "validation_calls": counts.get("validation", 0),
+            "validation_limit": settings.DAILY_VALIDATION_LIMIT,
+            "risk_score_calls": counts.get("risk_score", 0),
+            "risk_score_limit": settings.DAILY_RISK_SCORE_LIMIT,
+            "date": today,
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

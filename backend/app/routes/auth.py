@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from app.config import settings
 from supabase import create_client
+from datetime import datetime, timezone
 
 router = APIRouter()
 _supabase = None
@@ -20,6 +22,12 @@ class OnboardingData(BaseModel):
     move_date: str | None = None
     contact_name: str | None = None
     contact_email: str | None = None
+
+class ConsentUpdate(BaseModel):
+    ai_validation_consent: bool
+
+class GrantPaidTierRequest(BaseModel):
+    user_id: str
 
 @router.post("/auth/onboard")
 async def onboard_user(data: OnboardingData):
@@ -52,6 +60,34 @@ async def get_profile(user_id: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.patch("/auth/profile/{user_id}/consent")
+async def update_consent(user_id: str, body: ConsentUpdate):
+    try:
+        supabase = get_supabase()
+        update: dict = {"ai_validation_consent": body.ai_validation_consent}
+        if body.ai_validation_consent:
+            update["ai_validation_consent_at"] = datetime.now(timezone.utc).isoformat()
+        supabase.table("profiles").update(update).eq("id", user_id).execute()
+        return {"message": "Consent updated", "ai_validation_consent": body.ai_validation_consent}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/admin/grant-paid-tier", responses={403: {"description": "Invalid or missing admin secret"}})
+async def grant_paid_tier(
+    body: GrantPaidTierRequest,
+    x_admin_secret: Annotated[str | None, Header()] = None,
+):
+    if not settings.ADMIN_SECRET or x_admin_secret != settings.ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    try:
+        supabase = get_supabase()
+        supabase.table("profiles").update({
+            "tier": "paid",
+            "tier_granted_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", body.user_id).execute()
+        return {"message": "Paid tier granted", "user_id": body.user_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/auth/profile/{user_id}")
 async def delete_account(user_id: str):
@@ -66,6 +102,7 @@ async def delete_account(user_id: str):
                 supabase.storage.from_("documents").remove(paths)
 
         # Delete all user data in order
+        supabase.table("risk_scores").delete().eq("user_id", user_id).execute()
         supabase.table("documents").delete().eq("user_id", user_id).execute()
         supabase.table("tasks").delete().eq("user_id", user_id).execute()
         supabase.table("api_usage").delete().eq("user_id", user_id).execute()

@@ -2,7 +2,8 @@
 export const dynamic = 'force-dynamic'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount } from '@/lib/api'
+import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, type RiskScore } from '@/lib/api'
+import RiskScoreWidget from '@/app/components/RiskScoreWidget'
 import { useRouter } from 'next/navigation'
 
 const SECTION_ORDER = ['critical', 'visa', 'admin', 'employment', 'housing', 'banking', 'healthcare', 'transport', 'shipping', 'pets']
@@ -95,8 +96,9 @@ export default function DashboardPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [taskDocs, setTaskDocs] = useState<Record<string, any[]>>({})
   const [uploading, setUploading] = useState<string | null>(null)
-  const [usage, setUsage] = useState<{ call_count: number; limit: number } | null>(null)
-  const [profile, setProfile] = useState<{ move_date?: string; full_name?: string; contact_name?: string; contact_email?: string } | null>(null)
+  const [usage, setUsage] = useState<any | null>(null)
+  const [profile, setProfile] = useState<any | null>(null)
+  const [riskScore, setRiskScore] = useState<RiskScore | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
@@ -111,7 +113,11 @@ export default function DashboardPage() {
       const result = await getChecklist(data.user.id)
       setTasks(result.tasks || [])
       getUsage(data.user.id).then(setUsage).catch(() => null)
-      getProfile(data.user.id).then(setProfile).catch(() => null)
+      const prof = await getProfile(data.user.id).catch(() => null)
+      setProfile(prof)
+      if (prof?.tier === 'paid') {
+        getRiskScore(data.user.id).then(setRiskScore).catch(() => null)
+      }
       setLoading(false)
     })
   }, [])
@@ -252,11 +258,11 @@ export default function DashboardPage() {
             )}
             {usage && (
               <span className={`hidden sm:block text-xs font-medium px-2.5 py-1 rounded-full ${
-                usage.call_count >= usage.limit ? 'bg-red-50 text-red-600'
-                  : usage.call_count >= usage.limit - 1 ? 'bg-amber-50 text-amber-600'
+                usage.checklist_calls >= usage.checklist_limit ? 'bg-red-50 text-red-600'
+                  : usage.checklist_calls >= usage.checklist_limit - 1 ? 'bg-amber-50 text-amber-600'
                   : 'bg-gray-100 text-gray-500'
               }`}>
-                {usage.call_count}/{usage.limit} AI calls
+                {usage.checklist_calls}/{usage.checklist_limit} AI calls
               </span>
             )}
 
@@ -313,6 +319,24 @@ export default function DashboardPage() {
                     )}
                   </div>
 
+                  {/* AI consent */}
+                  {profile?.ai_validation_consent && (
+                    <div className="px-4 py-3 border-b border-gray-50">
+                      <button
+                        onClick={async () => {
+                          await updateConsent(user.id, false)
+                          setProfile((p: any) => ({ ...p, ai_validation_consent: false }))
+                        }}
+                        className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-800 transition w-full text-left"
+                      >
+                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        Withdraw AI processing consent
+                      </button>
+                    </div>
+                  )}
+
                   {/* Support + sign out */}
                   <div className="px-4 py-3 border-b border-gray-50 space-y-2">
                     <a href="mailto:support@relocationhub.app"
@@ -368,6 +392,17 @@ export default function DashboardPage() {
 
         {/* Move countdown */}
         {profile?.move_date && <CountdownBanner moveDate={profile.move_date} />}
+
+        {/* Risk score */}
+        {user && profile && (
+          <RiskScoreWidget
+            userId={user.id}
+            isPaid={profile.tier === 'paid'}
+            hasConsent={profile.ai_validation_consent ?? false}
+            initialScore={riskScore}
+            onConsentGranted={() => setProfile((p: any) => ({ ...p, ai_validation_consent: true }))}
+          />
+        )}
 
         {/* Progress */}
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
