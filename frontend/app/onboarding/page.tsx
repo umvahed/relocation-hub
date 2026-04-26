@@ -49,7 +49,7 @@ export default function OnboardingPage() {
         email: user.email!,
         full_name: form.full_name,
         origin_country: form.origin_country,
-        move_date: form.move_date,
+        move_date: form.move_date || undefined,
         contact_name: form.contact_name || undefined,
         contact_email: form.contact_email || undefined,
       })

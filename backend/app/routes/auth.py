@@ -39,9 +39,9 @@ async def onboard_user(data: OnboardingData):
             "full_name": data.full_name,
             "origin_country": data.origin_country,
             "destination_country": "Netherlands",
-            "move_date": data.move_date,
-            "contact_name": data.contact_name,
-            "contact_email": data.contact_email,
+            "move_date": data.move_date or None,
+            "contact_name": data.contact_name or None,
+            "contact_email": data.contact_email or None,
         }, on_conflict="id").execute()
 
         return {"message": "Profile upserted", "user_id": data.user_id}
