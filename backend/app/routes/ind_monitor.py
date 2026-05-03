@@ -12,12 +12,22 @@ _supabase = None
 
 IND_OAP_API = "https://oap.ind.nl/oap/api/desks"
 IND_BOOKING_URL = "https://oap.ind.nl/oap/en/#/doc"
-# Desk codes shown in the OAP desk selector
 IND_DESKS = {
     "AM": "Amsterdam",
     "DH": "Den Haag",
     "ZW": "Zwolle",
     "DB": "'s-Hertogenbosch",
+}
+# All known product keys used by the OAP portal
+PRODUCT_KEYS = ("TKV", "DOC", "BIO", "VAA", "REG", "NAT", "MVV", "V")
+
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9,nl;q=0.8",
+    "Referer": "https://oap.ind.nl/oap/en/",
+    "Origin": "https://oap.ind.nl",
+    "Connection": "keep-alive",
 }
 
 
@@ -28,6 +38,19 @@ def get_supabase():
     return _supabase
 
 
+def _extract_slots(data) -> bool:
+    """Return True if the response body contains at least one slot, regardless of shape."""
+    if isinstance(data, list):
+        return len(data) > 0
+    if isinstance(data, dict):
+        # Some API versions wrap in {"data": [...]} or {"slots": [...]}
+        for key in ("data", "slots", "dates", "results"):
+            val = data.get(key)
+            if isinstance(val, list) and len(val) > 0:
+                return True
+    return False
+
+
 class SubscribeRequest(BaseModel):
     user_id: str
     email: str
@@ -36,32 +59,38 @@ class SubscribeRequest(BaseModel):
 async def _fetch_ind_status() -> tuple[bool, str]:
     """Query OAP JSON API for each desk. Returns (slots_available, status_text)."""
     available_desks: list[str] = []
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://oap.ind.nl/oap/en/",
-        "Origin": "https://oap.ind.nl",
-    }
-    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+    errors: list[str] = []
+
+    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
         for code, name in IND_DESKS.items():
-            for product_key in ("TKV", "DOC"):
+            found = False
+            for product_key in PRODUCT_KEYS:
                 try:
                     resp = await client.get(
                         f"{IND_OAP_API}/{code}/slots/",
                         params={"productKey": product_key, "persons": 1},
-                        headers=headers,
+                        headers=BROWSER_HEADERS,
                     )
                     if resp.status_code == 200:
-                        data = resp.json()
-                        if isinstance(data, list) and len(data) > 0:
+                        try:
+                            data = resp.json()
+                        except Exception:
+                            continue
+                        if _extract_slots(data):
                             available_desks.append(f"{name} ({product_key})")
+                            found = True
                             break
-                except Exception:
-                    continue
+                    elif resp.status_code not in (400, 404):
+                        # 400/404 = invalid product key for this desk — expected, skip silently
+                        errors.append(f"{code}/{product_key}: HTTP {resp.status_code}")
+                except Exception as exc:
+                    errors.append(f"{code}/{product_key}: {type(exc).__name__}: {exc}")
+            _ = found  # used only for clarity
 
     if available_desks:
         return True, f"Slots available at: {', '.join(available_desks)}"
+    if errors:
+        return False, f"No slots found (errors: {'; '.join(errors[:5])})"
     return False, "No slots currently available at any IND desk"
 
 
@@ -137,6 +166,45 @@ async def get_status(user_id: str):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/ind-monitor/debug")
+async def debug_ind(authorization: Annotated[str | None, Header()] = None):
+    """Raw diagnostic probe — returns every desk/key combo with status + body snippet."""
+    if authorization != f"Bearer {settings.RESEND_API_KEY}":
+        raise HTTPException(status_code=401, detail="Unauthorised")
+
+    results = []
+    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+        for code, name in IND_DESKS.items():
+            for product_key in PRODUCT_KEYS:
+                entry: dict = {"desk": code, "name": name, "product_key": product_key}
+                try:
+                    resp = await client.get(
+                        f"{IND_OAP_API}/{code}/slots/",
+                        params={"productKey": product_key, "persons": 1},
+                        headers=BROWSER_HEADERS,
+                    )
+                    entry["status"] = resp.status_code
+                    try:
+                        body = resp.json()
+                        entry["body_type"] = type(body).__name__
+                        if isinstance(body, list):
+                            entry["count"] = len(body)
+                            entry["sample"] = body[:2]
+                        elif isinstance(body, dict):
+                            entry["keys"] = list(body.keys())[:10]
+                            entry["sample"] = {k: v for k, v in list(body.items())[:3]}
+                        else:
+                            entry["raw"] = str(body)[:200]
+                    except Exception as parse_err:
+                        entry["parse_error"] = str(parse_err)
+                        entry["raw_text"] = resp.text[:300]
+                except Exception as exc:
+                    entry["error"] = f"{type(exc).__name__}: {exc}"
+                results.append(entry)
+
+    return {"checked_at": datetime.now(timezone.utc).isoformat(), "results": results}
 
 
 @router.post("/ind-monitor/check")
