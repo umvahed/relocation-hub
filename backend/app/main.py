@@ -10,6 +10,7 @@ from app.routes.calendar import router as calendar_router
 from app.routes.documents import router as documents_router
 from app.routes.validation import router as validation_router
 from app.routes.risk_score import router as risk_score_router
+from app.routes.ind_monitor import router as ind_monitor_router
 
 app = FastAPI(
     title="RelocationHub API",
@@ -37,6 +38,7 @@ app.include_router(calendar_router, prefix="/api")
 app.include_router(documents_router, prefix="/api")
 app.include_router(validation_router, prefix="/api")
 app.include_router(risk_score_router, prefix="/api")
+app.include_router(ind_monitor_router, prefix="/api")
 
 @app.get("/")
 def root():

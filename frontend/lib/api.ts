@@ -199,3 +199,30 @@ export async function deleteDocument(document_id: string, user_id: string) {
   })
   return handleResponse(res)
 }
+
+export interface IndMonitorStatus {
+  subscribed: boolean
+  subscription: { active: boolean; last_notified_at: string | null; created_at: string } | null
+  latest_check: { slots_available: boolean; status_text: string; checked_at: string } | null
+}
+
+export async function getIndMonitorStatus(user_id: string): Promise<IndMonitorStatus> {
+  const res = await fetch(`${API_URL}/api/ind-monitor/status/${user_id}`)
+  return handleResponse(res)
+}
+
+export async function subscribeIndMonitor(user_id: string, email: string) {
+  const res = await fetch(`${API_URL}/api/ind-monitor/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id, email }),
+  })
+  return handleResponse(res)
+}
+
+export async function unsubscribeIndMonitor(user_id: string) {
+  const res = await fetch(`${API_URL}/api/ind-monitor/subscribe/${user_id}`, {
+    method: 'DELETE',
+  })
+  return handleResponse(res)
+}
