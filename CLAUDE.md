@@ -91,6 +91,22 @@ Not yet built: Stripe, resource links (housing/schools), B2B HR portal.
 | DELETE | `/api/ind-monitor/subscribe/{user_id}` | Unsubscribe user |
 | POST | `/api/ind-monitor/check` | Check OAP API + notify subscribers (cron, auth-protected) |
 
+## Go-live checklist (quick reference — full version in PLAN.md)
+
+- Supabase: migrations 000–005 run, RLS on all tables, `documents` storage bucket with auth policies, Google OAuth redirect set to `/auth/callback`
+- Railway: all 7 env vars set, `GET /api/health` returns 200, CORS origin matches Vercel URL exactly
+- Vercel: 3 `NEXT_PUBLIC_*` env vars set, build passes
+- cron-job.org: 4 jobs active (keepalive 5min, reminders daily, digest weekly, IND monitor 4h)
+- Smoke test: OAuth login → onboarding → checklist → document upload → validation → risk score → IND subscribe → iCal → edit profile → delete account
+
+## Performance notes (full roadmap in PLAN.md)
+
+- **Now**: stateless Railway + Supabase scales to ~500 DAU with no changes
+- **~500 users**: upgrade Supabase to Pro (connection pooling) — do this early, connection exhaustion is silent
+- **~2,000 users**: add async job queue for AI calls (arq + Redis), cache hot reads with Upstash Redis, switch checklist model to `claude-haiku-4-5`
+- **~5,000 users**: Supabase read replica, Cloudflare R2 for document storage, B2B multi-tenancy prep
+- **Never prematurely**: microservices, Kubernetes, prompt optimisation before measuring
+
 ## Roadmap
 
 ### Phase 1 — Premium AI features ✅ COMPLETE
