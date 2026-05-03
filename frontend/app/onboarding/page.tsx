@@ -28,6 +28,7 @@ export default function OnboardingPage() {
     destination_city: '',
     has_children: false,
     number_of_children: 1,
+    container_ship_date: '',
   })
   const router = useRouter()
   const supabase = createClient()
@@ -65,6 +66,7 @@ export default function OnboardingPage() {
         destination_city: form.destination_city || undefined,
         has_children: form.has_children,
         number_of_children: form.has_children ? form.number_of_children : undefined,
+        container_ship_date: form.container_ship_date || undefined,
       })
 
       const checklistResult = await generateChecklist({
@@ -75,6 +77,7 @@ export default function OnboardingPage() {
         has_pets: form.has_pets,
         shipping_type: form.shipping_type,
         has_relocation_allowance: form.has_relocation_allowance,
+        container_ship_date: form.container_ship_date || undefined,
       })
 
       if (checklistResult.detail) {
@@ -181,10 +184,24 @@ export default function OnboardingPage() {
             <select
               value={form.shipping_type}
               onChange={e => setForm(f => ({ ...f, shipping_type: e.target.value }))}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-5">
-              <option value="luggage_only">Luggage / carry-on only</option>
-              <option value="container">Shipping a container</option>
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3">
+              <option value="luggage_only">Luggage / air freight only</option>
+              <option value="container">Full container (FCL/LCL)</option>
+              <option value="both">Both — luggage now, container later</option>
             </select>
+            {(form.shipping_type === 'container' || form.shipping_type === 'both') && (
+              <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                <p className="text-xs font-medium text-amber-800 mb-2">Containers take 2–14 weeks to arrive depending on origin. When are you planning to ship?</p>
+                <input
+                  type="date"
+                  value={form.container_ship_date}
+                  onChange={e => setForm(f => ({ ...f, container_ship_date: e.target.value }))}
+                  className="w-full border border-amber-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <p className="text-xs text-amber-600 mt-1">Don't know yet? Leave blank — you can set it later.</p>
+              </div>
+            )}
+            <div className="mb-2" />
 
             <label className="block text-sm font-medium text-gray-700 mb-3">Does your employer provide a relocation or housing allowance?</label>
             <div className="flex gap-3 mb-5">

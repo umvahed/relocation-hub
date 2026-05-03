@@ -30,6 +30,7 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
     destination_city: profile.destination_city || '',
     has_children: profile.has_children ?? false,
     number_of_children: profile.number_of_children ?? 1,
+    container_ship_date: profile.container_ship_date || '',
   })
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
@@ -49,6 +50,7 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
         contact_email: form.contact_email || undefined,
         destination_city: form.destination_city || undefined,
         number_of_children: form.has_children ? form.number_of_children : undefined,
+        container_ship_date: form.container_ship_date || undefined,
       })
       onSave(updated)
       onClose()
@@ -70,6 +72,7 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
         contact_email: form.contact_email || undefined,
         destination_city: form.destination_city || undefined,
         number_of_children: form.has_children ? form.number_of_children : undefined,
+        container_ship_date: form.container_ship_date || undefined,
       })
       const result = await regenerateChecklist(userId)
       onRegenerate(result.tasks || [])
@@ -142,7 +145,8 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
             <label className={labelClass}>How are you moving your belongings?</label>
             <div className="flex gap-2">
               <button onClick={() => set('shipping_type', 'luggage_only')} className={toggleBtn(form.shipping_type === 'luggage_only')}>Luggage only</button>
-              <button onClick={() => set('shipping_type', 'container')} className={toggleBtn(form.shipping_type === 'container')}>Shipping container</button>
+              <button onClick={() => set('shipping_type', 'container')} className={toggleBtn(form.shipping_type === 'container')}>Container</button>
+              <button onClick={() => set('shipping_type', 'both')} className={toggleBtn(form.shipping_type === 'both')}>Both</button>
             </div>
           </div>
 
@@ -159,6 +163,16 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
               <option value="other">Other</option>
             </select>
           </div>
+
+          {/* Container ship date */}
+          {(form.shipping_type === 'container' || form.shipping_type === 'both') && (
+            <div>
+              <label className={labelClass}>Container ship date <span className="normal-case font-normal text-gray-400">(optional)</span></label>
+              <input type="date" value={form.container_ship_date}
+                onChange={e => set('container_ship_date', e.target.value)} className={inputClass} />
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Containers typically take 2–14 weeks to arrive depending on your origin country.</p>
+            </div>
+          )}
 
           {/* Pets + allowance */}
           <div className="grid grid-cols-2 gap-4">

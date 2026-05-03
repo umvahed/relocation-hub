@@ -33,6 +33,7 @@ export async function generateChecklist(data: {
   has_pets?: boolean
   shipping_type?: string
   has_relocation_allowance?: boolean
+  container_ship_date?: string
 }) {
   const res = await fetch(`${API_URL}/api/checklist/generate`, {
     method: 'POST',
@@ -163,6 +164,7 @@ export async function updateProfile(user_id: string, data: Partial<{
   destination_city: string
   has_children: boolean
   number_of_children: number
+  container_ship_date: string
 }>) {
   const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`, {
     method: 'PATCH',

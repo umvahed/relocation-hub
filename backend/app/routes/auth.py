@@ -36,6 +36,7 @@ class ProfileUpdate(BaseModel):
     destination_city: str | None = None
     has_children: bool | None = None
     number_of_children: int | None = None
+    container_ship_date: str | None = None
 
 class ConsentUpdate(BaseModel):
     ai_validation_consent: bool

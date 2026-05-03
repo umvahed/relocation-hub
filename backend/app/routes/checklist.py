@@ -121,8 +121,9 @@ class GenerateChecklistRequest(BaseModel):
     move_date: str | None = None
     employment_type: str = "employed"
     has_pets: bool = False
-    shipping_type: str = "luggage_only"  # "container", "luggage_only"
+    shipping_type: str = "luggage_only"  # "luggage_only", "container", "both"
     has_relocation_allowance: bool = False
+    container_ship_date: str | None = None
 
 def _check_and_increment_usage(supabase, user_id: str, call_type: str = "checklist"):
     today = date.today().isoformat()
@@ -152,7 +153,7 @@ def _check_and_increment_usage(supabase, user_id: str, call_type: str = "checkli
         supabase.table("api_usage").insert({"user_id": user_id, "date": today, "call_count": 1, "call_type": call_type}).execute()
 
 
-async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country: str, move_date, employment_type: str, has_pets: bool, shipping_type: str, has_relocation_allowance: bool) -> dict:
+async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country: str, move_date, employment_type: str, has_pets: bool, shipping_type: str, has_relocation_allowance: bool, container_ship_date: str | None = None) -> dict:
     conditional_notes = []
 
     if has_pets:
@@ -160,8 +161,13 @@ async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country
     else:
         conditional_notes.append("- The user is NOT bringing pets — do NOT include any pet relocation tasks.")
 
-    if shipping_type == "container":
-        conditional_notes.append("- The user is shipping a container — include: packing inventory list, container/removal company booking, customs declaration (T2L form), port of entry clearance, Dutch customs (Douane) registration, and final delivery coordination.")
+    if shipping_type in ("container", "both"):
+        ship_note = f" Container ship date: {container_ship_date}." if container_ship_date else " Ship date not yet set — remind user to book removal company early."
+        arrival_note = " Containers typically take 2–4 weeks (UK/Europe), 6–10 weeks (South Africa/Americas), or 10–14 weeks (Australia) door-to-door including customs clearance. Include a task to track the container and arrange delivery from port."
+        if shipping_type == "both":
+            conditional_notes.append(f"- The user is shipping BOTH a container AND bringing luggage/air freight.{ship_note}{arrival_note} Include container tasks (packing inventory, removal company booking, customs T2L form, Douane registration, port delivery) AND luggage tasks (airline baggage allowance, excess baggage costs). Emphasise that container contents will arrive weeks/months after the user — plan accordingly.")
+        else:
+            conditional_notes.append(f"- The user is shipping a full container.{ship_note}{arrival_note} Include: packing inventory list, container/removal company booking, customs declaration (T2L form), Dutch customs (Douane) registration, port of entry clearance, and final delivery coordination.")
     else:
         conditional_notes.append("- The user is bringing luggage only — include: deciding what to sell/store/donate, and checking airline baggage allowance and excess baggage costs. Do NOT include container shipping tasks.")
 
@@ -208,6 +214,7 @@ User profile:
 - Employment type: {employment_type}
 - Move date: {move_date or "Not specified"}
 - Shipping: {shipping_type}
+- Container ship date: {container_ship_date or "Not set"}
 - Has pets: {has_pets}
 - Has employer relocation allowance: {has_relocation_allowance}
 
@@ -307,7 +314,7 @@ async def generate_checklist(request: GenerateChecklistRequest):
             supabase, get_claude(),
             request.user_id, request.origin_country, request.move_date,
             request.employment_type, request.has_pets, request.shipping_type,
-            request.has_relocation_allowance,
+            request.has_relocation_allowance, request.container_ship_date,
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -334,6 +341,7 @@ async def regenerate_checklist(request: RegenerateRequest):
             p.get("has_pets", False),
             p.get("shipping_type", "luggage_only"),
             p.get("has_relocation_allowance", False),
+            p.get("container_ship_date"),
         )
     except HTTPException:
         raise
