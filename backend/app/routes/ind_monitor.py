@@ -30,6 +30,11 @@ BROWSER_HEADERS = {
     "Connection": "keep-alive",
 }
 
+# Vercel Edge proxy URL — Railway IPs are blocked by OAP; Edge runs on Cloudflare IPs
+def _edge_proxy_url() -> str | None:
+    base = getattr(settings, "FRONTEND_URL", None)
+    return f"{base}/api/ind-monitor/slots" if base else None
+
 
 def get_supabase():
     global _supabase
@@ -56,36 +61,50 @@ class SubscribeRequest(BaseModel):
     email: str
 
 
+async def _query_slots(client: httpx.AsyncClient, desk: str, product_key: str, proxy_url: str | None) -> tuple[int, any]:
+    """
+    Fetch slots for one desk+product_key combo.
+    Routes through the Vercel Edge proxy (trusted IPs) when available,
+    falls back to direct OAP call if no proxy is configured.
+    """
+    params = {"productKey": product_key, "persons": 1}
+    if proxy_url:
+        resp = await client.get(
+            proxy_url,
+            params={"desk": desk, **params},
+            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+        )
+    else:
+        resp = await client.get(
+            f"{IND_OAP_API}/{desk}/slots/",
+            params=params,
+            headers=BROWSER_HEADERS,
+        )
+    try:
+        data = resp.json()
+    except Exception:
+        data = None
+    return resp.status_code, data
+
+
 async def _fetch_ind_status() -> tuple[bool, str]:
-    """Query OAP JSON API for each desk. Returns (slots_available, status_text)."""
+    """Query OAP for each desk via Edge proxy. Returns (slots_available, status_text)."""
     available_desks: list[str] = []
     errors: list[str] = []
+    proxy_url = _edge_proxy_url()
 
-    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=25, follow_redirects=True) as client:
         for code, name in IND_DESKS.items():
-            found = False
             for product_key in PRODUCT_KEYS:
                 try:
-                    resp = await client.get(
-                        f"{IND_OAP_API}/{code}/slots/",
-                        params={"productKey": product_key, "persons": 1},
-                        headers=BROWSER_HEADERS,
-                    )
-                    if resp.status_code == 200:
-                        try:
-                            data = resp.json()
-                        except Exception:
-                            continue
-                        if _extract_slots(data):
-                            available_desks.append(f"{name} ({product_key})")
-                            found = True
-                            break
-                    elif resp.status_code not in (400, 404):
-                        # 400/404 = invalid product key for this desk — expected, skip silently
-                        errors.append(f"{code}/{product_key}: HTTP {resp.status_code}")
+                    status, data = await _query_slots(client, code, product_key, proxy_url)
+                    if status == 200 and data is not None and _extract_slots(data):
+                        available_desks.append(f"{name} ({product_key})")
+                        break
+                    elif status not in (200, 400, 404):
+                        errors.append(f"{code}/{product_key}: HTTP {status}")
                 except Exception as exc:
                     errors.append(f"{code}/{product_key}: {type(exc).__name__}: {exc}")
-            _ = found  # used only for clarity
 
     if available_desks:
         return True, f"Slots available at: {', '.join(available_desks)}"
@@ -170,22 +189,39 @@ async def get_status(user_id: str):
 
 @router.get("/ind-monitor/debug")
 async def debug_ind(authorization: Annotated[str | None, Header()] = None):
-    """Raw diagnostic probe — returns every desk/key combo with status + body snippet."""
+    """Raw diagnostic probe — one desk × one product key, via proxy if available."""
     if authorization != f"Bearer {settings.RESEND_API_KEY}":
         raise HTTPException(status_code=401, detail="Unauthorised")
 
+    proxy_url = _edge_proxy_url()
     results = []
-    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
-        for code, name in IND_DESKS.items():
-            for product_key in PRODUCT_KEYS:
-                entry: dict = {"desk": code, "name": name, "product_key": product_key}
+
+    async with httpx.AsyncClient(timeout=25, follow_redirects=True) as client:
+        # Only probe a single desk with a couple of keys to keep it fast
+        for code, name in list(IND_DESKS.items())[:2]:
+            for product_key in PRODUCT_KEYS[:4]:
+                entry: dict = {
+                    "desk": code,
+                    "name": name,
+                    "product_key": product_key,
+                    "via_proxy": proxy_url is not None,
+                }
                 try:
-                    resp = await client.get(
-                        f"{IND_OAP_API}/{code}/slots/",
-                        params={"productKey": product_key, "persons": 1},
-                        headers=BROWSER_HEADERS,
-                    )
+                    if proxy_url:
+                        resp = await client.get(
+                            proxy_url,
+                            params={"desk": code, "productKey": product_key, "persons": 1},
+                            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+                        )
+                    else:
+                        resp = await client.get(
+                            f"{IND_OAP_API}/{code}/slots/",
+                            params={"productKey": product_key, "persons": 1},
+                            headers=BROWSER_HEADERS,
+                        )
                     entry["status"] = resp.status_code
+                    entry["server"] = resp.headers.get("server", "")
+                    entry["cf_ray"] = resp.headers.get("cf-ray", "")
                     try:
                         body = resp.json()
                         entry["body_type"] = type(body).__name__
@@ -194,17 +230,19 @@ async def debug_ind(authorization: Annotated[str | None, Header()] = None):
                             entry["sample"] = body[:2]
                         elif isinstance(body, dict):
                             entry["keys"] = list(body.keys())[:10]
-                            entry["sample"] = {k: v for k, v in list(body.items())[:3]}
                         else:
                             entry["raw"] = str(body)[:200]
-                    except Exception as parse_err:
-                        entry["parse_error"] = str(parse_err)
+                    except Exception:
                         entry["raw_text"] = resp.text[:300]
                 except Exception as exc:
                     entry["error"] = f"{type(exc).__name__}: {exc}"
                 results.append(entry)
 
-    return {"checked_at": datetime.now(timezone.utc).isoformat(), "results": results}
+    return {
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "proxy_url": proxy_url,
+        "results": results,
+    }
 
 
 @router.post("/ind-monitor/check")
