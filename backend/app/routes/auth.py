@@ -33,6 +33,9 @@ class ProfileUpdate(BaseModel):
     has_relocation_allowance: bool | None = None
     contact_name: str | None = None
     contact_email: str | None = None
+    destination_city: str | None = None
+    has_children: bool | None = None
+    number_of_children: int | None = None
 
 class ConsentUpdate(BaseModel):
     ai_validation_consent: bool
@@ -76,7 +79,7 @@ async def update_profile(user_id: str, data: ProfileUpdate):
     try:
         supabase = get_supabase()
         update_data = data.model_dump(exclude_unset=True)
-        for key in ('move_date', 'contact_name', 'contact_email'):
+        for key in ('move_date', 'contact_name', 'contact_email', 'destination_city'):
             if key in update_data:
                 update_data[key] = update_data[key] or None
         if not update_data:

@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import { onboardUser, generateChecklist, getChecklist } from '@/lib/api'
+import { onboardUser, generateChecklist, getChecklist, updateProfile } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 
 const COUNTRIES = [
@@ -25,6 +25,9 @@ export default function OnboardingPage() {
     has_relocation_allowance: false,
     contact_name: '',
     contact_email: '',
+    destination_city: '',
+    has_children: false,
+    number_of_children: 1,
   })
   const router = useRouter()
   const supabase = createClient()
@@ -52,6 +55,16 @@ export default function OnboardingPage() {
         move_date: form.move_date || undefined,
         contact_name: form.contact_name || undefined,
         contact_email: form.contact_email || undefined,
+      })
+
+      await updateProfile(user.id, {
+        employment_type: form.employment_type,
+        has_pets: form.has_pets,
+        shipping_type: form.shipping_type,
+        has_relocation_allowance: form.has_relocation_allowance,
+        destination_city: form.destination_city || undefined,
+        has_children: form.has_children,
+        number_of_children: form.has_children ? form.number_of_children : undefined,
       })
 
       const checklistResult = await generateChecklist({
@@ -131,6 +144,18 @@ export default function OnboardingPage() {
               <option value="student">Student</option>
               <option value="family">Family reunification</option>
             </select>
+            <select
+              value={form.destination_city}
+              onChange={e => setForm(f => ({ ...f, destination_city: e.target.value }))}
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4">
+              <option value="">Which city are you moving to? (optional)</option>
+              <option value="amsterdam">Amsterdam</option>
+              <option value="rotterdam">Rotterdam</option>
+              <option value="den-haag">Den Haag</option>
+              <option value="utrecht">Utrecht</option>
+              <option value="eindhoven">Eindhoven</option>
+              <option value="other">Other</option>
+            </select>
             <div className="flex gap-3">
               <button onClick={() => setStep(1)}
                 className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition">
@@ -176,7 +201,7 @@ export default function OnboardingPage() {
             </div>
 
             <label className="block text-sm font-medium text-gray-700 mb-3">Are you bringing pets?</label>
-            <div className="flex gap-3 mb-6">
+            <div className="flex gap-3 mb-5">
               <button
                 onClick={() => setForm(f => ({ ...f, has_pets: true }))}
                 className={`flex-1 py-3 rounded-xl font-semibold border transition ${form.has_pets ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
@@ -188,6 +213,32 @@ export default function OnboardingPage() {
                 No
               </button>
             </div>
+
+            <label className="block text-sm font-medium text-gray-700 mb-3">Are you bringing children?</label>
+            <div className="flex gap-3 mb-3">
+              <button
+                onClick={() => setForm(f => ({ ...f, has_children: true }))}
+                className={`flex-1 py-3 rounded-xl font-semibold border transition ${form.has_children ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                Yes
+              </button>
+              <button
+                onClick={() => setForm(f => ({ ...f, has_children: false }))}
+                className={`flex-1 py-3 rounded-xl font-semibold border transition ${!form.has_children ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                No
+              </button>
+            </div>
+            {form.has_children && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">How many children?</label>
+                <select
+                  value={form.number_of_children}
+                  onChange={e => setForm(f => ({ ...f, number_of_children: Number(e.target.value) }))}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+            )}
+            {!form.has_children && <div className="mb-6" />}
 
             <div className="flex gap-3">
               <button onClick={() => setStep(2)}

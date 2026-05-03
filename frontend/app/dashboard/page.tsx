@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, type RiskScore } from '@/lib/api'
 import RiskScoreWidget from '@/app/components/RiskScoreWidget'
 import IndMonitorWidget from '@/app/components/IndMonitorWidget'
+import ResourcesWidget from '@/app/components/ResourcesWidget'
 import ThemeToggle from '@/app/components/ThemeToggle'
 import EditProfileModal from '@/app/components/EditProfileModal'
 import { compressImage, formatBytes, MAX_FILE_SIZE_FREE, MAX_FILE_SIZE_PAID, STORAGE_QUOTA_FREE, STORAGE_QUOTA_PAID } from '@/lib/storage'
@@ -462,6 +463,10 @@ export default function DashboardPage() {
 
         {user && profile && (
           <IndMonitorWidget userId={user.id} userEmail={user.email ?? profile.email ?? ''} />
+        )}
+
+        {profile && (
+          <ResourcesWidget profile={profile} />
         )}
 
         {/* Progress */}

@@ -27,6 +27,9 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
     has_relocation_allowance: profile.has_relocation_allowance ?? false,
     contact_name: profile.contact_name || '',
     contact_email: profile.contact_email || '',
+    destination_city: profile.destination_city || '',
+    has_children: profile.has_children ?? false,
+    number_of_children: profile.number_of_children ?? 1,
   })
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
@@ -44,6 +47,8 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
         move_date: form.move_date || undefined,
         contact_name: form.contact_name || undefined,
         contact_email: form.contact_email || undefined,
+        destination_city: form.destination_city || undefined,
+        number_of_children: form.has_children ? form.number_of_children : undefined,
       })
       onSave(updated)
       onClose()
@@ -63,6 +68,8 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
         move_date: form.move_date || undefined,
         contact_name: form.contact_name || undefined,
         contact_email: form.contact_email || undefined,
+        destination_city: form.destination_city || undefined,
+        number_of_children: form.has_children ? form.number_of_children : undefined,
       })
       const result = await regenerateChecklist(userId)
       onRegenerate(result.tasks || [])
@@ -139,6 +146,20 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
             </div>
           </div>
 
+          {/* Destination city */}
+          <div>
+            <label className={labelClass}>Destination city <span className="normal-case font-normal text-gray-400">(optional)</span></label>
+            <select value={form.destination_city} onChange={e => set('destination_city', e.target.value)} className={inputClass}>
+              <option value="">Select city</option>
+              <option value="amsterdam">Amsterdam</option>
+              <option value="rotterdam">Rotterdam</option>
+              <option value="den-haag">Den Haag</option>
+              <option value="utrecht">Utrecht</option>
+              <option value="eindhoven">Eindhoven</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
           {/* Pets + allowance */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -155,6 +176,25 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
                 <button onClick={() => set('has_relocation_allowance', false)} className={toggleBtn(!form.has_relocation_allowance)}>No</button>
               </div>
             </div>
+          </div>
+
+          {/* Children */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Bringing children?</label>
+              <div className="flex gap-2">
+                <button onClick={() => set('has_children', true)} className={toggleBtn(form.has_children)}>Yes</button>
+                <button onClick={() => set('has_children', false)} className={toggleBtn(!form.has_children)}>No</button>
+              </div>
+            </div>
+            {form.has_children && (
+              <div>
+                <label className={labelClass}>How many?</label>
+                <select value={form.number_of_children} onChange={e => set('number_of_children', Number(e.target.value))} className={inputClass}>
+                  {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* HR contact */}

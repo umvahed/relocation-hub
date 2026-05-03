@@ -10,11 +10,12 @@ export default function Home() {
           <div className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
             Relocation<span className="text-indigo-600">Hub</span>
           </div>
-          <div className="flex items-center gap-4">
-            <Link href="/tools/30-ruling" className="hidden sm:block text-sm text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition font-medium">
-              30% Ruling Calculator
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Link href="/tools/30-ruling" className="text-xs sm:text-sm font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition whitespace-nowrap">
+              <span className="hidden sm:inline">30% Ruling Calculator</span>
+              <span className="sm:hidden">30% Ruling</span>
             </Link>
-            <Link href="/login" className="text-sm font-medium bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+            <Link href="/login" className="text-sm font-medium bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition whitespace-nowrap">
               Get started free
             </Link>
           </div>
@@ -39,8 +40,8 @@ export default function Home() {
           <Link href="/login" className="w-full sm:w-auto bg-indigo-600 text-white px-7 py-3.5 rounded-xl text-base font-semibold hover:bg-indigo-700 transition shadow-sm">
             Start your relocation plan →
           </Link>
-          <Link href="/tools/30-ruling" className="w-full sm:w-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 px-7 py-3.5 rounded-xl text-base font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-            Check 30% ruling eligibility
+          <Link href="/tools/30-ruling" className="w-full sm:w-auto bg-emerald-600 text-white px-7 py-3.5 rounded-xl text-base font-semibold hover:bg-emerald-700 transition shadow-sm">
+            Check 30% ruling eligibility →
           </Link>
         </div>
         <p className="text-sm text-gray-400 dark:text-gray-500 mt-4">Free to start · No credit card required</p>
