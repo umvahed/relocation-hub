@@ -12,7 +12,7 @@ backend/    → Railway (relocation-hub-production.up.railway.app)
 - Auth: Supabase Google OAuth + email/password
 - AI: Anthropic Claude (checklist generation + document validation + risk score) via backend only
 - Storage: Supabase bucket `documents` (RLS enforced)
-- Cron: Vercel cron hits `/api/keepalive` every 5 min to prevent Railway cold starts; cron-job.org handles weekly-digest, send-reminders, ind-monitor (every 4h)
+- Cron: All crons run via cron-job.org (keepalive every 5 min, weekly-digest, send-reminders, ind-monitor every 4h). `vercel.json` is intentionally empty — Vercel Hobby only allows daily cron frequency, so keepalive runs via cron-job.org instead. When upgrading to Vercel Pro, move keepalive to vercel.json: `{ "crons": [{ "path": "/api/keepalive", "schedule": "*/5 * * * *" }] }`
 
 ## Env vars — where they live
 
