@@ -63,13 +63,27 @@ def _oap_url(desk: str, product_key: str) -> str:
     target = f"{IND_OAP_API}/{desk}/slots/?productKey={product_key}&persons=1"
     if settings.SCRAPER_API_KEY:
         from urllib.parse import quote
-        return f"{SCRAPER_API_BASE}?api_key={settings.SCRAPER_API_KEY}&url={quote(target)}"
+        # country_code=nl: prefer Dutch residential IPs for faster response from .nl gov sites
+        # timeout=70000: give ScraperAPI up to 70s to find a proxy and get a response
+        return (
+            f"{SCRAPER_API_BASE}?api_key={settings.SCRAPER_API_KEY}"
+            f"&url={quote(target)}&country_code=nl&timeout=70000"
+        )
     return target
+
+
+def _oap_url_safe(desk: str, product_key: str) -> str:
+    """Same as _oap_url but with API key masked — for logging/debug output."""
+    url = _oap_url(desk, product_key)
+    if settings.SCRAPER_API_KEY:
+        return url.replace(settings.SCRAPER_API_KEY, "***")
+    return url
 
 
 async def _query_slots(client: httpx.AsyncClient, desk: str, product_key: str) -> tuple[int, any]:
     url = _oap_url(desk, product_key)
-    resp = await client.get(url, headers=BROWSER_HEADERS, timeout=30)
+    # 90s: ScraperAPI needs up to 70s internally; give extra headroom
+    resp = await client.get(url, headers=BROWSER_HEADERS, timeout=90)
     try:
         data = resp.json()
     except Exception:
@@ -82,7 +96,7 @@ async def _fetch_ind_status() -> tuple[bool, str]:
     available_desks: list[str] = []
     errors: list[str] = []
 
-    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=100, follow_redirects=True) as client:
         for code, name in IND_DESKS.items():
             for product_key in PRODUCT_KEYS:
                 try:
@@ -185,7 +199,7 @@ async def debug_ind(authorization: Annotated[str | None, Header()] = None):
         raise HTTPException(status_code=401, detail="Unauthorised")
 
     results = []
-    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=100, follow_redirects=True) as client:
         for code, name in list(IND_DESKS.items())[:2]:
             for product_key in PRODUCT_KEYS:
                 entry: dict = {
@@ -193,7 +207,7 @@ async def debug_ind(authorization: Annotated[str | None, Header()] = None):
                     "name": name,
                     "product_key": product_key,
                     "via_scraper_api": bool(settings.SCRAPER_API_KEY),
-                    "url": _oap_url(code, product_key),
+                    "url": _oap_url_safe(code, product_key),
                 }
                 try:
                     status, body = await _query_slots(client, code, product_key)
