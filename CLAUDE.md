@@ -75,7 +75,7 @@ Not yet built: Stripe, IND slot monitor, peer benchmarking, shareable progress c
 
 ### Phase 3 — Innovation ← IN PROGRESS
 1. ✅ **Checklist regeneration + profile editing** — `PATCH /api/auth/profile`, `POST /api/checklist/regenerate`, `EditProfileModal` in settings
-2. **IND Appointment Slot Monitor** — background check + email alert when slots open
+2. ✅ **IND Appointment Slot Monitor** — `GET /api/ind-monitor/status`, `POST /api/ind-monitor/subscribe`, `POST /api/ind-monitor/check` (cron every 4h via cron-job.org), `IndMonitorWidget` on dashboard
 3. **Anonymous peer benchmarking** — aggregate stats from user data, shown on dashboard
 4. **Shareable relocation progress card** — public `/progress/[userId]` page with social share
 5. **30% Ruling eligibility calculator** — public `/tools/30-ruling` page, SEO + CTA
