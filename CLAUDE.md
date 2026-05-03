@@ -25,10 +25,17 @@ backend/    → Railway (relocation-hub-production.up.railway.app)
 | `SUPABASE_ANON_KEY` | Railway |
 | `SUPABASE_SERVICE_KEY` | Railway |
 | `ANTHROPIC_API_KEY` | Railway |
+| `RESEND_API_KEY` | Vercel (cron proxy routes read this server-side) |
+| `SUPABASE_URL` | Railway |
+| `SUPABASE_ANON_KEY` | Railway |
+| `SUPABASE_SERVICE_KEY` | Railway |
+| `ANTHROPIC_API_KEY` | Railway |
+| `RESEND_API_KEY` | Railway |
+| `RESEND_FROM_EMAIL` | Railway |
 | `FRONTEND_URL` | Railway |
 | `ADMIN_SECRET` | Railway |
 
-Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel.
+Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEND_API_KEY` lives in BOTH Vercel (cron proxies) and Railway (email sending).
 
 ## Key constraints
 
@@ -95,7 +102,7 @@ Not yet built: Stripe, resource links (housing/schools), B2B HR portal.
 - `reminders.py` — `POST /reminders/send` + `PATCH /reminders/task/{task_id}/due-date`
 - `calendar.py` — `GET /calendar/{user_id}/feed.ics`
 - Due date UI already wired in dashboard expanded task view
-- Weekly digest + keepalive cron jobs running on Vercel
+- Weekly digest + keepalive cron (Vercel); reminders + IND monitor cron (cron-job.org)
 
 ### Phase 3 — Innovation ← IN PROGRESS
 1. ✅ **Checklist regeneration + profile editing** — `PATCH /api/auth/profile`, `POST /api/checklist/regenerate`, `EditProfileModal` in settings
