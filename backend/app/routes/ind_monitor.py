@@ -63,12 +63,7 @@ def _oap_url(desk: str, product_key: str) -> str:
     target = f"{IND_OAP_API}/{desk}/slots/?productKey={product_key}&persons=1"
     if settings.SCRAPER_API_KEY:
         from urllib.parse import quote
-        # country_code=nl: prefer Dutch residential IPs for faster response from .nl gov sites
-        # timeout=70000: give ScraperAPI up to 70s to find a proxy and get a response
-        return (
-            f"{SCRAPER_API_BASE}?api_key={settings.SCRAPER_API_KEY}"
-            f"&url={quote(target)}&country_code=nl&timeout=70000"
-        )
+        return f"{SCRAPER_API_BASE}?api_key={settings.SCRAPER_API_KEY}&url={quote(target)}"
     return target
 
 
@@ -76,7 +71,7 @@ def _oap_url_safe(desk: str, product_key: str) -> str:
     """Same as _oap_url but with API key masked — for logging/debug output."""
     url = _oap_url(desk, product_key)
     if settings.SCRAPER_API_KEY:
-        return url.replace(settings.SCRAPER_API_KEY, "***")
+        return url.replace(settings.SCRAPER_API_KEY, "***")  # type: ignore[arg-type]
     return url
 
 
