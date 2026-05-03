@@ -12,7 +12,7 @@ backend/    → Railway (relocation-hub-production.up.railway.app)
 - Auth: Supabase Google OAuth + email/password
 - AI: Anthropic Claude (checklist generation + document validation + risk score) via backend only
 - Storage: Supabase bucket `documents` (RLS enforced)
-- Cron: Vercel cron hits `/api/keepalive` every 5 min to prevent Railway cold starts
+- Cron: Vercel cron hits `/api/keepalive` every 5 min to prevent Railway cold starts; cron-job.org handles weekly-digest, send-reminders, ind-monitor (every 4h)
 
 ## Env vars — where they live
 
@@ -49,16 +49,40 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel.
 
 ## Current state
 
-Working end-to-end: Google OAuth / email auth → onboarding → AI checklist → dashboard → document upload → document AI validation → relocation risk score → iCal feed → profile editing → checklist regeneration.
+Working end-to-end: Google OAuth / email auth → onboarding → AI checklist → dashboard → document upload → document AI validation → relocation risk score → iCal feed → task reminders → HR contact notifications → profile editing → checklist regeneration → IND appointment slot monitor.
 
-Not yet built: Stripe, IND slot monitor, peer benchmarking, shareable progress card, 30% ruling calculator, AI chat assistant.
+Not yet built: Stripe, peer benchmarking, shareable progress card, 30% ruling calculator, AI chat assistant.
 
-## New API endpoints (Feature 1)
+## All API endpoints
 
 | Method | Endpoint | What it does |
 |---|---|---|
-| PATCH | `/api/auth/profile/{user_id}` | Partial profile update (any field, exclude_unset) |
+| GET | `/api/health` | Railway healthcheck |
+| POST | `/api/auth/onboard` | Creates/upserts user profile |
+| GET | `/api/auth/profile/{user_id}` | Fetch full profile |
+| PATCH | `/api/auth/profile/{user_id}` | Partial profile update (exclude_unset) |
+| PATCH | `/api/auth/profile/{user_id}/consent` | Set/withdraw AI validation consent |
+| DELETE | `/api/auth/profile/{user_id}` | Full account deletion (cascades all data) |
+| POST | `/api/admin/grant-paid-tier` | Manually grant paid tier (X-Admin-Secret) |
+| POST | `/api/checklist/generate` | Hardcoded critical tasks + Claude AI tasks |
 | POST | `/api/checklist/regenerate` | Delete all tasks + re-generate from current profile |
+| GET | `/api/checklist/{user_id}` | All tasks for user |
+| PATCH | `/api/checklist/task/{task_id}` | Update task status |
+| GET | `/api/usage/{user_id}` | Daily call counts per type |
+| GET | `/api/documents/{user_id}` | List uploaded documents |
+| DELETE | `/api/documents/{document_id}` | Delete document |
+| POST | `/api/documents/{document_id}/validate` | AI document validation |
+| GET | `/api/documents/{document_id}/validation` | Get latest validation result |
+| POST | `/api/risk-score/compute` | Compute + upsert risk score |
+| GET | `/api/risk-score/{user_id}` | Get cached risk score |
+| GET | `/api/calendar/{user_id}/feed.ics` | iCal feed |
+| POST | `/api/reminders/send` | Send due-date reminder emails (cron) |
+| PATCH | `/api/reminders/task/{task_id}/due-date` | Set task due date |
+| POST | `/api/notifications/weekly-digest` | Send weekly digest to HR contacts (cron) |
+| GET | `/api/ind-monitor/status/{user_id}` | Subscription status + latest check result |
+| POST | `/api/ind-monitor/subscribe` | Subscribe user to slot alerts |
+| DELETE | `/api/ind-monitor/subscribe/{user_id}` | Unsubscribe user |
+| POST | `/api/ind-monitor/check` | Check OAP API + notify subscribers (cron, auth-protected) |
 
 ## Roadmap
 

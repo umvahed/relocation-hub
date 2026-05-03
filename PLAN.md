@@ -1,11 +1,10 @@
 # RelocationHub — Implementation Plan
-## Phase 2: Engagement Layer
 
-> Updated: 2026-04-26. Phase 1 (Document AI Validation + Risk Score) is complete and live.
+> Last updated: 2026-05-03. Phase 1 + Phase 2 complete. Phase 3 in progress.
 
 ---
 
-## Phase 1 — COMPLETE ✅
+## Phase 1 — Premium AI features ✅ COMPLETE
 
 | Feature | Status |
 |---|---|
@@ -16,82 +15,101 @@
 
 ---
 
-## What we're building next
+## Phase 2 — Engagement layer ✅ COMPLETE
 
-### Step 1 — Audit existing routes (do this first)
-
-Three route files exist but their real-world wiring is unknown:
-
-| File | Audit question |
+| Feature | Status |
 |---|---|
-| `backend/app/routes/notifications.py` | What endpoints exist? What does it actually send? Is Resend configured? |
-| `backend/app/routes/reminders.py` | Is the due-date PATCH wired? Are reminder emails sending? |
-| `backend/app/routes/calendar.py` | iCal feed confirmed working — what else is in here? |
-
-Read all three files before building anything new.
-
----
-
-### Step 2 — Email reminders
-
-Per-task due dates are already stored in `tasks.due_date`. What's needed:
-
-- **Backend:** scheduled job or endpoint that finds tasks with `due_date` approaching and sends reminder emails via Resend
-- **User control:** configurable cadence (day before, 3 days before, etc.) — stored on profile or per-task
-- **Trigger:** either a Vercel cron hitting a backend endpoint, or a Railway background task
-- `tasks.reminder_sent_at` column already exists — use to prevent duplicate sends
-
-**Resend env var:** `RESEND_API_KEY` — already in `config.py`, needs to be added to Railway if not there.
+| Task completion → HR contact email (`notify_task_complete`) | ✅ Live |
+| Weekly digest to HR contact (`POST /notifications/weekly-digest`) | ✅ Live |
+| Task due-date reminders (`POST /reminders/send`) | ✅ Live |
+| iCal feed (`GET /calendar/{user_id}/feed.ics`) | ✅ Live |
+| Keepalive cron (Vercel, every 5 min) | ✅ Live |
+| Weekly digest + reminders cron (cron-job.org) | ✅ Live |
 
 ---
 
-### Step 3 — HR/consultant contact notifications
+## Phase 3 — Innovation ← IN PROGRESS
 
-Described as the key differentiator. User adds a contact (name + email) during onboarding.
+### Feature 1 ✅ — Checklist regeneration + profile editing
 
-**What the contact should receive:**
-1. **Task completion alert** — when user ticks off a task, contact gets an email ("Ahmed completed: Register at gemeente")
-2. **Weekly digest** — summary of progress that week (tasks completed, tasks due soon)
+- `PATCH /api/auth/profile/{user_id}` — partial update, Pydantic `exclude_unset`
+- `POST /api/checklist/regenerate` — deletes all tasks + re-generates from current profile
+- `_build_and_insert_tasks()` extracted helper shared by generate + regenerate
+- `EditProfileModal.tsx` — all profile fields, two-step confirm for regenerate (destructive)
+- "Edit profile & plan" link in dashboard settings dropdown
 
-**What already exists:**
-- `profiles.contact_name` + `profiles.contact_email` — stored at onboarding
-- `notifications.py` — may already have some of this (needs audit from Step 1)
-- Task completion already fires in `PATCH /api/checklist/task/{task_id}` — hook exists
+### Feature 2 ✅ — IND Appointment Slot Monitor
 
-**Resend from address:** `RESEND_FROM_EMAIL` already in config (default: `Relocation Hub <onboarding@resend.dev>`)
+- Hits OAP JSON API (`https://oap.ind.nl/oap/api/desks/{desk}/slots/?productKey=DOC&persons=1`) for 4 desks: AM, DH, ZW, DB
+- Notifies on state change only: unavailable → available (no spam)
+- `ind_monitor_subscriptions` + `ind_monitor_cache` tables (migration 003)
+- Cron every 4h via cron-job.org → Vercel `/api/ind-monitor` → Railway `/api/ind-monitor/check`
+- `IndMonitorWidget.tsx` on dashboard — live status + subscribe/unsubscribe toggle
+
+### Feature 3 🔲 — Anonymous peer benchmarking
+
+Show aggregate stats from anonymised user data on the dashboard.
+
+**Ideas:**
+- "Users from South Africa are 68% complete on average"
+- "Most users complete critical tasks within 14 days"
+- "You're ahead of 73% of users at your stage"
+
+**Implementation:**
+- Backend: `GET /api/benchmarks` — aggregate query (no PII, group by origin_country)
+- Frontend: small card on dashboard below progress bar
+- No new table needed — query `tasks` + `profiles` with aggregation
+
+### Feature 4 🔲 — Shareable relocation progress card
+
+Public page at `/progress/[userId]` with social share.
+
+**Implementation:**
+- Public Next.js page (no auth) — reads from a public-safe view
+- Progress bar, completed vs total tasks, move date countdown
+- OG image for social sharing (og:image)
+- User controls sharing from dashboard settings (toggle `profiles.share_progress`)
+- Add `share_progress` boolean column to profiles
+
+### Feature 5 🔲 — 30% Ruling eligibility calculator
+
+Public page at `/tools/30-ruling` — SEO + CTA to sign up.
+
+**Implementation:**
+- Public Next.js page (no auth)
+- Form: salary, role, nationality, degree level, prior Netherlands stay
+- Logic: Dutch tax authority rules (40% ruling from 2024 transition)
+- Result: eligible / not eligible / borderline + explanation
+- CTA: "Track your 30% ruling application in RelocationHub"
+- No backend needed — pure frontend calculation
+
+### Feature 6 🔲 — AI Chat Assistant (last)
+
+In-app Claude chat with full user context.
+
+**Note:** Deprioritised — expensive per-message, can make UI clunky. Only build after all other Phase 3 features are shipped.
+
+**Implementation (when ready):**
+- Backend: `POST /api/chat` — streams Claude response with system prompt injecting user profile + task state
+- Frontend: floating chat button → slide-in panel
+- Tier gated (paid only)
+- Rate limited
 
 ---
 
-### Step 4 — Checklist regeneration
-
-Currently checklist is one-shot. `POST /api/checklist/generate` returns early if tasks exist.
-
-**Needed:** `POST /api/checklist/regenerate`
-- Deletes all existing tasks for user
-- Deletes all documents? (decide: probably not — keep documents, only regenerate tasks)
-- Re-runs the same generation logic with updated profile answers
-- Frontend: button in settings menu ("Regenerate checklist") with a confirmation dialog
-
----
-
-## After Phase 2 — Stripe (Phase 3)
+## Phase 4 — Monetisation 🔲
 
 When Stripe is ready:
 - Add `POST /api/billing/webhook` — on `checkout.session.completed` → set `profiles.tier = 'paid'`
 - No changes needed to validation/risk score guard logic (402 handling already in place)
 - No changes needed to frontend paywall UI (already checks `profile.tier === 'paid'`)
 - Add Stripe keys to Railway: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+- Price: €3.99/mo
 
 ---
 
-## Verification checklist for Phase 2
+## Phase 5 — B2B white-label 🔲
 
-- [ ] `notifications.py` audited — endpoints + Resend integration documented
-- [ ] `reminders.py` audited — what's working vs. missing
-- [ ] Resend API key confirmed in Railway env vars
-- [ ] Task completion triggers contact email
-- [ ] Weekly digest sends to contact email
-- [ ] Reminder email sends N days before due date
-- [ ] `reminder_sent_at` stamped to prevent duplicates
-- [ ] Regenerate endpoint deletes + recreates tasks
-- [ ] Regenerate button in settings with confirmation
+- HR/Company Portal: companies pay per-employee; HR dashboard sees all relocatees' progress
+- Bulk onboarding, task annotation, admin controls
+- Separate pricing tier (per-seat)
