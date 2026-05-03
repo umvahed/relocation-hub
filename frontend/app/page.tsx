@@ -22,18 +22,18 @@ export default function Home() {
       </nav>
 
       {/* Hero */}
-      <section className="bg-gradient-to-b from-indigo-50/60 dark:from-indigo-950/30 to-white dark:to-gray-900 max-w-5xl mx-auto px-5 pt-20 pb-16 text-center rounded-3xl mt-4">
-        <div className="inline-flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-sm font-medium px-3 py-1 rounded-full mb-6">
+      <section className="bg-gradient-to-b from-indigo-50/60 dark:from-indigo-950/30 to-white dark:to-gray-900 max-w-5xl mx-auto px-5 pt-16 pb-16 text-center rounded-3xl mt-4">
+        <div className="inline-flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs sm:text-sm font-medium px-3 py-1 rounded-full mb-4">
           <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
-          Built for expats relocating to the Netherlands
+          For people moving to the Netherlands
         </div>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 dark:text-white leading-tight tracking-tight mb-5">
+        <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-gray-900 dark:text-white leading-tight tracking-tight mb-4">
           Your Dutch relocation,
           <br className="hidden sm:block" />
           <span className="text-indigo-600">planned and tracked.</span>
         </h1>
-        <p className="text-lg text-gray-500 dark:text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">
-          AI-generated checklist, document validation, risk scoring, IND appointment alerts, and a 30% ruling calculator — everything an expat needs, in one place.
+        <p className="text-sm sm:text-lg text-gray-500 dark:text-gray-400 mb-6 max-w-2xl mx-auto leading-relaxed">
+          AI checklist, document validation, risk scoring, IND appointment alerts, and a 30% ruling calculator — everything you need, in one place.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link href="/login" className="w-full sm:w-auto bg-indigo-600 text-white px-7 py-3.5 rounded-xl text-base font-semibold hover:bg-indigo-700 transition shadow-sm">
