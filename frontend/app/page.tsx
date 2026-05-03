@@ -10,12 +10,11 @@ export default function Home() {
           <div className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
             Relocation<span className="text-indigo-600">Hub</span>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <Link href="/tools/30-ruling" className="text-xs sm:text-sm font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition whitespace-nowrap">
-              <span className="hidden sm:inline">30% Ruling Calculator</span>
-              <span className="sm:hidden">30% Ruling</span>
+          <div className="flex items-center gap-4">
+            <Link href="/tools/30-ruling" className="hidden sm:block text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-300 transition">
+              30% Ruling Calculator
             </Link>
-            <Link href="/login" className="text-sm font-medium bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition whitespace-nowrap">
+            <Link href="/login" className="text-sm font-medium bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
               Get started free
             </Link>
           </div>
