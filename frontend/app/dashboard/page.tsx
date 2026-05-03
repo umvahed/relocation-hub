@@ -352,6 +352,20 @@ export default function DashboardPage() {
                     </button>
                   </div>
 
+                  {/* 30% Ruling tool */}
+                  <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
+                    <a
+                      href="/tools/30-ruling"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition w-full text-left font-medium">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      30% Ruling calculator
+                    </a>
+                  </div>
+
                   {/* Storage usage */}
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                     <div className="flex justify-between items-center mb-1.5">

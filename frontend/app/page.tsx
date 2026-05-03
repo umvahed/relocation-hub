@@ -120,11 +120,25 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Tools banner */}
+      <section className="max-w-5xl mx-auto px-5 py-10">
+        <div className="bg-gradient-to-r from-emerald-50 to-indigo-50 dark:from-emerald-950/30 dark:to-indigo-950/30 border border-emerald-100 dark:border-emerald-900/50 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide mb-1">Free tool</p>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">30% Ruling eligibility calculator</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Check if you qualify for the Dutch tax ruling — and how much you'd save.</p>
+          </div>
+          <Link href="/tools/30-ruling" className="flex-shrink-0 bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition whitespace-nowrap">
+            Check eligibility →
+          </Link>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-gray-100 dark:border-gray-800 py-6 px-5">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
           <span>Relocation<span className="text-indigo-600">Hub</span></span>
-          <span>Built for expats moving to the Netherlands</span>
+          <Link href="/tools/30-ruling" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">30% Ruling Calculator</Link>
           <a href="mailto:support@relocationhub.app" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">
             support@relocationhub.app
           </a>
