@@ -10,13 +10,15 @@ from supabase import create_client
 router = APIRouter()
 _supabase = None
 
-IND_URL = "https://www.ind.nl/en/make-an-appointment-with-ind"
+IND_URL = "https://ind.nl/en/service-contact/make-an-appointment-with-the-ind"
 # Text present on IND page when NO slots are available
 _NO_SLOT_PHRASES = [
     "it is currently not possible to make an appointment",
     "no appointments available",
     "appointment is not possible",
     "niet mogelijk een afspraak",
+    "no online appointments",
+    "temporarily not possible",
 ]
 
 
@@ -55,7 +57,7 @@ def _send_alert(email: str, slots_available: bool, status_text: str) -> bool:
         <div style="font-size: 15px; font-weight: 600; color: {'#15803d' if slots_available else '#92400e'};">
           {'✅ ' + status_text if slots_available else '⚠️ ' + status_text}
         </div>
-        {'<p style="font-size: 13px; color: #374151; margin: 8px 0 0;">Book your appointment at <a href="' + IND_URL + '" style="color: #4f46e5;">ind.nl</a> before slots fill up again.</p>' if slots_available else ''}
+        {'<p style="font-size: 13px; color: #374151; margin: 8px 0 0;">Book your appointment at <a href="https://oap.ind.nl/oap/en/" style="color: #4f46e5;">oap.ind.nl</a> before slots fill up again.</p>' if slots_available else ''}
       </div>
       <p style="color: #9ca3af; font-size: 13px; margin: 0;">
         You'll receive another alert when the status changes.
