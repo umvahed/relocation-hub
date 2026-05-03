@@ -105,6 +105,7 @@ function ContainerArrivalBanner({ shipDate, originCountry }: { shipDate: string;
   const latest = new Date(ship); latest.setDate(latest.getDate() + max * 7)
   const fmt = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
   const today = new Date(); today.setHours(0, 0, 0, 0)
+  const shipped = ship <= today
   const arrived = latest < today
   return (
     <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl px-4 py-3.5 flex items-center gap-3">
@@ -113,8 +114,13 @@ function ContainerArrivalBanner({ shipDate, originCountry }: { shipDate: string;
         <p className="text-xs font-semibold text-orange-700 dark:text-orange-300 uppercase tracking-wide">Container shipment</p>
         {arrived
           ? <p className="text-sm text-orange-800 dark:text-orange-200">Your container should have arrived. Confirm delivery with your moving company.</p>
-          : <p className="text-sm text-orange-800 dark:text-orange-200">Shipped {fmt(ship)} · Estimated arrival <span className="font-semibold">{fmt(earliest)}–{fmt(latest)}</span> · Allow extra time for customs clearance.</p>
+          : <p className="text-sm text-orange-800 dark:text-orange-200">
+              {shipped ? 'Shipped' : 'Ships'} {fmt(ship)} · Estimated arrival <span className="font-semibold">{fmt(earliest)}–{fmt(latest)}</span> · Allow extra time for customs clearance.
+            </p>
         }
+        <a href="#section-shipping" className="inline-block mt-1 text-xs font-medium text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-200 underline underline-offset-2 transition">
+          See your Shipping &amp; Logistics tasks →
+        </a>
       </div>
     </div>
   )
@@ -568,7 +574,7 @@ export default function DashboardPage() {
         {sections.map(({ cat, meta, tasks: sectionTasks }) => {
           const locked = cat !== 'critical' && !criticalAllDone
           return (
-            <div key={cat} className={locked ? 'opacity-50 pointer-events-none select-none' : ''}>
+            <div key={cat} id={`section-${cat}`} className={locked ? 'opacity-50 pointer-events-none select-none' : ''}>
               <div className={`flex items-center gap-2 mb-3 border-l-4 ${meta.border} pl-3`}>
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${meta.color} ${meta.text}`}>
                   {meta.label}
