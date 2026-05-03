@@ -18,8 +18,10 @@ IND_DESKS = {
     "ZW": "Zwolle",
     "DB": "'s-Hertogenbosch",
 }
-# All known product keys used by the OAP portal
-PRODUCT_KEYS = ("TKV", "DOC", "BIO", "VAA", "REG", "NAT", "MVV", "V")
+# OAP blocks all data-centre IPs (Railway, Vercel, etc.) — requests must come from residential IPs.
+# We route through ScraperAPI (scraperapi.com) which uses residential proxy pools.
+# Free tier: 1000 req/month. At 4 desks × 2 keys × 6 checks/day = 720 req/month — within limit.
+PRODUCT_KEYS = ("TKV", "DOC")
 
 BROWSER_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -27,13 +29,9 @@ BROWSER_HEADERS = {
     "Accept-Language": "en-US,en;q=0.9,nl;q=0.8",
     "Referer": "https://oap.ind.nl/oap/en/",
     "Origin": "https://oap.ind.nl",
-    "Connection": "keep-alive",
 }
 
-# Vercel Edge proxy URL — Railway IPs are blocked by OAP; Edge runs on Cloudflare IPs
-def _edge_proxy_url() -> str | None:
-    base = getattr(settings, "FRONTEND_URL", None)
-    return f"{base}/api/ind-monitor/slots" if base else None
+SCRAPER_API_BASE = "https://api.scraperapi.com"
 
 
 def get_supabase():
@@ -61,25 +59,17 @@ class SubscribeRequest(BaseModel):
     email: str
 
 
-async def _query_slots(client: httpx.AsyncClient, desk: str, product_key: str, proxy_url: str | None) -> tuple[int, any]:
-    """
-    Fetch slots for one desk+product_key combo.
-    Routes through the Vercel Edge proxy (trusted IPs) when available,
-    falls back to direct OAP call if no proxy is configured.
-    """
-    params = {"productKey": product_key, "persons": 1}
-    if proxy_url:
-        resp = await client.get(
-            proxy_url,
-            params={"desk": desk, **params},
-            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
-        )
-    else:
-        resp = await client.get(
-            f"{IND_OAP_API}/{desk}/slots/",
-            params=params,
-            headers=BROWSER_HEADERS,
-        )
+def _oap_url(desk: str, product_key: str) -> str:
+    target = f"{IND_OAP_API}/{desk}/slots/?productKey={product_key}&persons=1"
+    if settings.SCRAPER_API_KEY:
+        from urllib.parse import quote
+        return f"{SCRAPER_API_BASE}?api_key={settings.SCRAPER_API_KEY}&url={quote(target)}"
+    return target
+
+
+async def _query_slots(client: httpx.AsyncClient, desk: str, product_key: str) -> tuple[int, any]:
+    url = _oap_url(desk, product_key)
+    resp = await client.get(url, headers=BROWSER_HEADERS, timeout=30)
     try:
         data = resp.json()
     except Exception:
@@ -88,20 +78,21 @@ async def _query_slots(client: httpx.AsyncClient, desk: str, product_key: str, p
 
 
 async def _fetch_ind_status() -> tuple[bool, str]:
-    """Query OAP for each desk via Edge proxy. Returns (slots_available, status_text)."""
+    """Query OAP for each desk via ScraperAPI (residential IPs). Returns (slots_available, status_text)."""
     available_desks: list[str] = []
     errors: list[str] = []
-    proxy_url = _edge_proxy_url()
 
-    async with httpx.AsyncClient(timeout=25, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
         for code, name in IND_DESKS.items():
             for product_key in PRODUCT_KEYS:
                 try:
-                    status, data = await _query_slots(client, code, product_key, proxy_url)
+                    status, data = await _query_slots(client, code, product_key)
                     if status == 200 and data is not None and _extract_slots(data):
                         available_desks.append(f"{name} ({product_key})")
                         break
-                    elif status not in (200, 400, 404):
+                    elif status == 200 and data is not None:
+                        break  # 200 empty = valid key, no slots — no need to try next key
+                    elif status not in (400, 404):
                         errors.append(f"{code}/{product_key}: HTTP {status}")
                 except Exception as exc:
                     errors.append(f"{code}/{product_key}: {type(exc).__name__}: {exc}")
@@ -189,58 +180,40 @@ async def get_status(user_id: str):
 
 @router.get("/ind-monitor/debug")
 async def debug_ind(authorization: Annotated[str | None, Header()] = None):
-    """Raw diagnostic probe — one desk × one product key, via proxy if available."""
+    """Raw diagnostic probe — 2 desks × 2 product keys via current routing strategy."""
     if authorization != f"Bearer {settings.RESEND_API_KEY}":
         raise HTTPException(status_code=401, detail="Unauthorised")
 
-    proxy_url = _edge_proxy_url()
     results = []
-
-    async with httpx.AsyncClient(timeout=25, follow_redirects=True) as client:
-        # Only probe a single desk with a couple of keys to keep it fast
+    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
         for code, name in list(IND_DESKS.items())[:2]:
-            for product_key in PRODUCT_KEYS[:4]:
+            for product_key in PRODUCT_KEYS:
                 entry: dict = {
                     "desk": code,
                     "name": name,
                     "product_key": product_key,
-                    "via_proxy": proxy_url is not None,
+                    "via_scraper_api": bool(settings.SCRAPER_API_KEY),
+                    "url": _oap_url(code, product_key),
                 }
                 try:
-                    if proxy_url:
-                        resp = await client.get(
-                            proxy_url,
-                            params={"desk": code, "productKey": product_key, "persons": 1},
-                            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
-                        )
+                    status, body = await _query_slots(client, code, product_key)
+                    entry["status"] = status
+                    if isinstance(body, list):
+                        entry["body_type"] = "list"
+                        entry["count"] = len(body)
+                        entry["sample"] = body[:2]
+                    elif isinstance(body, dict):
+                        entry["body_type"] = "dict"
+                        entry["keys"] = list(body.keys())[:10]
                     else:
-                        resp = await client.get(
-                            f"{IND_OAP_API}/{code}/slots/",
-                            params={"productKey": product_key, "persons": 1},
-                            headers=BROWSER_HEADERS,
-                        )
-                    entry["status"] = resp.status_code
-                    entry["server"] = resp.headers.get("server", "")
-                    entry["cf_ray"] = resp.headers.get("cf-ray", "")
-                    try:
-                        body = resp.json()
                         entry["body_type"] = type(body).__name__
-                        if isinstance(body, list):
-                            entry["count"] = len(body)
-                            entry["sample"] = body[:2]
-                        elif isinstance(body, dict):
-                            entry["keys"] = list(body.keys())[:10]
-                        else:
-                            entry["raw"] = str(body)[:200]
-                    except Exception:
-                        entry["raw_text"] = resp.text[:300]
                 except Exception as exc:
                     entry["error"] = f"{type(exc).__name__}: {exc}"
                 results.append(entry)
 
     return {
         "checked_at": datetime.now(timezone.utc).isoformat(),
-        "proxy_url": proxy_url,
+        "scraper_api_configured": bool(settings.SCRAPER_API_KEY),
         "results": results,
     }
 
