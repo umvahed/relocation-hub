@@ -310,7 +310,7 @@ export default function RulingCalculator() {
                       fail({
                         title: 'Application window has closed',
                         explanation: 'The 30% ruling must be applied for within 4 months of your first Dutch working day. This window has passed for your start date.',
-                        tip: 'Contact your employer's HR or payroll team to confirm whether they filed on time. If they did, the ruling may still be active.',
+                        tip: "Contact your employer's HR or payroll team to confirm whether they filed on time. If they did, the ruling may still be active.",
                       })
                     } else {
                       setStep('salary')
