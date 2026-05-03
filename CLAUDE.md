@@ -49,9 +49,9 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel.
 
 ## Current state
 
-Working end-to-end: Google OAuth / email auth → onboarding → AI checklist → dashboard → document upload → document AI validation → relocation risk score → iCal feed → task reminders → HR contact notifications → profile editing → checklist regeneration → IND appointment slot monitor.
+Working end-to-end: Google OAuth / email auth → onboarding → AI checklist → dashboard → document upload → document AI validation → relocation risk score → iCal feed → task reminders → HR contact notifications → profile editing → checklist regeneration → IND appointment slot monitor → 30% ruling calculator (public).
 
-Not yet built: Stripe, peer benchmarking, shareable progress card, 30% ruling calculator, AI chat assistant.
+Not yet built: Stripe, resource links (housing/schools), B2B HR portal.
 
 ## All API endpoints
 
@@ -100,7 +100,7 @@ Not yet built: Stripe, peer benchmarking, shareable progress card, 30% ruling ca
 ### Phase 3 — Innovation ← IN PROGRESS
 1. ✅ **Checklist regeneration + profile editing** — `PATCH /api/auth/profile`, `POST /api/checklist/regenerate`, `EditProfileModal` in settings
 2. ✅ **IND Appointment Slot Monitor** — `GET /api/ind-monitor/status`, `POST /api/ind-monitor/subscribe`, `POST /api/ind-monitor/check` (cron every 4h via cron-job.org), `IndMonitorWidget` on dashboard
-3. **30% Ruling eligibility calculator** — public `/tools/30-ruling`, multi-step gated form, no auth, SEO + CTA
+3. ✅ **30% Ruling eligibility calculator** — public `/tools/30-ruling`, 4 hard gates (employer / distance / timing / salary), no auth, linked from landing page + dashboard
 4. **Resource links** — housing (Pararius deep-link by city) + schools (ExpatGuide by city, if has_children); requires `destination_city` + `has_children` + `number_of_children` profile fields + migration 005
 5. ~~Shareable relocation progress card~~ — cut
 6. ~~Anonymous peer benchmarking~~ — cut

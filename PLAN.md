@@ -46,17 +46,19 @@
 - Cron every 4h via cron-job.org → Vercel `/api/ind-monitor` → Railway `/api/ind-monitor/check`
 - `IndMonitorWidget.tsx` on dashboard — live status + subscribe/unsubscribe toggle
 
-### Feature 3 🔲 — 30% Ruling eligibility calculator
+### Feature 3 ✅ — 30% Ruling eligibility calculator
 
-Public page at `/tools/30-ruling` — SEO + CTA to sign up.
+Public page at `/tools/30-ruling`. No auth, no backend. Pure frontend calculation.
 
-**Implementation:**
-- Public Next.js page (no auth)
-- Form: salary, role, nationality, degree level, prior Netherlands stay
-- Logic: Dutch tax authority rules (40% ruling from 2024 transition)
-- Result: eligible / not eligible / borderline + explanation
-- CTA: "Track your 30% ruling application in RelocationHub"
-- No backend needed — pure frontend calculation
+**4 hard gates (fail immediately with explanation):**
+1. Dutch employer check — fails if no Dutch employer or NL payroll
+2. Distance check — fails if <150km from border OR <16 of last 24 months outside NL
+3. Timing check — fails if >4 months since start date (window closed)
+4. Salary check — fails if below €46,660 (standard) or €35,468 (young specialist: under 30 + master's)
+
+**On eligible:** shows tax-free allowance (30% of salary) + estimated annual saving (at 49.5%), key facts, disclaimer, CTA to sign up.
+
+**Linked from:** landing page hero (secondary CTA) + tools banner + footer + dashboard settings dropdown.
 
 ### Feature 4 🔲 — Resource links (housing + schools)
 

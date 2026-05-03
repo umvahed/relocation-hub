@@ -204,6 +204,7 @@ id, checked_at, slots_available (boolean), status_text
 - `001_phase1_engagement.sql` — api_usage, contact columns, reminder_sent_at
 - `002_document_validation_risk_score.sql` — document_validations, risk_scores, profiles tier/consent columns, api_usage call_type
 - `003_ind_monitor.sql` — ind_monitor_subscriptions, ind_monitor_cache
+- `004_profile_logistics_columns.sql` — employment_type, has_pets, shipping_type, has_relocation_allowance on profiles
 
 **Supabase Storage:** `documents` bucket (private). RLS policies restrict to own folder.
 
@@ -228,6 +229,7 @@ id, checked_at, slots_available (boolean), status_text
 | `/onboarding` | `app/onboarding/page.tsx` | 5-step form; guards re-entry |
 | `/dashboard` | `app/dashboard/page.tsx` | Checklist, countdown banner, widgets, settings, delete account |
 | `/documents` | `app/documents/page.tsx` | Documents grouped by category, ValidationBadge, Validate button |
+| `/tools/30-ruling` | `app/tools/30-ruling/page.tsx` | Public 30% ruling eligibility calculator — 4 hard gates, no auth |
 
 **Components (`app/components/`):**
 
@@ -320,8 +322,8 @@ RESEND_API_KEY    ← needed by cron proxy routes (server-side only, no NEXT_PUB
 ✅ Task due-date reminders via Resend (cron-job.org)
 ✅ **Profile editing + checklist regeneration** — EditProfileModal, PATCH /api/auth/profile, POST /api/checklist/regenerate
 ✅ **IND Appointment Slot Monitor** — OAP JSON API (4 desks), email alert on slot transition, IndMonitorWidget, cron every 4h (cron-job.org)
-🔲 30% Ruling eligibility calculator (`/tools/30-ruling`)
-🔲 Resource links (housing + schools, city-aware)
+✅ **30% Ruling calculator** — `/tools/30-ruling`, public, 4 hard gates (employer/distance/timing/salary), linked from landing + dashboard
+🔲 Resource links (housing + schools, city-aware, migration 005)
 🔲 Stripe billing
 
 ---
@@ -342,11 +344,8 @@ RESEND_API_KEY    ← needed by cron proxy routes (server-side only, no NEXT_PUB
 ### Phase 3 — Innovation ← IN PROGRESS
 1. ✅ Checklist regeneration + profile editing
 2. ✅ IND Appointment Slot Monitor
-3. 🔲 30% Ruling eligibility calculator (`/tools/30-ruling`) — public, multi-step, SEO + CTA
-4. 🔲 Resource links — Pararius housing (by city) + ExpatGuide schools (if has_children); needs profile fields + migration 005
-5. ~~Shareable progress card~~ — cut
-6. ~~Anonymous peer benchmarking~~ — cut
-7. ~~AI Chat Assistant~~ — cut
+3. ✅ 30% Ruling eligibility calculator (`/tools/30-ruling`) — public, 4 hard gates, no auth, SEO + CTA
+4. 🔲 Resource links — Pararius housing (by city) + ExpatGuide schools (if has_children); needs `destination_city` + `has_children` + `number_of_children` + migration 005
 
 ### Phase 4 — Monetisation
 - Stripe €3.99/mo
