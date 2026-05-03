@@ -36,17 +36,29 @@ class SubscribeRequest(BaseModel):
 async def _fetch_ind_status() -> tuple[bool, str]:
     """Query OAP JSON API for each desk. Returns (slots_available, status_text)."""
     available_desks: list[str] = []
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://oap.ind.nl/oap/en/",
+        "Origin": "https://oap.ind.nl",
+    }
     async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
         for code, name in IND_DESKS.items():
-            try:
-                resp = await client.get(
-                    f"{IND_OAP_API}/{code}/slots/",
-                    params={"productKey": "DOC", "persons": 1},
-                )
-                if resp.status_code == 200 and resp.json():
-                    available_desks.append(name)
-            except Exception:
-                continue
+            for product_key in ("TKV", "DOC"):
+                try:
+                    resp = await client.get(
+                        f"{IND_OAP_API}/{code}/slots/",
+                        params={"productKey": product_key, "persons": 1},
+                        headers=headers,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if isinstance(data, list) and len(data) > 0:
+                            available_desks.append(f"{name} ({product_key})")
+                            break
+                except Exception:
+                    continue
 
     if available_desks:
         return True, f"Slots available at: {', '.join(available_desks)}"

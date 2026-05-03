@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { computeRiskScore, getRiskScore, updateConsent, type RiskScore } from '@/lib/api'
+import { computeRiskScore, updateConsent, type RiskScore } from '@/lib/api'
 import AiConsentModal from '@/app/components/AiConsentModal'
 
 const LEVEL_STYLES = {
@@ -28,6 +28,7 @@ export default function RiskScoreWidget({ userId, isPaid, hasConsent, initialSco
   const [score, setScore] = useState<RiskScore | null>(initialScore ?? null)
   const [loading, setLoading] = useState(false)
   const [showConsent, setShowConsent] = useState(false)
+  const [collapsed, setCollapsed] = useState(!!initialScore)
 
   const handleCompute = () => {
     if (!hasConsent) { setShowConsent(true); return }
@@ -36,6 +37,7 @@ export default function RiskScoreWidget({ userId, isPaid, hasConsent, initialSco
 
   const runCompute = async () => {
     setLoading(true)
+    setCollapsed(false)
     try {
       const result = await computeRiskScore(userId)
       setScore(result)
@@ -71,81 +73,107 @@ export default function RiskScoreWidget({ userId, isPaid, hasConsent, initialSco
       {showConsent && (
         <AiConsentModal userId={userId} onConsent={handleConsent} onDecline={() => setShowConsent(false)} />
       )}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Relocation Risk Score</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+        {/* Header — always visible */}
+        <div className="flex items-center justify-between p-5 pb-4">
           <button
-            onClick={handleCompute}
-            disabled={loading}
-            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition disabled:opacity-50 flex items-center gap-1.5"
+            onClick={() => setCollapsed(c => !c)}
+            className="flex items-center gap-3 flex-1 text-left min-w-0"
           >
-            {loading && (
-              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">Risk Score</h2>
+            {score && s && collapsed && (
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-gray-900 dark:text-white leading-none">{score.score}</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.badge}`}>{s.label}</span>
+              </div>
             )}
-            {score ? 'Refresh' : 'Compute score'}
           </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={handleCompute}
+              disabled={loading}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {loading && (
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              {score ? 'Refresh' : 'Compute'}
+            </button>
+            {score && (
+              <button onClick={() => setCollapsed(c => !c)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                <svg className={`w-4 h-4 transition-transform ${collapsed ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
-        {!score && !loading && (
-          <p className="text-xs text-gray-400 dark:text-gray-500">Click "Compute score" to analyse your relocation readiness across 4 dimensions.</p>
-        )}
-
-        {score && s && (
-          <div className="space-y-4">
-            {/* Overall score */}
-            <div className="flex items-end gap-3">
-              <span className="text-4xl font-bold text-gray-900 dark:text-white leading-none">{score.score}</span>
-              <div className="mb-0.5">
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${s.badge}`}>{s.label}</span>
-              </div>
-            </div>
-
-            {/* Score bar */}
-            <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
-              <div className={`h-2 rounded-full transition-all duration-700 ${s.bar}`} style={{ width: `${score.score}%` }} />
-            </div>
-
-            {/* Dimension breakdown */}
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(score.dimension_scores).map(([key, val]) => (
-                <div key={key} className="bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{DIM_LABELS[key] ?? key}</p>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <div className="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
-                      <div
-                        className={`h-1.5 rounded-full ${val >= 70 ? 'bg-emerald-500' : val >= 40 ? 'bg-amber-500' : 'bg-red-500'}`}
-                        style={{ width: `${val}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 w-6 text-right">{val}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Top risk items */}
-            {score.risk_items.length > 0 && (
-              <div className="space-y-2 pt-1">
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Top risks to address</p>
-                {score.risk_items.map(item => (
-                  <div key={item.rank} className="flex gap-3 bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2.5">
-                    <span className="text-xs font-bold text-gray-300 dark:text-gray-500 mt-0.5 flex-shrink-0">#{item.rank}</span>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">{item.title}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.detail}</p>
-                      <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5 font-medium">{item.action}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {/* Expanded body */}
+        {!collapsed && (
+          <div className="px-5 pb-5 space-y-4 border-t border-gray-100 dark:border-gray-700 pt-4">
+            {!score && !loading && (
+              <p className="text-xs text-gray-400 dark:text-gray-500">Click "Compute" to analyse your relocation readiness across 4 dimensions.</p>
             )}
 
-            <p className="text-xs text-gray-300 dark:text-gray-600 text-right">
-              Last computed {new Date(score.computed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-            </p>
+            {score && s && (
+              <>
+                {/* Overall score */}
+                <div className="flex items-end gap-3">
+                  <span className="text-4xl font-bold text-gray-900 dark:text-white leading-none">{score.score}</span>
+                  <div className="mb-0.5">
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${s.badge}`}>{s.label}</span>
+                  </div>
+                </div>
+
+                {/* Score bar */}
+                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+                  <div className={`h-2 rounded-full transition-all duration-700 ${s.bar}`} style={{ width: `${score.score}%` }} />
+                </div>
+
+                {/* Dimension breakdown */}
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(score.dimension_scores).map(([key, val]) => (
+                    <div key={key} className="bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{DIM_LABELS[key] ?? key}</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <div className="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full ${val >= 70 ? 'bg-emerald-500' : val >= 40 ? 'bg-amber-500' : 'bg-red-500'}`}
+                            style={{ width: `${val}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 w-6 text-right">{val}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Top risk items */}
+                {score.risk_items.length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Top risks to address</p>
+                    {score.risk_items.map(item => (
+                      <div key={item.rank} className="flex gap-3 bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2.5">
+                        <span className="text-xs font-bold text-gray-300 dark:text-gray-500 mt-0.5 flex-shrink-0">#{item.rank}</span>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">{item.title}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.detail}</p>
+                          <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5 font-medium">{item.action}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-300 dark:text-gray-600 text-right">
+                  Last computed {new Date(score.computed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>
