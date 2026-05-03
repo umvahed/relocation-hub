@@ -100,10 +100,11 @@ Not yet built: Stripe, peer benchmarking, shareable progress card, 30% ruling ca
 ### Phase 3 — Innovation ← IN PROGRESS
 1. ✅ **Checklist regeneration + profile editing** — `PATCH /api/auth/profile`, `POST /api/checklist/regenerate`, `EditProfileModal` in settings
 2. ✅ **IND Appointment Slot Monitor** — `GET /api/ind-monitor/status`, `POST /api/ind-monitor/subscribe`, `POST /api/ind-monitor/check` (cron every 4h via cron-job.org), `IndMonitorWidget` on dashboard
-3. **Anonymous peer benchmarking** — aggregate stats from user data, shown on dashboard
-4. **Shareable relocation progress card** — public `/progress/[userId]` page with social share
-5. **30% Ruling eligibility calculator** — public `/tools/30-ruling` page, SEO + CTA
-6. **AI Chat Assistant** — in-app Claude chat with full user context (last, expensive)
+3. **30% Ruling eligibility calculator** — public `/tools/30-ruling`, multi-step gated form, no auth, SEO + CTA
+4. **Resource links** — housing (Pararius deep-link by city) + schools (ExpatGuide by city, if has_children); requires `destination_city` + `has_children` + `number_of_children` profile fields + migration 005
+5. ~~Shareable relocation progress card~~ — cut
+6. ~~Anonymous peer benchmarking~~ — cut
+7. ~~AI Chat Assistant~~ — cut
 
 ### Phase 4 — Monetisation
 - Stripe €3.99/mo

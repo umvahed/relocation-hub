@@ -320,10 +320,8 @@ RESEND_API_KEY    ← needed by cron proxy routes (server-side only, no NEXT_PUB
 ✅ Task due-date reminders via Resend (cron-job.org)
 ✅ **Profile editing + checklist regeneration** — EditProfileModal, PATCH /api/auth/profile, POST /api/checklist/regenerate
 ✅ **IND Appointment Slot Monitor** — OAP JSON API (4 desks), email alert on slot transition, IndMonitorWidget, cron every 4h (cron-job.org)
-🔲 Anonymous peer benchmarking
-🔲 Shareable relocation progress card (`/progress/[userId]`)
 🔲 30% Ruling eligibility calculator (`/tools/30-ruling`)
-🔲 AI Chat Assistant
+🔲 Resource links (housing + schools, city-aware)
 🔲 Stripe billing
 
 ---
@@ -344,10 +342,11 @@ RESEND_API_KEY    ← needed by cron proxy routes (server-side only, no NEXT_PUB
 ### Phase 3 — Innovation ← IN PROGRESS
 1. ✅ Checklist regeneration + profile editing
 2. ✅ IND Appointment Slot Monitor
-3. 🔲 Anonymous peer benchmarking
-4. 🔲 Shareable relocation progress card (`/progress/[userId]`)
-5. 🔲 30% Ruling eligibility calculator (`/tools/30-ruling`)
-6. 🔲 AI Chat Assistant (last — expensive, can make UI clunky)
+3. 🔲 30% Ruling eligibility calculator (`/tools/30-ruling`) — public, multi-step, SEO + CTA
+4. 🔲 Resource links — Pararius housing (by city) + ExpatGuide schools (if has_children); needs profile fields + migration 005
+5. ~~Shareable progress card~~ — cut
+6. ~~Anonymous peer benchmarking~~ — cut
+7. ~~AI Chat Assistant~~ — cut
 
 ### Phase 4 — Monetisation
 - Stripe €3.99/mo

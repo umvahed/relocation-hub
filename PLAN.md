@@ -46,32 +46,7 @@
 - Cron every 4h via cron-job.org → Vercel `/api/ind-monitor` → Railway `/api/ind-monitor/check`
 - `IndMonitorWidget.tsx` on dashboard — live status + subscribe/unsubscribe toggle
 
-### Feature 3 🔲 — Anonymous peer benchmarking
-
-Show aggregate stats from anonymised user data on the dashboard.
-
-**Ideas:**
-- "Users from South Africa are 68% complete on average"
-- "Most users complete critical tasks within 14 days"
-- "You're ahead of 73% of users at your stage"
-
-**Implementation:**
-- Backend: `GET /api/benchmarks` — aggregate query (no PII, group by origin_country)
-- Frontend: small card on dashboard below progress bar
-- No new table needed — query `tasks` + `profiles` with aggregation
-
-### Feature 4 🔲 — Shareable relocation progress card
-
-Public page at `/progress/[userId]` with social share.
-
-**Implementation:**
-- Public Next.js page (no auth) — reads from a public-safe view
-- Progress bar, completed vs total tasks, move date countdown
-- OG image for social sharing (og:image)
-- User controls sharing from dashboard settings (toggle `profiles.share_progress`)
-- Add `share_progress` boolean column to profiles
-
-### Feature 5 🔲 — 30% Ruling eligibility calculator
+### Feature 3 🔲 — 30% Ruling eligibility calculator
 
 Public page at `/tools/30-ruling` — SEO + CTA to sign up.
 
@@ -83,17 +58,24 @@ Public page at `/tools/30-ruling` — SEO + CTA to sign up.
 - CTA: "Track your 30% ruling application in RelocationHub"
 - No backend needed — pure frontend calculation
 
-### Feature 6 🔲 — AI Chat Assistant (last)
+### Feature 4 🔲 — Resource links (housing + schools)
 
-In-app Claude chat with full user context.
+Lightweight "Resources" card on the dashboard. No backend. Contextual based on profile.
 
-**Note:** Deprioritised — expensive per-message, can make UI clunky. Only build after all other Phase 3 features are shipped.
+**Requires new profile fields (migration 005):**
+- `destination_city` text (Amsterdam, Rotterdam, Utrecht, Den Haag, Eindhoven, Other)
+- `has_children` boolean (default false)
+- `number_of_children` integer (nullable)
 
-**Implementation (when ready):**
-- Backend: `POST /api/chat` — streams Claude response with system prompt injecting user profile + task state
-- Frontend: floating chat button → slide-in panel
-- Tier gated (paid only)
-- Rate limited
+**What it shows:**
+- 🏠 Pararius deep-link: `https://pararius.com/apartments/{city}/{N}-bedrooms` — N calculated from household size
+- 🎓 ExpatGuide schools link (only if `has_children`): `https://expatguide.nl/education/bilingual-schools-netherlands/` filtered by city
+- Add `destination_city` + children fields to onboarding step 2 and EditProfileModal
+
+**Cut features (deliberately removed from roadmap):**
+- ~~Shareable relocation progress card~~ — low real-world usage, not core value
+- ~~Anonymous peer benchmarking~~ — mildly interesting, doesn't help users act
+- ~~AI Chat Assistant~~ — expensive, clunky, not differentiated
 
 ---
 

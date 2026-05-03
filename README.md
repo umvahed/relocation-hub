@@ -111,6 +111,6 @@ npm run dev
 |---|---|
 | Phase 1 — Premium AI (Document Validation + Risk Score) | ✅ Complete |
 | Phase 2 — Engagement (reminders, notifications, iCal) | ✅ Complete |
-| Phase 3 — Innovation (regen, IND monitor, benchmarking…) | 🔄 In progress |
+| Phase 3 — Innovation (regen, IND monitor, 30% ruling, resources) | 🔄 In progress |
 | Phase 4 — Monetisation (Stripe €3.99/mo) | 🔲 Pending |
 | Phase 5 — B2B white-label HR portal | 🔲 Pending |
