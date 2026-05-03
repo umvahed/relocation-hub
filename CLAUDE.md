@@ -49,32 +49,43 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel.
 
 ## Current state
 
-Working end-to-end: Google OAuth / email auth → onboarding → AI checklist → dashboard → document upload → document AI validation → relocation risk score → iCal feed.
+Working end-to-end: Google OAuth / email auth → onboarding → AI checklist → dashboard → document upload → document AI validation → relocation risk score → iCal feed → profile editing → checklist regeneration.
 
-Not yet built: Stripe, email reminders, HR contact notifications, checklist regeneration.
+Not yet built: Stripe, IND slot monitor, peer benchmarking, shareable progress card, 30% ruling calculator, AI chat assistant.
+
+## New API endpoints (Feature 1)
+
+| Method | Endpoint | What it does |
+|---|---|---|
+| PATCH | `/api/auth/profile/{user_id}` | Partial profile update (any field, exclude_unset) |
+| POST | `/api/checklist/regenerate` | Delete all tasks + re-generate from current profile |
 
 ## Roadmap
 
 ### Phase 1 — Premium AI features ✅ COMPLETE
+1. ✅ Document AI Validation
+2. ✅ Relocation Risk Score
 
-1. ✅ **Document AI Validation** — PDF/image docs validated against IND 2025 rules via Claude. Pass/warn/fail + issues. GDPR consent modal. Paid tier gated.
-2. ✅ **Relocation Risk Score** — 0–100 score across 4 weighted dimensions. Python calculates scores; Claude writes risk items. Refreshable widget on dashboard.
+### Phase 2 — Engagement layer ✅ COMPLETE (audited)
+- `notifications.py` — `notify_task_complete()` + `POST /notifications/weekly-digest`
+- `reminders.py` — `POST /reminders/send` + `PATCH /reminders/task/{task_id}/due-date`
+- `calendar.py` — `GET /calendar/{user_id}/feed.ics`
+- Due date UI already wired in dashboard expanded task view
+- Weekly digest + keepalive cron jobs running on Vercel
 
-### Phase 2 — Engagement layer (next)
+### Phase 3 — Innovation ← IN PROGRESS
+1. ✅ **Checklist regeneration + profile editing** — `PATCH /api/auth/profile`, `POST /api/checklist/regenerate`, `EditProfileModal` in settings
+2. **IND Appointment Slot Monitor** — background check + email alert when slots open
+3. **Anonymous peer benchmarking** — aggregate stats from user data, shown on dashboard
+4. **Shareable relocation progress card** — public `/progress/[userId]` page with social share
+5. **30% Ruling eligibility calculator** — public `/tools/30-ruling` page, SEO + CTA
+6. **AI Chat Assistant** — in-app Claude chat with full user context (last, expensive)
 
-1. **Audit existing routes** — `notifications.py`, `reminders.py`, `calendar.py` exist but need verification of what's actually wired and working
-2. **Email reminders** — per-task due dates, user-configurable cadence via Resend
-3. **HR/consultant contact notifications** — task completion alerts + weekly digest (Resend). Key differentiator.
-4. **Checklist regeneration** — `/api/checklist/regenerate` endpoint (delete + regenerate from updated onboarding answers)
-
-### Phase 3 — Monetisation
-
+### Phase 4 — Monetisation
 - Stripe €3.99/mo
-- Free: checklist only — Paid: AI validation + risk score + reminders
-- Stripe webhook on `checkout.session.completed` sets `profiles.tier = 'paid'` — admin endpoint + frontend 402 handling need no changes
+- Webhook on `checkout.session.completed` → `profiles.tier = 'paid'`
+- No frontend/backend guard changes needed
 
-### Phase 4 — B2B white-label
-
-- Admin portal: HR/consultant sees all assigned users' progress, sets reminders, annotates tasks
-- Bulk onboarding, multi-user dashboard
-- Sold to relocation agencies and corporate HR teams
+### Phase 5 — B2B white-label
+- HR/Company Portal: companies pay per-employee; HR sees all relocatees' progress
+- Bulk onboarding, task annotation, admin dashboard

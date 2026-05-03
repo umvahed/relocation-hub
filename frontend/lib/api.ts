@@ -150,6 +150,34 @@ export async function setDueDate(task_id: string, due_date: string) {
   return handleResponse(res)
 }
 
+export async function updateProfile(user_id: string, data: Partial<{
+  full_name: string
+  origin_country: string
+  move_date: string
+  employment_type: string
+  has_pets: boolean
+  shipping_type: string
+  has_relocation_allowance: boolean
+  contact_name: string
+  contact_email: string
+}>) {
+  const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res)
+}
+
+export async function regenerateChecklist(user_id: string) {
+  const res = await fetch(`${API_URL}/api/checklist/regenerate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id }),
+  })
+  return handleResponse(res)
+}
+
 export async function getProfile(user_id: string) {
   const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`)
   return handleResponse(res)

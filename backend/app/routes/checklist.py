@@ -152,54 +152,38 @@ def _check_and_increment_usage(supabase, user_id: str, call_type: str = "checkli
         supabase.table("api_usage").insert({"user_id": user_id, "date": today, "call_count": 1, "call_type": call_type}).execute()
 
 
-@router.post("/checklist/generate")
-async def generate_checklist(request: GenerateChecklistRequest):
-    try:
-        supabase = get_supabase()
-        claude = get_claude()
-        existing = supabase.table("tasks").select("id").eq("user_id", request.user_id).execute()
-        if existing.data:
-            return {"message": "Checklist already exists", "tasks": existing.data}
+async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country: str, move_date, employment_type: str, has_pets: bool, shipping_type: str, has_relocation_allowance: bool) -> dict:
+    conditional_notes = []
 
-        _check_and_increment_usage(supabase, request.user_id)
+    if has_pets:
+        conditional_notes.append("- The user IS bringing pets — include: EU pet passport or third-country health certificate, rabies vaccination and titre test (done 30+ days before travel), microchip registration, NVWA import notification, and airline pet policy research.")
+    else:
+        conditional_notes.append("- The user is NOT bringing pets — do NOT include any pet relocation tasks.")
 
-        conditional_notes = []
+    if shipping_type == "container":
+        conditional_notes.append("- The user is shipping a container — include: packing inventory list, container/removal company booking, customs declaration (T2L form), port of entry clearance, Dutch customs (Douane) registration, and final delivery coordination.")
+    else:
+        conditional_notes.append("- The user is bringing luggage only — include: deciding what to sell/store/donate, and checking airline baggage allowance and excess baggage costs. Do NOT include container shipping tasks.")
 
-        # Pets
-        if request.has_pets:
-            conditional_notes.append("- The user IS bringing pets — include: EU pet passport or third-country health certificate, rabies vaccination and titre test (done 30+ days before travel), microchip registration, NVWA import notification, and airline pet policy research.")
-        else:
-            conditional_notes.append("- The user is NOT bringing pets — do NOT include any pet relocation tasks.")
+    if has_relocation_allowance:
+        conditional_notes.append("- The user has an employer relocation/housing allowance — include: confirming allowance amount and tax treatment (30% ruling interaction), keeping all receipts, and submitting expense claims to HR.")
+    else:
+        conditional_notes.append("- The user does NOT have an employer relocation allowance — do not include tasks about claiming or submitting relocation expenses to HR.")
 
-        # Shipping
-        if request.shipping_type == "container":
-            conditional_notes.append("- The user is shipping a container — include: packing inventory list, container/removal company booking, customs declaration (T2L form), port of entry clearance, Dutch customs (Douane) registration, and final delivery coordination.")
-        else:
-            conditional_notes.append("- The user is bringing luggage only — include: deciding what to sell/store/donate, and checking airline baggage allowance and excess baggage costs. Do NOT include container shipping tasks.")
+    if employment_type == "employed":
+        conditional_notes.append("- The user is moving for employment (salaried) — include 30% ruling enquiry if applicable (highly skilled migrant), payroll onboarding, and employment contract review. The employer submits the IND application.")
+    elif employment_type == "self_employed":
+        conditional_notes.append("- The user is self-employed/freelancing — include tasks for registering with KVK (Dutch Chamber of Commerce), obtaining a VAT number (BTW), and understanding ZZP tax obligations. Do NOT include employer-driven tasks like 30% ruling or TEV. The user will need to apply for a self-employment residence permit (zelfstandige) — note that the employer does NOT file on their behalf.")
+    elif employment_type == "student":
+        conditional_notes.append("- The user is moving as a student — include tasks for university/institution enrollment confirmation, student residence permit (applied for by the institution on their behalf), arranging student accommodation, and opening a student bank account. Do NOT include employment-related tasks like 30% ruling, payroll, or employer onboarding.")
+    elif employment_type == "family":
+        conditional_notes.append("- The user is moving for family reunification — include tasks for the family reunification residence permit (applied by the Dutch resident sponsor), obtaining an MVV if required, and registering at gemeente after arrival. Do NOT include employment or student-specific tasks.")
 
-        # Relocation allowance
-        if request.has_relocation_allowance:
-            conditional_notes.append("- The user has an employer relocation/housing allowance — include: confirming allowance amount and tax treatment (30% ruling interaction), keeping all receipts, and submitting expense claims to HR.")
-        else:
-            conditional_notes.append("- The user does NOT have an employer relocation allowance — do not include tasks about claiming or submitting relocation expenses to HR.")
+    conditional_block = "\n".join(conditional_notes)
+    is_south_africa = origin_country.strip().lower() in ("south africa", "za")
 
-        # Employment type
-        if request.employment_type == "employed":
-            conditional_notes.append("- The user is moving for employment (salaried) — include 30% ruling enquiry if applicable (highly skilled migrant), payroll onboarding, and employment contract review. The employer submits the IND application.")
-        elif request.employment_type == "self_employed":
-            conditional_notes.append("- The user is self-employed/freelancing — include tasks for registering with KVK (Dutch Chamber of Commerce), obtaining a VAT number (BTW), and understanding ZZP tax obligations. Do NOT include employer-driven tasks like 30% ruling or TEV. The user will need to apply for a self-employment residence permit (zelfstandige) — note that the employer does NOT file on their behalf.")
-        elif request.employment_type == "student":
-            conditional_notes.append("- The user is moving as a student — include tasks for university/institution enrollment confirmation, student residence permit (applied for by the institution on their behalf), arranging student accommodation, and opening a student bank account. Do NOT include employment-related tasks like 30% ruling, payroll, or employer onboarding.")
-        elif request.employment_type == "family":
-            conditional_notes.append("- The user is moving for family reunification — include tasks for the family reunification residence permit (applied by the Dutch resident sponsor), obtaining an MVV if required, and registering at gemeente after arrival. Do NOT include employment or student-specific tasks.")
-
-        conditional_block = "\n".join(conditional_notes) if conditional_notes else ""
-
-        is_south_africa = request.origin_country.strip().lower() in ("south africa", "za")
-
-        # Build the already-hardcoded task list so Claude knows not to duplicate them
-        if is_south_africa:
-            already_covered = """
+    if is_south_africa:
+        already_covered = """
 ALREADY HANDLED — do NOT generate tasks for any of the following (they are hardcoded):
 - Passport validity check
 - IND approval letter / inwilligingsbrief
@@ -212,20 +196,20 @@ ALREADY HANDLED — do NOT generate tasks for any of the following (they are har
 - Apostilled birth certificate
 - Police clearance certificate (SAPS)
 - Apostilled academic or professional qualifications"""
-        else:
-            already_covered = """
+    else:
+        already_covered = """
 ALREADY HANDLED — do NOT generate tasks for any of the following (they are hardcoded):
 - Passport validity check
 - IND residence permit application (employer submits this, not the user)"""
 
-        prompt = f"""You are a senior relocation expert specialising in moves to the Netherlands. Generate a precise, correctly-sequenced relocation checklist for someone moving from {request.origin_country} to the Netherlands.
+    prompt = f"""You are a senior relocation expert specialising in moves to the Netherlands. Generate a precise, correctly-sequenced relocation checklist for someone moving from {origin_country} to the Netherlands.
 
 User profile:
-- Employment type: {request.employment_type}
-- Move date: {request.move_date or "Not specified"}
-- Shipping: {request.shipping_type}
-- Has pets: {request.has_pets}
-- Has employer relocation allowance: {request.has_relocation_allowance}
+- Employment type: {employment_type}
+- Move date: {move_date or "Not specified"}
+- Shipping: {shipping_type}
+- Has pets: {has_pets}
+- Has employer relocation allowance: {has_relocation_allowance}
 
 {conditional_block}
 
@@ -271,55 +255,91 @@ Return ONLY a JSON array. No other text. Each task must have:
 
 Generate 20-25 tasks. Return ONLY valid JSON array."""
 
-        message = claude.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=6000,
-            messages=[{"role": "user", "content": prompt}]
+    message = claude.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=6000,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    tasks_json = message.content[0].text.strip()
+    if tasks_json.startswith("```"):
+        tasks_json = tasks_json.split("```")[1]
+        if tasks_json.startswith("json"):
+            tasks_json = tasks_json[4:]
+
+    tasks = json.loads(tasks_json)
+    valid_categories = {"critical", "visa", "admin", "employment", "housing", "banking", "healthcare", "transport", "shipping", "pets"}
+
+    if is_south_africa:
+        hardcoded = SA_VFS_PREREQUISITES + SA_DOCUMENT_TASKS
+    else:
+        hardcoded = GENERAL_CRITICAL_TASKS
+
+    tasks_to_insert = [{**doc, "user_id": user_id, "status": "pending"} for doc in hardcoded]
+
+    for task in tasks:
+        category = task.get("category", "admin")
+        if category not in valid_categories or category == "critical":
+            category = "admin"
+        tasks_to_insert.append({
+            "user_id": user_id,
+            "title": task["title"],
+            "description": task.get("description", ""),
+            "category": category,
+            "priority": task.get("priority", 5),
+            "status": "pending",
+            "external_link": task.get("external_link"),
+        })
+
+    result = supabase.table("tasks").insert(tasks_to_insert).execute()
+    return {"message": "Checklist generated", "task_count": len(result.data), "tasks": result.data}
+
+
+@router.post("/checklist/generate")
+async def generate_checklist(request: GenerateChecklistRequest):
+    try:
+        supabase = get_supabase()
+        existing = supabase.table("tasks").select("id").eq("user_id", request.user_id).execute()
+        if existing.data:
+            return {"message": "Checklist already exists", "tasks": existing.data}
+        _check_and_increment_usage(supabase, request.user_id)
+        return await _build_and_insert_tasks(
+            supabase, get_claude(),
+            request.user_id, request.origin_country, request.move_date,
+            request.employment_type, request.has_pets, request.shipping_type,
+            request.has_relocation_allowance,
         )
-
-        tasks_json = message.content[0].text.strip()
-        if tasks_json.startswith("```"):
-            tasks_json = tasks_json.split("```")[1]
-            if tasks_json.startswith("json"):
-                tasks_json = tasks_json[4:]
-
-        tasks = json.loads(tasks_json)
-
-        valid_categories = {"critical", "visa", "admin", "employment", "housing", "banking", "healthcare", "transport", "shipping", "pets"}
-
-        # Hardcoded critical tasks — inserted first, before all Claude-generated tasks.
-        # SA users get VFS prerequisites (priority 100) + document tasks (priority 90).
-        # Other countries get the general prerequisites only.
-        if is_south_africa:
-            hardcoded = SA_VFS_PREREQUISITES + SA_DOCUMENT_TASKS
-        else:
-            hardcoded = GENERAL_CRITICAL_TASKS
-
-        tasks_to_insert = [
-            {**doc, "user_id": request.user_id, "status": "pending"}
-            for doc in hardcoded
-        ]
-
-        # Claude-generated tasks — never in the "critical" category (that is hardcoded-only)
-        for task in tasks:
-            category = task.get("category", "admin")
-            if category not in valid_categories or category == "critical":
-                category = "admin"
-            tasks_to_insert.append({
-                "user_id": request.user_id,
-                "title": task["title"],
-                "description": task.get("description", ""),
-                "category": category,
-                "priority": task.get("priority", 5),
-                "status": "pending",
-                "external_link": task.get("external_link"),
-            })
-
-        result = supabase.table("tasks").insert(tasks_to_insert).execute()
-        return {"message": "Checklist generated", "task_count": len(result.data), "tasks": result.data}
-
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class RegenerateRequest(BaseModel):
+    user_id: str
+
+@router.post("/checklist/regenerate")
+async def regenerate_checklist(request: RegenerateRequest):
+    try:
+        supabase = get_supabase()
+        profile_res = supabase.table("profiles").select("*").eq("id", request.user_id).execute()
+        if not profile_res.data:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        p = profile_res.data[0]
+        supabase.table("tasks").delete().eq("user_id", request.user_id).execute()
+        return await _build_and_insert_tasks(
+            supabase, get_claude(),
+            request.user_id,
+            p["origin_country"],
+            p.get("move_date"),
+            p.get("employment_type", "employed"),
+            p.get("has_pets", False),
+            p.get("shipping_type", "luggage_only"),
+            p.get("has_relocation_allowance", False),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @router.get("/checklist/{user_id}")
 async def get_checklist(user_id: str):

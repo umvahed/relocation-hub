@@ -23,6 +23,17 @@ class OnboardingData(BaseModel):
     contact_name: str | None = None
     contact_email: str | None = None
 
+class ProfileUpdate(BaseModel):
+    full_name: str | None = None
+    origin_country: str | None = None
+    move_date: str | None = None
+    employment_type: str | None = None
+    has_pets: bool | None = None
+    shipping_type: str | None = None
+    has_relocation_allowance: bool | None = None
+    contact_name: str | None = None
+    contact_email: str | None = None
+
 class ConsentUpdate(BaseModel):
     ai_validation_consent: bool
 
@@ -57,6 +68,22 @@ async def get_profile(user_id: str):
         if not result.data:
             raise HTTPException(status_code=404, detail="Profile not found")
         return result.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.patch("/auth/profile/{user_id}")
+async def update_profile(user_id: str, data: ProfileUpdate):
+    try:
+        supabase = get_supabase()
+        update_data = data.model_dump(exclude_unset=True)
+        for key in ('move_date', 'contact_name', 'contact_email'):
+            if key in update_data:
+                update_data[key] = update_data[key] or None
+        if not update_data:
+            return {"message": "No changes"}
+        supabase.table("profiles").update(update_data).eq("id", user_id).execute()
+        result = supabase.table("profiles").select("*").eq("id", user_id).execute()
+        return result.data[0] if result.data else {"message": "Updated"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
