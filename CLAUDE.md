@@ -56,9 +56,9 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEN
 
 ## Current state
 
-Working end-to-end: Google OAuth / email auth → onboarding → AI checklist → dashboard → document upload → document AI validation → relocation risk score → iCal feed → task reminders → HR contact notifications → profile editing → checklist regeneration → IND appointment slot monitor → 30% ruling calculator (public).
+Working end-to-end: Google OAuth / email auth → onboarding (5 steps, destination city, children, container ship date) → AI checklist → dashboard → task search → document upload → AI validation → risk score → iCal feed → task reminders → HR contact notifications → profile editing → checklist regeneration → IND appointment slot monitor → 30% ruling calculator (public) → resource links (Pararius, ExpatGuide, Marktplaats, IKEA) → container arrival estimate.
 
-Not yet built: Stripe, resource links (housing/schools), B2B HR portal.
+Not yet built: Stripe payments, B2B HR portal.
 
 ## All API endpoints
 
@@ -120,19 +120,18 @@ Not yet built: Stripe, resource links (housing/schools), B2B HR portal.
 - Due date UI already wired in dashboard expanded task view
 - Weekly digest + keepalive cron (Vercel); reminders + IND monitor cron (cron-job.org)
 
-### Phase 3 — Innovation ← IN PROGRESS
-1. ✅ **Checklist regeneration + profile editing** — `PATCH /api/auth/profile`, `POST /api/checklist/regenerate`, `EditProfileModal` in settings
-2. ✅ **IND Appointment Slot Monitor** — `GET /api/ind-monitor/status`, `POST /api/ind-monitor/subscribe`, `POST /api/ind-monitor/check` (cron every 4h via cron-job.org), `IndMonitorWidget` on dashboard
-3. ✅ **30% Ruling eligibility calculator** — public `/tools/30-ruling`, 4 hard gates (employer / distance / timing / salary), no auth, linked from landing page + dashboard
-4. **Resource links** — housing (Pararius deep-link by city) + schools (ExpatGuide by city, if has_children); requires `destination_city` + `has_children` + `number_of_children` profile fields + migration 005
-5. ~~Shareable relocation progress card~~ — cut
-6. ~~Anonymous peer benchmarking~~ — cut
-7. ~~AI Chat Assistant~~ — cut
+### Phase 3 — Innovation ✅ COMPLETE
+1. ✅ Checklist regeneration + profile editing
+2. ✅ IND Appointment Slot Monitor
+3. ✅ 30% Ruling eligibility calculator
+4. ✅ Resource links (Pararius, ExpatGuide, Marktplaats, IKEA)
+5. ✅ Container shipping improvements (3 options, ship date, arrival estimate) + task search
 
-### Phase 4 — Monetisation
+### Phase 4 — Monetisation ← NEXT
 - Stripe €3.99/mo
-- Webhook on `checkout.session.completed` → `profiles.tier = 'paid'`
-- No frontend/backend guard changes needed
+- `POST /api/billing/create-checkout` + `POST /api/billing/webhook`
+- Webhook: `checkout.session.completed` → `profiles.tier = 'paid'`
+- No frontend/backend guard changes needed (tier checks already in place)
 
 ### Phase 5 — B2B white-label
 - HR/Company Portal: companies pay per-employee; HR sees all relocatees' progress
