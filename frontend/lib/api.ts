@@ -160,6 +160,9 @@ export async function updateProfile(user_id: string, data: Partial<{
   has_relocation_allowance: boolean
   contact_name: string
   contact_email: string
+  destination_city: string
+  has_children: boolean
+  number_of_children: number
 }>) {
   const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`, {
     method: 'PATCH',
