@@ -10,16 +10,15 @@ from supabase import create_client
 router = APIRouter()
 _supabase = None
 
-IND_URL = "https://ind.nl/en/service-contact/make-an-appointment-with-the-ind"
-# Text present on IND page when NO slots are available
-_NO_SLOT_PHRASES = [
-    "it is currently not possible to make an appointment",
-    "no appointments available",
-    "appointment is not possible",
-    "niet mogelijk een afspraak",
-    "no online appointments",
-    "temporarily not possible",
-]
+IND_OAP_API = "https://oap.ind.nl/oap/api/desks"
+IND_BOOKING_URL = "https://oap.ind.nl/oap/en/#/doc"
+# Desk codes shown in the OAP desk selector
+IND_DESKS = {
+    "AM": "Amsterdam",
+    "DH": "Den Haag",
+    "ZW": "Zwolle",
+    "DB": "'s-Hertogenbosch",
+}
 
 
 def get_supabase():
@@ -35,14 +34,23 @@ class SubscribeRequest(BaseModel):
 
 
 async def _fetch_ind_status() -> tuple[bool, str]:
-    """Return (slots_available, status_text). Raises on network error."""
+    """Query OAP JSON API for each desk. Returns (slots_available, status_text)."""
+    available_desks: list[str] = []
     async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-        resp = await client.get(IND_URL)
-    resp.raise_for_status()
-    text = resp.text.lower()
-    available = not any(phrase in text for phrase in _NO_SLOT_PHRASES)
-    status = "Slots appear available" if available else "No slots currently available"
-    return available, status
+        for code, name in IND_DESKS.items():
+            try:
+                resp = await client.get(
+                    f"{IND_OAP_API}/{code}/slots/",
+                    params={"productKey": "DOC", "persons": 1},
+                )
+                if resp.status_code == 200 and resp.json():
+                    available_desks.append(name)
+            except Exception:
+                continue
+
+    if available_desks:
+        return True, f"Slots available at: {', '.join(available_desks)}"
+    return False, "No slots currently available at any IND desk"
 
 
 def _send_alert(email: str, slots_available: bool, status_text: str) -> bool:
@@ -57,7 +65,7 @@ def _send_alert(email: str, slots_available: bool, status_text: str) -> bool:
         <div style="font-size: 15px; font-weight: 600; color: {'#15803d' if slots_available else '#92400e'};">
           {'✅ ' + status_text if slots_available else '⚠️ ' + status_text}
         </div>
-        {'<p style="font-size: 13px; color: #374151; margin: 8px 0 0;">Book your appointment at <a href="https://oap.ind.nl/oap/en/" style="color: #4f46e5;">oap.ind.nl</a> before slots fill up again.</p>' if slots_available else ''}
+        {'<p style="font-size: 13px; color: #374151; margin: 8px 0 0;">Book your appointment at <a href="' + IND_BOOKING_URL + '" style="color: #4f46e5;">oap.ind.nl</a> before slots fill up again.</p>' if slots_available else ''}
       </div>
       <p style="color: #9ca3af; font-size: 13px; margin: 0;">
         You'll receive another alert when the status changes.
