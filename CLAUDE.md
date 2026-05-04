@@ -21,10 +21,6 @@ backend/    → Railway (relocation-hub-production.up.railway.app)
 | `NEXT_PUBLIC_SUPABASE_URL` | Vercel |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Vercel |
 | `NEXT_PUBLIC_API_URL` | Vercel |
-| `SUPABASE_URL` | Railway |
-| `SUPABASE_ANON_KEY` | Railway |
-| `SUPABASE_SERVICE_KEY` | Railway |
-| `ANTHROPIC_API_KEY` | Railway |
 | `RESEND_API_KEY` | Vercel (cron proxy routes read this server-side) |
 | `SUPABASE_URL` | Railway |
 | `SUPABASE_ANON_KEY` | Railway |
@@ -34,6 +30,7 @@ backend/    → Railway (relocation-hub-production.up.railway.app)
 | `RESEND_FROM_EMAIL` | Railway |
 | `FRONTEND_URL` | Railway |
 | `ADMIN_SECRET` | Railway |
+| `SCRAPER_API_KEY` | Railway (optional — IND slot detection via residential proxy) |
 
 Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEND_API_KEY` lives in BOTH Vercel (cron proxies) and Railway (email sending).
 
@@ -95,7 +92,7 @@ Not yet built: Stripe payments, B2B HR portal.
 ## Go-live checklist (quick reference — full version in PLAN.md)
 
 - Supabase: migrations 000–005 run, RLS on all tables, `documents` storage bucket with auth policies, Google OAuth redirect set to `/auth/callback`
-- Railway: all 7 env vars set, `GET /api/health` returns 200, CORS origin matches Vercel URL exactly
+- Railway: all 8 core env vars set (SCRAPER_API_KEY optional), `GET /api/health` returns 200, CORS origin matches Vercel URL exactly
 - Vercel: 3 `NEXT_PUBLIC_*` env vars set, build passes
 - cron-job.org: 4 jobs active (keepalive 5min, reminders daily, digest weekly, IND monitor 4h)
 - Smoke test: OAuth login → onboarding → checklist → document upload → validation → risk score → IND subscribe → iCal → edit profile → delete account
@@ -123,7 +120,7 @@ Not yet built: Stripe payments, B2B HR portal.
 
 ### Phase 3 — Innovation ✅ COMPLETE
 1. ✅ Checklist regeneration + profile editing
-2. ✅ IND Appointment Slot Monitor
+2. ✅ IND Appointment Slot Monitor (4h reminder cron + community self-report → instant alert to all subscribers)
 3. ✅ 30% Ruling eligibility calculator
 4. ✅ Resource links (Pararius, ExpatGuide, Marktplaats, IKEA)
 5. ✅ Container shipping improvements (3 options, ship date, arrival estimate) + task search

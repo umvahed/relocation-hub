@@ -16,3 +16,6 @@ frontend/.env
 # General
 .DS_Store
 *.log
+
+# Claude Code session data
+.claude/settings.json
