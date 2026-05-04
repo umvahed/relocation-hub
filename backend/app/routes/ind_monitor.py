@@ -3,7 +3,6 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 import httpx
 import asyncio
-import random
 from datetime import datetime, timezone
 from app.config import settings
 from app.routes.notifications import _send_email
@@ -61,17 +60,11 @@ class SubscribeRequest(BaseModel):
     email: str
 
 
-def _oap_url(desk: str, product_key: str, session: int | None = None) -> str:
+def _oap_url(desk: str, product_key: str) -> str:
     target = f"{IND_OAP_API}/{desk}/slots/?productKey={product_key}&persons=1"
     if settings.SCRAPER_API_KEY:
         from urllib.parse import quote
-        # session_number forces a fresh residential IP per request — avoids OAP rate-limiting
-        # the same IP across consecutive desk checks
-        sid = session if session is not None else random.randint(1, 9999999)
-        return (
-            f"{SCRAPER_API_BASE}?api_key={settings.SCRAPER_API_KEY}"
-            f"&url={quote(target)}&session_number={sid}"
-        )
+        return f"{SCRAPER_API_BASE}?api_key={settings.SCRAPER_API_KEY}&url={quote(target)}"
     return target
 
 
@@ -213,40 +206,56 @@ async def get_status(user_id: str):
 
 @router.get("/ind-monitor/debug")
 async def debug_ind(authorization: Annotated[str | None, Header()] = None):
-    """Raw diagnostic probe — 2 desks × 2 product keys via current routing strategy."""
+    """Raw diagnostic probe — connectivity test + 1 desk check."""
     if authorization != f"Bearer {settings.RESEND_API_KEY}":
         raise HTTPException(status_code=401, detail="Unauthorised")
 
+    connectivity: dict = {}
     results = []
-    async with httpx.AsyncClient(timeout=100, follow_redirects=True) as client:
-        for code, name in list(IND_DESKS.items())[:2]:
-            for product_key in PRODUCT_KEYS:
-                entry: dict = {
-                    "desk": code,
-                    "name": name,
-                    "product_key": product_key,
-                    "via_scraper_api": bool(settings.SCRAPER_API_KEY),
-                    "url": _oap_url_safe(code, product_key),
-                }
-                try:
-                    status, body = await _query_slots(client, code, product_key)
-                    entry["status"] = status
-                    if isinstance(body, list):
-                        entry["body_type"] = "list"
-                        entry["count"] = len(body)
-                        entry["sample"] = body[:2]
-                    elif isinstance(body, dict):
-                        entry["body_type"] = "dict"
-                        entry["keys"] = list(body.keys())[:10]
-                    else:
-                        entry["body_type"] = type(body).__name__
-                except Exception as exc:
-                    entry["error"] = f"{type(exc).__name__}: {exc}"
-                results.append(entry)
+
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        # Step 1: verify Railway can reach ScraperAPI at all using a known-good URL
+        if settings.SCRAPER_API_KEY:
+            from urllib.parse import quote
+            test_url = (
+                f"{SCRAPER_API_BASE}?api_key={settings.SCRAPER_API_KEY}"
+                f"&url={quote('https://httpbin.org/json')}"
+            )
+            try:
+                r = await client.get(test_url, timeout=20)
+                connectivity["scraperapi_reachable"] = True
+                connectivity["test_status"] = r.status_code
+            except Exception as exc:
+                connectivity["scraperapi_reachable"] = False
+                connectivity["test_error"] = f"{type(exc).__name__}: {exc}"
+
+        # Step 2: probe just Amsterdam with one key
+        for product_key in PRODUCT_KEYS[:1]:
+            entry: dict = {
+                "desk": "AM",
+                "product_key": product_key,
+                "url": _oap_url_safe("AM", product_key),
+            }
+            try:
+                status, body = await _query_slots(client, "AM", product_key)
+                entry["status"] = status
+                if isinstance(body, list):
+                    entry["body_type"] = "list"
+                    entry["count"] = len(body)
+                    entry["sample"] = body[:2]
+                elif isinstance(body, dict):
+                    entry["body_type"] = "dict"
+                    entry["keys"] = list(body.keys())[:10]
+                else:
+                    entry["body_type"] = type(body).__name__
+            except Exception as exc:
+                entry["error"] = f"{type(exc).__name__}: {exc}"
+            results.append(entry)
 
     return {
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "scraper_api_configured": bool(settings.SCRAPER_API_KEY),
+        "connectivity": connectivity,
         "results": results,
     }
 
