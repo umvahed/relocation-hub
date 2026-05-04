@@ -171,9 +171,11 @@ export default function DashboardPage() {
   const toggleTask = async (task: any) => {
     if (task.status !== 'completed' && task.category === 'critical' && isPaid) {
       const docs = taskDocs[task.id] || []
-      const failedDoc = docs.find(d => taskValidations[d.id]?.status === 'fail')
-      if (failedDoc) {
-        setTaskBlockMsg(prev => ({ ...prev, [task.id]: `"${failedDoc.file_name}" failed validation — fix the issues before marking this task complete.` }))
+      const blockedDoc = docs.find(d => taskValidations[d.id]?.status === 'fail' || taskValidations[d.id]?.status === 'warn')
+      if (blockedDoc) {
+        const v = taskValidations[blockedDoc.id]
+        const reason = v?.status === 'fail' ? 'failed validation' : 'has unresolved warnings'
+        setTaskBlockMsg(prev => ({ ...prev, [task.id]: `"${blockedDoc.file_name}" ${reason} — resolve all document issues before marking this critical task complete.` }))
         return
       }
     }

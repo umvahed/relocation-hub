@@ -22,7 +22,12 @@ DOC_TYPE_RULES = {
         "Passport validation rules (IND 2025):\n"
         "- Must be valid for at least 6 months beyond the permit end date\n"
         "- Must have 2 or more blank visa pages\n"
-        "- Photo page must be clearly visible and legible"
+        "- Photo page must be clearly visible and legible\n"
+        "SEVERITY RULES (strictly enforced):\n"
+        "- If the passport is already expired OR the visible expiry date is within 6 months of today "
+        f"({date.today().isoformat()}): status MUST be 'fail', severity MUST be 'error'. Never downgrade to warn.\n"
+        "- If blank visa pages cannot be confirmed from the image alone: status 'warn', severity 'warning'.\n"
+        "- If photo page is obscured or unreadable: status 'fail', severity 'error'."
     ),
     "employment_contract": (
         "Employment contract validation rules (IND 2025):\n"

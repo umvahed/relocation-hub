@@ -192,7 +192,7 @@ def _build_cover_pdf(profile: dict, documents: list[dict], validations: dict) ->
 async def _build_zip(user_id: str) -> tuple[bytes, str]:
     supabase = get_supabase()
 
-    p_res = supabase.table("profiles").select("*").eq("user_id", user_id).execute()
+    p_res = supabase.table("profiles").select("*").eq("id", user_id).execute()
     if not p_res.data:
         raise HTTPException(status_code=404, detail="Profile not found")
     profile = p_res.data[0]
@@ -236,7 +236,12 @@ async def _build_zip(user_id: str) -> tuple[bytes, str]:
 
 @router.get("/docpack/{user_id}")
 async def download_docpack(user_id: str):
-    zip_bytes, filename = await _build_zip(user_id)
+    try:
+        zip_bytes, filename = await _build_zip(user_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build document pack: {e}")
     return StreamingResponse(
         io.BytesIO(zip_bytes),
         media_type="application/zip",
@@ -250,7 +255,7 @@ async def send_docpack_to_hr(user_id: str):
 
     p_res = supabase.table("profiles").select(
         "full_name, contact_name, contact_email"
-    ).eq("user_id", user_id).execute()
+    ).eq("id", user_id).execute()
     if not p_res.data:
         raise HTTPException(status_code=404, detail="Profile not found")
     profile = p_res.data[0]
