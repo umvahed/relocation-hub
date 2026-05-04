@@ -5,6 +5,21 @@ import { createClient } from '@/lib/supabase'
 import { onboardUser, generateChecklist, getChecklist, updateProfile } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 
+const LOADING_SAYINGS = [
+  'Counting tulip fields for accuracy... 🌷',
+  'Bribing the housing committee... 🏠',
+  'Teaching your spreadsheet to ride a bike... 🚲',
+  'Filing the paperwork for your paperwork... 📋',
+  'Googling if stroopwafels count as a meal... 🍪',
+  'Convincing the IND you\'re not a robot... 🤖',
+  'Calculating the exact volume of cheese ahead... 🧀',
+  'Warning: Dutch directness may cause mild shock... ⚡',
+  'Booking your first rain-soaked bike commute... ☔',
+  '23 million bikes for 17 million people — you\'ll fit right in... 🚲',
+  'Scheduling your first "gezellig" moment... 🍺',
+  'Translating "alsjeblieft" for the 47th time... 🇳🇱',
+]
+
 const COUNTRIES = [
   'South Africa', 'United Kingdom', 'United States', 'Germany',
   'France', 'India', 'Australia', 'Canada', 'Spain', 'Italy',
@@ -14,6 +29,7 @@ const COUNTRIES = [
 export default function OnboardingPage() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [sayingIndex, setSayingIndex] = useState(0)
   const [user, setUser] = useState<any>(null)
   const [form, setForm] = useState({
     full_name: '',
@@ -32,6 +48,12 @@ export default function OnboardingPage() {
   })
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    if (!loading) return
+    const id = setInterval(() => setSayingIndex(i => (i + 1) % LOADING_SAYINGS.length), 2400)
+    return () => clearInterval(id)
+  }, [loading])
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -326,13 +348,14 @@ export default function OnboardingPage() {
                 onClick={handleSubmit}
                 disabled={loading}
                 className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition disabled:opacity-50">
-                {loading ? 'Generating your plan...' : 'Generate my plan →'}
+                {loading ? 'Building your plan...' : 'Generate my plan →'}
               </button>
             </div>
             {loading && (
-              <p className="text-center text-sm text-indigo-600 mt-4 animate-pulse">
-                We're generating your personalised checklist...
-              </p>
+              <div className="mt-5 text-center space-y-2">
+                <p className="text-sm font-semibold text-indigo-600 animate-pulse">Building your personalised plan...</p>
+                <p className="text-xs text-gray-400 transition-opacity duration-500">{LOADING_SAYINGS[sayingIndex]}</p>
+              </div>
             )}
           </div>
         )}

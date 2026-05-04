@@ -14,7 +14,8 @@ router = APIRouter()
 _supabase = None
 _claude = None
 
-SUPPORTED_MIME_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"}
+MIME_PDF = "application/pdf"
+SUPPORTED_MIME_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", MIME_PDF}
 
 DOC_TYPE_RULES = {
     "passport": (
@@ -83,6 +84,56 @@ def _infer_doc_type(title: str, category: str) -> str:
     return "general_document"
 
 
+def _call_claude(file_bytes: bytes, mime_type: str, doc_type: str, rules: str, document_id: str) -> dict:
+    encoded = base64.standard_b64encode(file_bytes).decode("utf-8")
+    if mime_type == MIME_PDF:
+        content_block: dict = {"type": "document", "source": {"type": "base64", "media_type": MIME_PDF, "data": encoded}}
+    else:
+        content_block = {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": encoded}}
+
+    user_prompt = (
+        f"Validate this {doc_type.replace('_', ' ')} against the following rules.\n\n"
+        "Applicant age bracket: 30_plus\n\n"
+        f"{rules}\n\n"
+        "Return ONLY this JSON schema — no other text:\n"
+        "{\n"
+        '  "status": "pass" | "warn" | "fail",\n'
+        '  "summary": "<one sentence, no PII>",\n'
+        '  "issues": [\n'
+        '    { "severity": "error" | "warning" | "info", "field": "<field name>", "message": "<description>", "action": "<what to do>" }\n'
+        "  ]\n"
+        "}"
+    )
+    system_prompt = (
+        "You are a strict IND immigration document validator. "
+        "Return ONLY valid JSON matching the exact schema requested. "
+        "Never log, quote, reproduce, or reference personal data fields such as names, "
+        "passport numbers, dates of birth, or addresses. Describe issues in general terms only."
+    )
+    try:
+        claude = get_claude()
+        message = claude.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1500,
+            system=system_prompt,
+            messages=[{"role": "user", "content": [content_block, {"type": "text", "text": user_prompt}]}],
+        )
+        raw = message.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {
+            "status": "fail",
+            "summary": "Document unreadable — reupload a clearer scan",
+            "issues": [{"severity": "error", "field": "document", "message": "Could not parse document content", "action": "Upload a higher-quality scan or PDF"}],
+        }
+    except Exception:
+        raise HTTPException(status_code=502, detail=f"AI validation failed for document {document_id}")
+
+
 class ValidateDocumentRequest(BaseModel):
     user_id: str
 
@@ -98,7 +149,9 @@ async def validate_document(document_id: str, body: ValidateDocumentRequest):
     doc = doc_res.data[0]
 
     # Paywall check
-    profile_res = supabase.table("profiles").select("tier, ai_validation_consent, origin_country").eq("id", body.user_id).execute()
+    profile_res = supabase.table("profiles").select(
+        "tier, ai_validation_consent, origin_country, full_name, contact_name, contact_email"
+    ).eq("id", body.user_id).execute()
     if not profile_res.data:
         raise HTTPException(status_code=404, detail="Profile not found")
     profile = profile_res.data[0]
@@ -139,60 +192,7 @@ async def validate_document(document_id: str, body: ValidateDocumentRequest):
     doc_type = _infer_doc_type(task_title, task_category)
     rules = DOC_TYPE_RULES[doc_type]
 
-    # Determine age bracket from profile for salary threshold selection
-    age_bracket = "30_plus"  # default conservative; frontend can pass DOB later
-
-    system_prompt = (
-        "You are a strict IND immigration document validator. "
-        "Return ONLY valid JSON matching the exact schema requested. "
-        "Never log, quote, reproduce, or reference personal data fields such as names, "
-        "passport numbers, dates of birth, or addresses. Describe issues in general terms only."
-    )
-
-    user_prompt = (
-        f"Validate this {doc_type.replace('_', ' ')} against the following rules.\n\n"
-        f"Applicant age bracket: {age_bracket}\n\n"
-        f"{rules}\n\n"
-        "Return ONLY this JSON schema — no other text:\n"
-        "{\n"
-        '  "status": "pass" | "warn" | "fail",\n'
-        '  "summary": "<one sentence, no PII>",\n'
-        '  "issues": [\n'
-        '    { "severity": "error" | "warning" | "info", "field": "<field name>", "message": "<description>", "action": "<what to do>" }\n'
-        "  ]\n"
-        "}"
-    )
-
-    # Build content block — base64 inline (never URL)
-    encoded = base64.standard_b64encode(file_bytes).decode("utf-8")
-    if mime_type == "application/pdf":
-        content_block: dict = {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": encoded}}
-    else:
-        content_block = {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": encoded}}
-
-    try:
-        claude = get_claude()
-        message = claude.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1500,
-            system=system_prompt,
-            messages=[{"role": "user", "content": [content_block, {"type": "text", "text": user_prompt}]}],
-        )
-        raw = message.content[0].text.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        result = json.loads(raw)
-    except json.JSONDecodeError:
-        result = {
-            "status": "fail",
-            "summary": "Document unreadable — reupload a clearer scan",
-            "issues": [{"severity": "error", "field": "document", "message": "Could not parse document content", "action": "Upload a higher-quality scan or PDF"}],
-        }
-    except Exception as e:
-        # Log only document_id, never file content
-        raise HTTPException(status_code=502, detail=f"AI validation failed for document {document_id}")
+    result = _call_claude(file_bytes, mime_type, doc_type, rules, document_id)
 
     # Store result — raw bytes already garbage-collected at this point
     record = {
@@ -206,6 +206,8 @@ async def validate_document(document_id: str, body: ValidateDocumentRequest):
     }
     saved = supabase.table("document_validations").insert(record).execute()
 
+    _notify_critical_doc_validation(supabase, doc, profile, record, body.user_id)
+
     return {
         "validation_id": saved.data[0]["id"],
         "document_id": document_id,
@@ -214,6 +216,112 @@ async def validate_document(document_id: str, body: ValidateDocumentRequest):
         "issues": result.get("issues", []),
         "validated_at": record["validated_at"],
     }
+
+
+def _send_validation_email(to: str, subject: str, html: str) -> None:
+    if not settings.RESEND_API_KEY:
+        return
+    try:
+        import resend as resend_lib
+        resend_lib.api_key = settings.RESEND_API_KEY
+        resend_lib.Emails.send({"from": settings.RESEND_FROM_EMAIL, "to": [to], "subject": subject, "html": html})
+    except Exception:
+        pass
+
+
+def _build_issues_html(issues: list) -> str:
+    SEV_COLOR = {"error": "#dc2626", "warning": "#d97706", "info": "#2563eb"}
+    html = ""
+    for issue in issues:
+        sev = issue.get("severity", "info")
+        col = SEV_COLOR.get(sev, "#6b7280")
+        html += (
+            f'<div style="border-left:3px solid {col};padding:8px 12px;margin-bottom:8px;background:#f9fafb;">'
+            f'<p style="margin:0;font-size:12px;font-weight:700;color:{col};">{sev.upper()} · {issue.get("field","")}</p>'
+            f'<p style="margin:4px 0 0;font-size:13px;color:#374151;">{issue.get("message","")}</p>'
+            f'<p style="margin:4px 0 0;font-size:12px;color:#6b7280;font-style:italic;">{issue.get("action","")}</p>'
+            f'</div>'
+        )
+    return html
+
+
+def _build_validation_email_html(
+    greeting: str, intro: str, status_label: str, status_color: str,
+    summary: str, issues_html: str, show_cta: bool,
+) -> str:
+    cta = ""
+    if show_cta:
+        cta = (
+            f'<a href="{settings.FRONTEND_URL}/documents" style="display:inline-block;background:#4f46e5;color:#fff;'
+            f'text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:20px;">'
+            f'View &amp; fix document</a>'
+        )
+    issues_block = f'<div style="margin-bottom:16px;">{issues_html}</div>' if issues_html else ""
+    return (
+        '<div style="font-family:-apple-system,sans-serif;max-width:540px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">'
+        '<div style="margin-bottom:20px;font-size:18px;font-weight:700;">'
+        'Relocation<span style="color:#4f46e5;">Hub</span></div>'
+        f'<h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">Hi {greeting},</h2>'
+        f'<p style="color:#6b7280;margin:0 0 16px;line-height:1.6;">{intro}</p>'
+        f'<p style="font-size:15px;font-weight:700;color:{status_color};margin:0 0 12px;">{status_label}</p>'
+        f'<p style="font-size:13px;color:#374151;margin:0 0 16px;">{summary}</p>'
+        f'{issues_block}{cta}'
+        '<hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0"/>'
+        '<p style="font-size:11px;color:#9ca3af;">RelocationHub &middot; relocation-hub.vercel.app</p>'
+        '</div>'
+    )
+
+
+def _notify_critical_doc_validation(supabase, doc: dict, profile: dict, validation: dict, user_id: str) -> None:
+    task_id = doc.get("task_id")
+    if not task_id:
+        return
+    task_res = supabase.table("tasks").select("title, category").eq("id", task_id).execute()
+    if not task_res.data or task_res.data[0].get("category") != "critical":
+        return
+
+    try:
+        auth_user = supabase.auth.admin.get_user_by_id(user_id)
+        user_email = auth_user.user.email or ""
+    except Exception:
+        user_email = ""
+
+    status = validation["status"]
+    file_name = doc.get("file_name", "document")
+    task_title = task_res.data[0]["title"]
+    user_name = profile.get("full_name") or "there"
+    status_label = {"pass": "Passed ✅", "warn": "Passed with warnings ⚠️", "fail": "Failed ❌"}.get(status, status.upper())
+    status_color = {"pass": "#16a34a", "warn": "#d97706", "fail": "#dc2626"}.get(status, "#6b7280")
+    issues_html = _build_issues_html(validation.get("issues", []))
+
+    if user_email:
+        _send_validation_email(
+            to=user_email,
+            subject=f"Document validation result: {file_name}",
+            html=_build_validation_email_html(
+                greeting=user_name.split()[0],
+                intro=f'Your <strong>{file_name}</strong> (critical task: <em>{task_title}</em>) has been validated.',
+                status_label=status_label, status_color=status_color,
+                summary=validation["summary"], issues_html=issues_html,
+                show_cta=(status == "fail"),
+            ),
+        )
+
+    contact_email = profile.get("contact_email")
+    if contact_email:
+        contact_name = profile.get("contact_name") or "there"
+        _send_validation_email(
+            to=contact_email,
+            subject=f"{user_name}'s document validation: {status_label}",
+            html=_build_validation_email_html(
+                greeting=contact_name,
+                intro=f'<strong>{user_name}</strong> uploaded <strong>{file_name}</strong> '
+                      f'for critical task <em>{task_title}</em>. Here is the validation result:',
+                status_label=status_label, status_color=status_color,
+                summary=validation["summary"], issues_html=issues_html,
+                show_cta=False,
+            ),
+        )
 
 
 @router.get("/documents/{document_id}/validation")

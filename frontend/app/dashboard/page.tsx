@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, type RiskScore } from '@/lib/api'
+import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, getDocumentValidation, validateDocument, type RiskScore, type ValidationResult } from '@/lib/api'
 import RiskScoreWidget from '@/app/components/RiskScoreWidget'
 import IndMonitorWidget from '@/app/components/IndMonitorWidget'
 import ResourcesWidget from '@/app/components/ResourcesWidget'
@@ -12,6 +12,7 @@ import { compressImage, formatBytes, MAX_FILE_SIZE_FREE, MAX_FILE_SIZE_PAID, STO
 import { useRouter } from 'next/navigation'
 
 const SECTION_ORDER = ['critical', 'visa', 'admin', 'employment', 'housing', 'banking', 'healthcare', 'transport', 'shipping', 'pets']
+const VALIDATABLE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'])
 
 const SECTION_META: Record<string, { label: string; color: string; text: string; border: string }> = {
   critical:   { label: 'Critical — Required First', color: 'bg-rose-50 dark:bg-rose-900/20',    text: 'text-rose-700 dark:text-rose-300',    border: 'border-rose-400'   },
@@ -133,6 +134,8 @@ export default function DashboardPage() {
   const [search, setSearch] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [taskDocs, setTaskDocs] = useState<Record<string, any[]>>({})
+  const [taskValidations, setTaskValidations] = useState<Record<string, ValidationResult | null>>({})
+  const [taskBlockMsg, setTaskBlockMsg] = useState<Record<string, string>>({})
   const [uploading, setUploading] = useState<string | null>(null)
   const [usage, setUsage] = useState<any | null>(null)
   const [profile, setProfile] = useState<any | null>(null)
@@ -166,6 +169,15 @@ export default function DashboardPage() {
   }, [])
 
   const toggleTask = async (task: any) => {
+    if (task.status !== 'completed' && task.category === 'critical' && isPaid) {
+      const docs = taskDocs[task.id] || []
+      const failedDoc = docs.find(d => taskValidations[d.id]?.status === 'fail')
+      if (failedDoc) {
+        setTaskBlockMsg(prev => ({ ...prev, [task.id]: `"${failedDoc.file_name}" failed validation — fix the issues before marking this task complete.` }))
+        return
+      }
+    }
+    setTaskBlockMsg(prev => { const n = { ...prev }; delete n[task.id]; return n })
     const newStatus = task.status === 'completed' ? 'pending' : 'completed'
     await updateTask(task.id, newStatus)
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
@@ -176,12 +188,20 @@ export default function DashboardPage() {
     setExpandedId(taskId)
     if (!taskDocs[taskId]) {
       const { data } = await supabase.from('documents').select('*').eq('task_id', taskId)
-      setTaskDocs(prev => ({ ...prev, [taskId]: data || [] }))
+      const docs = data || []
+      setTaskDocs(prev => ({ ...prev, [taskId]: docs }))
+      if (isPaid && docs.length > 0) {
+        docs.forEach((doc: any) => {
+          if (taskValidations[doc.id] !== undefined) return
+          getDocumentValidation(doc.id, user.id)
+            .then(v => setTaskValidations(prev => ({ ...prev, [doc.id]: v })))
+            .catch(() => setTaskValidations(prev => ({ ...prev, [doc.id]: null })))
+        })
+      }
     }
   }
 
   const handleFileUpload = async (taskId: string, category: string, file: File) => {
-    const isPaid = profile?.tier === 'paid'
     const maxFileSize = isPaid ? MAX_FILE_SIZE_PAID : MAX_FILE_SIZE_FREE
     const quota = isPaid ? STORAGE_QUOTA_PAID : STORAGE_QUOTA_FREE
 
@@ -199,14 +219,22 @@ export default function DashboardPage() {
     const path = `${user.id}/${taskId}/${Date.now()}-${processed.name}`
     const { data, error } = await supabase.storage.from('documents').upload(path, processed)
     if (!error && data) {
-      await supabase.from('documents').insert({
+      const { data: newDoc } = await supabase.from('documents').insert({
         user_id: user.id, task_id: taskId,
         file_name: file.name, file_path: data.path,
         file_size: processed.size, mime_type: processed.type, category,
-      })
+      }).select()
       setStorageUsed(prev => prev + processed.size)
       const { data: docs } = await supabase.from('documents').select('*').eq('task_id', taskId)
       setTaskDocs(prev => ({ ...prev, [taskId]: docs || [] }))
+
+      const task = tasks.find(t => t.id === taskId)
+      const docId = newDoc?.[0]?.id
+      if (docId && task?.category === 'critical' && isPaid && profile?.ai_validation_consent && VALIDATABLE_MIME_TYPES.has(processed.type)) {
+        validateDocument(docId, user.id)
+          .then(result => setTaskValidations(prev => ({ ...prev, [docId]: result })))
+          .catch(() => null)
+      }
     }
     setUploading(null)
   }
@@ -604,6 +632,12 @@ export default function DashboardPage() {
                           : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600'
                     }`}>
 
+                      {taskBlockMsg[task.id] && (
+                        <div className="mx-4 mt-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                          <p className="text-xs text-red-700 dark:text-red-400">{taskBlockMsg[task.id]}</p>
+                        </div>
+                      )}
+
                       <div className="flex items-start gap-3 p-4">
                         <button
                           onClick={() => toggleTask(task)}
@@ -693,20 +727,34 @@ export default function DashboardPage() {
                               <p className="text-xs text-gray-400 dark:text-gray-500 italic">No documents attached yet.</p>
                             ) : (
                               <div className="space-y-1.5">
-                                {docs.map((doc: any) => (
-                                  <div key={doc.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 rounded-lg px-3 py-2">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                      </svg>
-                                      <span className="text-xs text-gray-700 dark:text-gray-200 truncate">{doc.file_name}</span>
-                                    </div>
-                                    <button onClick={() => openFile(doc.file_path)}
-                                      className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium ml-2 flex-shrink-0">
-                                      View
-                                    </button>
-                                  </div>
-                                ))}
+                                {docs.map((doc: any) => {
+                                    const v = taskValidations[doc.id]
+                                    const badgeClass = v?.status === 'pass'
+                                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                                      : v?.status === 'warn'
+                                        ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                                        : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                                    const badgeLabel = v?.status === 'pass' ? '✓ pass' : v?.status === 'warn' ? '⚠ warn' : '✗ fail'
+                                    return (
+                                      <div key={doc.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 rounded-lg px-3 py-2">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                          </svg>
+                                          <span className="text-xs text-gray-700 dark:text-gray-200 truncate">{doc.file_name}</span>
+                                          {v && (
+                                            <span className={`flex-shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded ${badgeClass}`}>
+                                              {badgeLabel}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <button onClick={() => openFile(doc.file_path)}
+                                          className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium ml-2 flex-shrink-0">
+                                          View
+                                        </button>
+                                      </div>
+                                    )
+                                  })}
                               </div>
                             )}
                           </div>
