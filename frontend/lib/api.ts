@@ -232,6 +232,32 @@ export async function unsubscribeIndMonitor(user_id: string) {
   return handleResponse(res)
 }
 
+export async function downloadDocpack(user_id: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/docpack/${user_id}`)
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(error.detail || `Request failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  const disposition = res.headers.get('Content-Disposition') || ''
+  const match = disposition.match(/filename="(.+)"/)
+  a.download = match ? match[1] : 'RelocationHub_DocPack.zip'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+export async function sendDocpackToHr(user_id: string): Promise<{ sent: boolean; to: string }> {
+  const res = await fetch(`${API_URL}/api/docpack/${user_id}/send-to-hr`, {
+    method: 'POST',
+  })
+  return handleResponse(res)
+}
+
 export async function reportIndSlot(user_id: string) {
   const res = await fetch(`${API_URL}/api/ind-monitor/report-slot`, {
     method: 'POST',

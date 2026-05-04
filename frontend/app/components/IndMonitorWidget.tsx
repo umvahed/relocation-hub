@@ -16,6 +16,26 @@ const Spinner = ({ size }: { readonly size: string }) => (
   </svg>
 )
 
+const ReportButtonContent = ({ reporting, reported }: { readonly reporting: boolean; readonly reported: boolean }) => {
+  if (reporting) return <Spinner size="w-3 h-3" />
+  if (reported) return (
+    <>
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      All subscribers alerted!
+    </>
+  )
+  return (
+    <>
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+      </svg>
+      I found a slot — alert everyone!
+    </>
+  )
+}
+
 function formatCheckedAgo(checkedAt: string): string {
   const diff = Math.floor((Date.now() - new Date(checkedAt).getTime()) / 60000)
   if (diff < 1) return 'just now'
@@ -72,6 +92,8 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
     try {
       await reportIndSlot(userId)
       setReported(true)
+      const s = await getIndMonitorStatus(userId)
+      setLatestCheck(s.latest_check ?? null)
     } catch (e: any) {
       setError(e.message || 'Failed to send alert')
     } finally {
@@ -201,23 +223,7 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
               disabled={reporting || reported}
               className="flex items-center justify-center gap-2 w-full px-3.5 py-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition disabled:opacity-60 text-xs font-medium text-amber-700 dark:text-amber-400"
             >
-              {reporting && <Spinner size="w-3 h-3" />}
-              {!reporting && reported && (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  All subscribers alerted!
-                </>
-              )}
-              {!reporting && !reported && (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                  I found a slot — alert everyone!
-                </>
-              )}
+              <ReportButtonContent reporting={reporting} reported={reported} />
             </button>
           )}
 

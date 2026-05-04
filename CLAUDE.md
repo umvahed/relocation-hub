@@ -53,7 +53,7 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEN
 
 ## Current state
 
-Working end-to-end: Google OAuth / email auth → onboarding (5 steps, destination city, children, container ship date) → AI checklist → dashboard → task search → document upload → AI validation → risk score → iCal feed → task reminders → HR contact notifications → profile editing → checklist regeneration → IND appointment slot monitor → 30% ruling calculator (public) → resource links (Pararius, ExpatGuide, Marktplaats, IKEA) → container arrival estimate.
+Working end-to-end: Google OAuth / email auth → onboarding (5 steps, destination city, children, container ship date) → AI checklist → dashboard → task search → document upload → AI validation → risk score → iCal feed → task reminders → HR contact notifications → profile editing → checklist regeneration → IND appointment slot monitor → 30% ruling calculator (public) → resource links (Pararius, ExpatGuide, Marktplaats, IKEA) → container arrival estimate → document pack (ZIP download + send to HR).
 
 Not yet built: Stripe payments, B2B HR portal.
 
@@ -88,6 +88,8 @@ Not yet built: Stripe payments, B2B HR portal.
 | DELETE | `/api/ind-monitor/subscribe/{user_id}` | Unsubscribe user |
 | POST | `/api/ind-monitor/check` | Check OAP API + notify subscribers (cron, auth-protected) |
 | POST | `/api/ind-monitor/report-slot` | Community self-report: user found a slot, emails all other subscribers |
+| GET | `/api/docpack/{user_id}` | Build + stream ZIP (cover PDF + all documents) |
+| POST | `/api/docpack/{user_id}/send-to-hr` | Build ZIP, upload to Supabase, email 7-day signed URL to HR contact |
 
 ## Go-live checklist (quick reference — full version in PLAN.md)
 
@@ -124,6 +126,7 @@ Not yet built: Stripe payments, B2B HR portal.
 3. ✅ 30% Ruling eligibility calculator
 4. ✅ Resource links (Pararius, ExpatGuide, Marktplaats, IKEA)
 5. ✅ Container shipping improvements (3 options, ship date, arrival estimate) + task search
+6. ✅ Document pack (cover PDF with full profile + document table, ZIP download + send to HR via email)
 
 ### Phase 4 — Monetisation ← NEXT
 - Stripe €3.99/mo
