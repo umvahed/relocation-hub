@@ -85,7 +85,11 @@ def _oap_url_safe(desk: str, product_key: str) -> str:
 
 async def _query_slots(client: httpx.AsyncClient, desk: str, product_key: str) -> tuple[int, any]:
     url = _oap_url(desk, product_key)
-    resp = await client.get(url, headers=BROWSER_HEADERS, timeout=90)
+    # When routing through ScraperAPI, send no custom headers — their endpoint
+    # rejects requests with a foreign Origin header (returns 500, no credits deducted).
+    # ScraperAPI applies its own browser headers to the proxied OAP request.
+    headers = {} if settings.SCRAPER_API_KEY else BROWSER_HEADERS
+    resp = await client.get(url, headers=headers, timeout=90)
     try:
         data = resp.json()
     except Exception:
