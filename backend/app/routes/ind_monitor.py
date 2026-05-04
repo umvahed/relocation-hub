@@ -1,7 +1,7 @@
-from typing import Annotated
+from typing import Annotated, Optional
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
-import httpx
+import json
 from datetime import datetime, timezone, timedelta
 from app.config import settings
 from app.routes.notifications import _send_email
@@ -10,12 +10,23 @@ from supabase import create_client
 router = APIRouter()
 _supabase = None
 
+IND_OAP_BASE = "https://oap.ind.nl"
 IND_BOOKING_URL = "https://oap.ind.nl/oap/en/#/doc"
 
-# oap.ind.nl blocks all cloud and proxy IPs — automated slot detection is not feasible.
-# The monitor works as a scheduled reminder: email subscribers to check themselves,
-# with a direct link and tips on when slots tend to appear.
-REMINDER_INTERVAL_HOURS = 8  # send at most once every 8h per subscriber
+DESKS = [
+    {"code": "AM", "name": "Amsterdam"},
+    {"code": "DH", "name": "Den Haag"},
+    {"code": "ZW", "name": "Zwolle"},
+    {"code": "DB", "name": "'s-Hertogenbosch"},
+]
+PRODUCT_KEYS = [
+    {"key": "TKV", "label": "Residence permit biometrics"},
+    {"key": "DOC", "label": "Document pickup"},
+]
+
+REMINDER_INTERVAL_HOURS = 8
+SCRAPER_PROXY_HOST = "proxy.scraperapi.com"
+SCRAPER_PROXY_PORT = 8010
 
 
 def get_supabase():
@@ -30,34 +41,177 @@ class SubscribeRequest(BaseModel):
     email: str
 
 
-def _send_reminder(email: str) -> bool:
+def _get_proxies() -> Optional[dict]:
+    """
+    ScraperAPI proxy mode — routes traffic through Dutch residential IPs while
+    curl_cffi preserves Chrome TLS fingerprint end-to-end (unlike URL mode which
+    loses the fingerprint because ScraperAPI makes its own HTTP request).
+    """
+    key = settings.SCRAPER_API_KEY
+    if not key:
+        return None
+    proxy_url = f"http://scraperapi.country_code=nl:{key}@{SCRAPER_PROXY_HOST}:{SCRAPER_PROXY_PORT}"
+    return {"http": proxy_url, "https": proxy_url}
+
+
+def _check_oap_slots() -> list[dict]:
+    """
+    Returns list of dicts: {desk_code, desk_name, product_key, product_label,
+    first_date, slot_count} for every desk+type combination that has open slots.
+    Returns [] on any failure (gracefully falls back to reminder mode).
+    """
+    try:
+        from curl_cffi import requests as cf_requests
+    except ImportError:
+        return []
+
+    proxies = _get_proxies()
+    if not proxies:
+        return []
+
+    session = cf_requests.Session(impersonate="chrome120")
+
+    # Establish PROFILE session cookie — required by Apache backend
+    try:
+        session.get(f"{IND_OAP_BASE}/oap/en/", proxies=proxies, timeout=15)
+    except Exception:
+        pass
+
+    found = []
+    for desk in DESKS:
+        for pk in PRODUCT_KEYS:
+            url = (
+                f"{IND_OAP_BASE}/oap/api/desks/{desk['code']}/slots/"
+                f"?productKey={pk['key']}&persons=1"
+            )
+            try:
+                r = session.get(url, proxies=proxies, timeout=20)
+                if r.status_code != 200:
+                    continue
+                text = r.text.strip()
+                # OAP wraps responses in `while(...)` as an anti-CSRF measure
+                if text.startswith("while("):
+                    text = text[6:]
+                    if text.endswith(")"):
+                        text = text[:-1]
+                data = json.loads(text)
+                slots = data.get("data") or []
+                if slots:
+                    found.append({
+                        "desk_code": desk["code"],
+                        "desk_name": desk["name"],
+                        "product_key": pk["key"],
+                        "product_label": pk["label"],
+                        "first_date": slots[0].get("date"),
+                        "slot_count": len(slots),
+                    })
+            except Exception:
+                continue
+
+    return found
+
+
+def _send_slots_email(email: str, slots: list[dict]) -> bool:
+    subject = "IND appointment slots are available — book now!"
+
+    slots_html = "".join(
+        f"""
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
+                    padding:12px 16px;margin-bottom:8px;">
+          <p style="margin:0;font-size:14px;font-weight:600;color:#166534;">
+            {s['desk_name']} — {s['product_label']}
+          </p>
+          <p style="margin:4px 0 0;font-size:13px;color:#374151;">
+            First available: <strong>{s['first_date']}</strong> &nbsp;·&nbsp; {s['slot_count']} slot(s)
+          </p>
+        </div>
+        """
+        for s in slots
+    )
+
+    html = f"""
+    <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;
+                padding:32px 24px;color:#1a1a1a;">
+      <div style="margin-bottom:24px;">
+        <span style="font-size:18px;font-weight:700;color:#1a1a1a;">
+          Relocation<span style="color:#4f46e5;">Hub</span>
+        </span>
+      </div>
+      <h2 style="font-size:20px;font-weight:600;margin:0 0 8px;">
+        🎉 IND appointment slots are available!
+      </h2>
+      <p style="font-size:15px;color:#374151;margin:0 0 16px;">
+        We found open slots — book immediately before they disappear.
+      </p>
+      {slots_html}
+      <a href="{IND_BOOKING_URL}"
+         style="display:inline-block;background:#4f46e5;color:#fff;font-size:15px;
+                font-weight:600;padding:12px 24px;border-radius:10px;
+                text-decoration:none;margin:16px 0 24px;">
+        Book appointment now →
+      </a>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;
+                  padding:16px 20px;margin-bottom:24px;">
+        <p style="font-size:13px;font-weight:600;color:#1a1a1a;margin:0 0 8px;">
+          💡 Act fast
+        </p>
+        <ul style="font-size:13px;color:#374151;margin:0;padding-left:20px;line-height:1.8;">
+          <li>Slots fill within minutes — open the link immediately</li>
+          <li>Have your V-number and BSN ready to complete the booking</li>
+          <li>All four desk locations are checked: Amsterdam, Den Haag, Zwolle,
+              's-Hertogenbosch</li>
+        </ul>
+      </div>
+      <p style="color:#9ca3af;font-size:13px;margin:0;">
+        You're receiving this because you subscribed to IND appointment alerts on
+        <a href="{settings.FRONTEND_URL}/dashboard"
+           style="color:#4f46e5;text-decoration:none;">RelocationHub</a>.
+      </p>
+    </div>
+    """
+    return _send_email(to=email, subject=subject, html=html)
+
+
+def _send_reminder_email(email: str) -> bool:
     subject = "Reminder: check your IND appointment slots"
     html = f"""
-    <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a;">
-      <div style="margin-bottom: 24px;">
-        <span style="font-size: 18px; font-weight: 700; color: #1a1a1a;">Relocation<span style="color: #4f46e5;">Hub</span></span>
+    <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;
+                padding:32px 24px;color:#1a1a1a;">
+      <div style="margin-bottom:24px;">
+        <span style="font-size:18px;font-weight:700;color:#1a1a1a;">
+          Relocation<span style="color:#4f46e5;">Hub</span>
+        </span>
       </div>
-      <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 12px;">IND Appointment Reminder</h2>
-      <p style="font-size: 15px; color: #374151; margin: 0 0 20px;">
-        It's time to check for available IND appointment slots. Slots can appear and disappear quickly — checking regularly gives you the best chance.
+      <h2 style="font-size:20px;font-weight:600;margin:0 0 12px;">
+        IND Appointment Reminder
+      </h2>
+      <p style="font-size:15px;color:#374151;margin:0 0 20px;">
+        It's time to check for available IND appointment slots. Slots can appear
+        and disappear quickly — checking regularly gives you the best chance.
       </p>
       <a href="{IND_BOOKING_URL}"
-         style="display: inline-block; background: #4f46e5; color: #fff; font-size: 15px; font-weight: 600;
-                padding: 12px 24px; border-radius: 10px; text-decoration: none; margin-bottom: 24px;">
+         style="display:inline-block;background:#4f46e5;color:#fff;font-size:15px;
+                font-weight:600;padding:12px 24px;border-radius:10px;
+                text-decoration:none;margin-bottom:24px;">
         Check slots now →
       </a>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;">
-        <p style="font-size: 13px; font-weight: 600; color: #1a1a1a; margin: 0 0 8px;">💡 Tips for finding slots</p>
-        <ul style="font-size: 13px; color: #374151; margin: 0; padding-left: 20px; line-height: 1.8;">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;
+                  padding:16px 20px;margin-bottom:24px;">
+        <p style="font-size:13px;font-weight:600;color:#1a1a1a;margin:0 0 8px;">
+          💡 Tips for finding slots
+        </p>
+        <ul style="font-size:13px;color:#374151;margin:0;padding-left:20px;line-height:1.8;">
           <li>Monday mornings often have new slots after the weekend</li>
           <li>Check again after 17:00 — cancellations happen end of business day</li>
-          <li>Try all four desk locations: Amsterdam, Den Haag, Zwolle, 's-Hertogenbosch</li>
+          <li>Try all four desk locations: Amsterdam, Den Haag, Zwolle,
+              's-Hertogenbosch</li>
           <li>Book immediately when you see a slot — they fill within minutes</li>
         </ul>
       </div>
-      <p style="color: #9ca3af; font-size: 13px; margin: 0;">
+      <p style="color:#9ca3af;font-size:13px;margin:0;">
         You're receiving this because you subscribed to IND appointment reminders.
-        <a href="{settings.FRONTEND_URL}/dashboard" style="color: #4f46e5; text-decoration: none;">Manage alerts</a>
+        <a href="{settings.FRONTEND_URL}/dashboard"
+           style="color:#4f46e5;text-decoration:none;">Manage alerts</a>
       </p>
     </div>
     """
@@ -121,9 +275,29 @@ async def check_ind(authorization: Annotated[str | None, Header()] = None):
         raise HTTPException(status_code=401, detail="Unauthorised")
 
     supabase = get_supabase()
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=REMINDER_INTERVAL_HOURS)).isoformat()
 
-    # Only remind subscribers who haven't been notified within the interval
+    available_slots = _check_oap_slots()
+    slots_found = bool(available_slots)
+
+    if slots_found:
+        desks_str = " | ".join(
+            f"{s['desk_name']} ({s['product_label']}, first: {s['first_date']})"
+            for s in available_slots
+        )
+        status_text = f"SLOTS AVAILABLE: {desks_str}"
+    else:
+        proxy_active = bool(settings.SCRAPER_API_KEY)
+        status_text = (
+            "No slots available (checked all desks)"
+            if proxy_active
+            else "No slots checked — SCRAPER_API_KEY not set (reminder mode)"
+        )
+
+    supabase.table("ind_monitor_cache").insert({
+        "slots_available": slots_found,
+        "status_text": status_text,
+    }).execute()
+
     subs = (
         supabase.table("ind_monitor_subscriptions")
         .select("user_id, email, last_notified_at")
@@ -132,24 +306,29 @@ async def check_ind(authorization: Annotated[str | None, Header()] = None):
     )
 
     now = datetime.now(timezone.utc).isoformat()
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=REMINDER_INTERVAL_HOURS)).isoformat()
     notified = 0
+
     for sub in subs.data or []:
         last = sub.get("last_notified_at")
-        if last and last > cutoff:
-            continue  # reminded recently — skip
-        if _send_reminder(sub["email"]):
-            supabase.table("ind_monitor_subscriptions").update(
-                {"last_notified_at": now}
-            ).eq("user_id", sub["user_id"]).execute()
-            notified += 1
+        if slots_found:
+            # Bypass rate limit — send immediately when slots are found
+            if _send_slots_email(sub["email"], available_slots):
+                supabase.table("ind_monitor_subscriptions").update(
+                    {"last_notified_at": now}
+                ).eq("user_id", sub["user_id"]).execute()
+                notified += 1
+        else:
+            # Fallback: reminder every 8h when no slots detected
+            if last and last > cutoff:
+                continue
+            if _send_reminder_email(sub["email"]):
+                supabase.table("ind_monitor_subscriptions").update(
+                    {"last_notified_at": now}
+                ).eq("user_id", sub["user_id"]).execute()
+                notified += 1
 
-    # Log run
-    supabase.table("ind_monitor_cache").insert({
-        "slots_available": False,
-        "status_text": f"Reminder sent to {notified} subscriber(s)" if notified else "No reminders due",
-    }).execute()
-
-    # Prune cache
+    # Prune cache — keep last 100 rows
     old_rows = (
         supabase.table("ind_monitor_cache")
         .select("id")
@@ -162,4 +341,9 @@ async def check_ind(authorization: Annotated[str | None, Header()] = None):
         ids = [r["id"] for r in old_rows.data]
         supabase.table("ind_monitor_cache").delete().in_("id", ids).execute()
 
-    return {"notified": notified, "mode": "reminder"}
+    return {
+        "slots_found": slots_found,
+        "available": available_slots,
+        "notified": notified,
+        "status": status_text,
+    }
