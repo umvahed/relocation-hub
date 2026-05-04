@@ -2,6 +2,8 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 import httpx
+import asyncio
+import random
 from datetime import datetime, timezone
 from app.config import settings
 from app.routes.notifications import _send_email
@@ -59,11 +61,17 @@ class SubscribeRequest(BaseModel):
     email: str
 
 
-def _oap_url(desk: str, product_key: str) -> str:
+def _oap_url(desk: str, product_key: str, session: int | None = None) -> str:
     target = f"{IND_OAP_API}/{desk}/slots/?productKey={product_key}&persons=1"
     if settings.SCRAPER_API_KEY:
         from urllib.parse import quote
-        return f"{SCRAPER_API_BASE}?api_key={settings.SCRAPER_API_KEY}&url={quote(target)}"
+        # session_number forces a fresh residential IP per request — avoids OAP rate-limiting
+        # the same IP across consecutive desk checks
+        sid = session if session is not None else random.randint(1, 9999999)
+        return (
+            f"{SCRAPER_API_BASE}?api_key={settings.SCRAPER_API_KEY}"
+            f"&url={quote(target)}&session_number={sid}"
+        )
     return target
 
 
@@ -77,7 +85,6 @@ def _oap_url_safe(desk: str, product_key: str) -> str:
 
 async def _query_slots(client: httpx.AsyncClient, desk: str, product_key: str) -> tuple[int, any]:
     url = _oap_url(desk, product_key)
-    # 90s: ScraperAPI needs up to 70s internally; give extra headroom
     resp = await client.get(url, headers=BROWSER_HEADERS, timeout=90)
     try:
         data = resp.json()
@@ -92,7 +99,9 @@ async def _fetch_ind_status() -> tuple[bool, str]:
     errors: list[str] = []
 
     async with httpx.AsyncClient(timeout=100, follow_redirects=True) as client:
-        for code, name in IND_DESKS.items():
+        for i, (code, name) in enumerate(IND_DESKS.items()):
+            if i > 0:
+                await asyncio.sleep(3)  # pause between desks — avoids OAP rate-limiting (429)
             for product_key in PRODUCT_KEYS:
                 try:
                     status, data = await _query_slots(client, code, product_key)
@@ -101,6 +110,17 @@ async def _fetch_ind_status() -> tuple[bool, str]:
                         break
                     elif status == 200 and data is not None:
                         break  # 200 empty = valid key, no slots — no need to try next key
+                    elif status == 429:
+                        # Rate-limited — wait and retry once
+                        await asyncio.sleep(10)
+                        status2, data2 = await _query_slots(client, code, product_key)
+                        if status2 == 200 and data2 is not None and _extract_slots(data2):
+                            available_desks.append(f"{name} ({product_key})")
+                            break
+                        elif status2 == 200 and data2 is not None:
+                            break
+                        else:
+                            errors.append(f"{code}/{product_key}: rate-limited (429)")
                     elif status not in (400, 404):
                         errors.append(f"{code}/{product_key}: HTTP {status}")
                 except Exception as exc:
