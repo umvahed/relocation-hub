@@ -231,3 +231,12 @@ export async function unsubscribeIndMonitor(user_id: string) {
   })
   return handleResponse(res)
 }
+
+export async function reportIndSlot(user_id: string) {
+  const res = await fetch(`${API_URL}/api/ind-monitor/report-slot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id }),
+  })
+  return handleResponse(res)
+}

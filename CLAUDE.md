@@ -90,6 +90,7 @@ Not yet built: Stripe payments, B2B HR portal.
 | POST | `/api/ind-monitor/subscribe` | Subscribe user to slot alerts |
 | DELETE | `/api/ind-monitor/subscribe/{user_id}` | Unsubscribe user |
 | POST | `/api/ind-monitor/check` | Check OAP API + notify subscribers (cron, auth-protected) |
+| POST | `/api/ind-monitor/report-slot` | Community self-report: user found a slot, emails all other subscribers |
 
 ## Go-live checklist (quick reference — full version in PLAN.md)
 

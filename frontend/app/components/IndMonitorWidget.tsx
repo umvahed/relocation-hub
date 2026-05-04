@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { subscribeIndMonitor, unsubscribeIndMonitor, getIndMonitorStatus } from '@/lib/api'
+import { subscribeIndMonitor, unsubscribeIndMonitor, getIndMonitorStatus, reportIndSlot } from '@/lib/api'
 
 const IND_BOOKING_URL = 'https://oap.ind.nl/oap/en/#/doc'
 
@@ -19,6 +19,8 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
   } | null>(null)
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
+  const [reporting, setReporting] = useState(false)
+  const [reported, setReported] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -47,6 +49,19 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
       setError(e.message || 'Failed to update subscription')
     } finally {
       setToggling(false)
+    }
+  }
+
+  const handleReport = async () => {
+    setReporting(true)
+    setError('')
+    try {
+      await reportIndSlot(userId)
+      setReported(true)
+    } catch (e: any) {
+      setError(e.message || 'Failed to send alert')
+    } finally {
+      setReporting(false)
     }
   }
 
@@ -166,6 +181,36 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
             </svg>
           </a>
 
+          {/* Community report button — only for subscribers */}
+          {subscribed && (
+            <button
+              onClick={handleReport}
+              disabled={reporting || reported}
+              className="flex items-center justify-center gap-2 w-full px-3.5 py-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition disabled:opacity-60 text-xs font-medium text-amber-700 dark:text-amber-400"
+            >
+              {reporting ? (
+                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : reported ? (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  All subscribers alerted!
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  I found a slot — alert everyone!
+                </>
+              )}
+            </button>
+          )}
+
           {/* Subscription status */}
           {subscribed ? (
             <div className="flex items-start gap-2 text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl px-3.5 py-2.5">
@@ -173,13 +218,13 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>
-                Alerts active — we&apos;ll email <strong>{userEmail}</strong> the moment slots appear.
+                Alerts active — you&apos;ll get an email the moment slots appear, plus a reminder every 4 hours.
                 {reminderAgo && <span className="text-indigo-400 dark:text-indigo-500"> Last sent {reminderAgo}.</span>}
               </span>
             </div>
           ) : (
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              Subscribe to get an immediate email alert when slots open up at any IND desk.
+              Subscribe for instant email alerts when slots appear — plus a community alert if any subscriber spots one first.
             </p>
           )}
         </div>

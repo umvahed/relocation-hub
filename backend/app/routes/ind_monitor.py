@@ -24,7 +24,7 @@ PRODUCT_KEYS = [
     {"key": "DOC", "label": "Document pickup"},
 ]
 
-REMINDER_INTERVAL_HOURS = 8
+REMINDER_INTERVAL_HOURS = 4
 SCRAPER_PROXY_HOST = "proxy.scraperapi.com"
 SCRAPER_PROXY_PORT = 8010
 
@@ -216,6 +216,97 @@ def _send_reminder_email(email: str) -> bool:
     </div>
     """
     return _send_email(to=email, subject=subject, html=html)
+
+
+class ReportSlotRequest(BaseModel):
+    user_id: str
+
+
+def _send_community_report_email(email: str) -> bool:
+    subject = "A fellow user found IND slots — check now!"
+    html = f"""
+    <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;
+                padding:32px 24px;color:#1a1a1a;">
+      <div style="margin-bottom:24px;">
+        <span style="font-size:18px;font-weight:700;color:#1a1a1a;">
+          Relocation<span style="color:#4f46e5;">Hub</span>
+        </span>
+      </div>
+      <h2 style="font-size:20px;font-weight:600;margin:0 0 8px;">
+        🎉 Someone just found IND appointment slots!
+      </h2>
+      <p style="font-size:15px;color:#374151;margin:0 0 20px;">
+        A fellow RelocationHub user spotted available slots and flagged it for everyone.
+        Check now — slots disappear within minutes.
+      </p>
+      <a href="{IND_BOOKING_URL}"
+         style="display:inline-block;background:#4f46e5;color:#fff;font-size:15px;
+                font-weight:600;padding:12px 24px;border-radius:10px;
+                text-decoration:none;margin:0 0 24px;">
+        Book appointment now →
+      </a>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;
+                  padding:16px 20px;margin-bottom:24px;">
+        <p style="font-size:13px;font-weight:600;color:#1a1a1a;margin:0 0 8px;">
+          💡 Act fast
+        </p>
+        <ul style="font-size:13px;color:#374151;margin:0;padding-left:20px;line-height:1.8;">
+          <li>Slots fill within minutes — open the link immediately</li>
+          <li>Have your V-number and BSN ready to complete the booking</li>
+          <li>Try all four desks: Amsterdam, Den Haag, Zwolle, 's-Hertogenbosch</li>
+        </ul>
+      </div>
+      <p style="color:#9ca3af;font-size:13px;margin:0;">
+        You're receiving this because you subscribed to IND appointment alerts on
+        <a href="{settings.FRONTEND_URL}/dashboard"
+           style="color:#4f46e5;text-decoration:none;">RelocationHub</a>.
+      </p>
+    </div>
+    """
+    return _send_email(to=email, subject=subject, html=html)
+
+
+@router.post("/ind-monitor/report-slot")
+async def report_slot(body: ReportSlotRequest):
+    """User self-reports finding a slot — immediately alerts all subscribers."""
+    supabase = get_supabase()
+
+    # Verify the reporter is an active subscriber
+    sub = (
+        supabase.table("ind_monitor_subscriptions")
+        .select("email")
+        .eq("user_id", body.user_id)
+        .eq("active", True)
+        .execute()
+    )
+    if not sub.data:
+        raise HTTPException(status_code=403, detail="Must be subscribed to report slots")
+
+    # Log to cache
+    supabase.table("ind_monitor_cache").insert({
+        "slots_available": True,
+        "status_text": "Community report: user spotted available slots",
+    }).execute()
+
+    # Email all active subscribers except the reporter
+    subs = (
+        supabase.table("ind_monitor_subscriptions")
+        .select("user_id, email")
+        .eq("active", True)
+        .neq("user_id", body.user_id)
+        .execute()
+    )
+
+    now = datetime.now(timezone.utc).isoformat()
+    notified = 0
+    for s in subs.data or []:
+        if _send_community_report_email(s["email"]):
+            supabase.table("ind_monitor_subscriptions").update(
+                {"last_notified_at": now}
+            ).eq("user_id", s["user_id"]).execute()
+            notified += 1
+
+    return {"reported": True, "notified": notified}
 
 
 @router.post("/ind-monitor/subscribe")
