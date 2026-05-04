@@ -64,7 +64,10 @@ def _oap_url(desk: str, product_key: str) -> str:
     target = f"{IND_OAP_API}/{desk}/slots/?productKey={product_key}&persons=1"
     if settings.SCRAPER_API_KEY:
         from urllib.parse import quote
-        return f"{SCRAPER_API_BASE}?api_key={settings.SCRAPER_API_KEY}&url={quote(target)}"
+        # premium=true: use ScraperAPI's high-trust residential pool for anti-bot protected sites.
+        # oap.ind.nl rejects standard proxies (500/no credits); premium bypasses that.
+        # Costs 10 credits/request vs 1 — free tier has 1000 credits = 100 premium calls.
+        return f"{SCRAPER_API_BASE}?api_key={settings.SCRAPER_API_KEY}&url={quote(target)}&premium=true"
     return target
 
 
