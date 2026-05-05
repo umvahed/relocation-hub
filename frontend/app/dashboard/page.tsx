@@ -13,6 +13,10 @@ import { compressImage, formatBytes, MAX_FILE_SIZE_FREE, MAX_FILE_SIZE_PAID, STO
 import { useRouter } from 'next/navigation'
 
 const SECTION_ORDER = ['critical', 'visa', 'employment', 'transport', 'shipping', 'admin', 'housing', 'banking', 'healthcare', 'pets']
+
+const LEGAL_DEADLINE_RE = /gemeente|inschrijving|zorgverzekering|health insurance|driving licen|rdw|digid/i
+const dueDateLabel = (task: any) =>
+  LEGAL_DEADLINE_RE.test(task.title + ' ' + (task.description || '')) ? 'Legal deadline' : 'Target date'
 const PRE_DEPARTURE_CATS = new Set(['critical', 'visa', 'employment', 'transport', 'shipping'])
 const POST_ARRIVAL_CATS = new Set(['admin', 'housing', 'banking', 'healthcare', 'pets'])
 const VALIDATABLE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'])
@@ -798,7 +802,7 @@ export default function DashboardPage() {
                           )}
 
                           <div className="flex items-center gap-3">
-                            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Due date</span>
+                            <span className={`text-xs font-semibold uppercase tracking-wide whitespace-nowrap ${LEGAL_DEADLINE_RE.test(task.title + ' ' + (task.description || '')) ? 'text-rose-500 dark:text-rose-400' : 'text-gray-500 dark:text-gray-400'}`}>{dueDateLabel(task)}</span>
                             <input
                               type="date"
                               value={task.due_date || ''}
@@ -871,7 +875,7 @@ export default function DashboardPage() {
                                           View
                                         </button>
                                         {v && (
-                                          <button onClick={() => router.push('/documents')}
+                                          <button onClick={() => router.push(`/documents?from_category=${task.category}`)}
                                             className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium ml-2 flex-shrink-0">
                                             Details
                                           </button>

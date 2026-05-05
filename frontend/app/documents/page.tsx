@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { getDocuments, deleteDocument, getProfile, getDocumentValidation, validateDocument, downloadDocpack, sendDocpackToHr, type ValidationResult } from '@/lib/api'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import AiConsentModal from '@/app/components/AiConsentModal'
 import ValidationBadge from '@/app/components/ValidationBadge'
 
@@ -41,6 +41,8 @@ export default function DocumentsPage() {
   const [sendingToHr, setSendingToHr] = useState(false)
   const [sentToHr, setSentToHr] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const fromCategory = searchParams.get('from_category')
   const supabase = createClient()
 
   useEffect(() => {
@@ -169,8 +171,10 @@ export default function DocumentsPage() {
       <header className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3.5 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition font-medium">
-              ← Dashboard
+            <button
+              onClick={() => router.push(fromCategory ? `/dashboard#section-${fromCategory}` : '/dashboard')}
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition font-medium">
+              {fromCategory ? `← Back to ${fromCategory.charAt(0).toUpperCase() + fromCategory.slice(1)} tasks` : '← Dashboard'}
             </button>
             <div className="text-base font-semibold tracking-tight text-gray-900 dark:text-white">
               Relocation<span className="text-indigo-600">Hub</span>
@@ -183,7 +187,7 @@ export default function DocumentsPage() {
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
         <p className="text-sm text-gray-400 dark:text-gray-500">
-          Upload, validate with AI, and share with your HR contact.
+          Attach documents to tasks on the dashboard — validate with AI and share with your HR contact from here.
         </p>
 
         {!isPaid && docs.length > 0 && (

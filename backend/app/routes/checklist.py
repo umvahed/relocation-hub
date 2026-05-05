@@ -305,6 +305,28 @@ Generate 20-25 tasks. Return ONLY valid JSON array."""
         if "30%" in title_lower or "ruling" in title_lower:
             task["external_link"] = "/tools/30-ruling"
 
+    # Pre-fill legal due dates from move_date — only for tasks with hard Dutch-law deadlines
+    if move_date:
+        try:
+            from datetime import timedelta
+            move_dt = date.fromisoformat(str(move_date)[:10])
+            LEGAL_OFFSETS: list[tuple[list[str], int]] = [
+                (["gemeente", "inschrijving", "register at gemeente"], 5),
+                (["digid"], 17),
+                (["zorgverzekering", "health insurance", "mandatory health"], 125),
+                (["driving licen", "rdw", "exchange your driving"], 190),
+            ]
+            for task in tasks_to_insert:
+                if task.get("due_date"):
+                    continue
+                combined = (task.get("title", "") + " " + task.get("description", "")).lower()
+                for keywords, offset in LEGAL_OFFSETS:
+                    if any(kw in combined for kw in keywords):
+                        task["due_date"] = (move_dt + timedelta(days=offset)).isoformat()
+                        break
+        except Exception:
+            pass
+
     result = supabase.table("tasks").insert(tasks_to_insert).execute()
     return {"message": "Checklist generated", "task_count": len(result.data), "tasks": result.data}
 
