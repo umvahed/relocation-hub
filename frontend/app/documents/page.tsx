@@ -162,7 +162,8 @@ function DocumentsContent() {
     return acc
   }, {})
 
-  const isPaid = profile?.tier === 'paid'
+  const trialActive = profile?.trial_ends_at && new Date(profile.trial_ends_at) > new Date()
+  const isPaid = profile?.tier === 'paid' || !!trialActive
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">

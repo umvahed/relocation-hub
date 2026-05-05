@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from app.config import settings
 from supabase import create_client
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
 _supabase = None
@@ -53,7 +53,10 @@ class GrantPaidTierRequest(BaseModel):
 async def onboard_user(data: OnboardingData):
     try:
         supabase = get_supabase()
-        supabase.table("profiles").upsert({
+        existing = supabase.table("profiles").select("id, trial_ends_at").eq("id", data.user_id).execute()
+        is_new = not existing.data
+
+        row: dict = {
             "id": data.user_id,
             "email": data.email,
             "full_name": data.full_name,
@@ -62,7 +65,11 @@ async def onboard_user(data: OnboardingData):
             "move_date": data.move_date or None,
             "contact_name": data.contact_name or None,
             "contact_email": data.contact_email or None,
-        }, on_conflict="id").execute()
+        }
+        if is_new:
+            row["trial_ends_at"] = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+
+        supabase.table("profiles").upsert(row, on_conflict="id").execute()
 
         return {"message": "Profile upserted", "user_id": data.user_id}
 

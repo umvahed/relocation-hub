@@ -338,7 +338,8 @@ export default function DashboardPage() {
   const criticalTasks = tasks.filter(t => t.category === 'critical')
   const criticalAllDone = criticalTasks.length === 0 || criticalTasks.every(t => t.status === 'completed')
   const criticalRemaining = criticalTasks.filter(t => t.status !== 'completed').length
-  const isPaid = profile?.tier === 'paid'
+  const trialActive = profile?.trial_ends_at && new Date(profile.trial_ends_at) > new Date()
+  const isPaid = profile?.tier === 'paid' || !!trialActive
   const storageQuota = isPaid ? STORAGE_QUOTA_PAID : STORAGE_QUOTA_FREE
   const storagePercent = Math.min(100, Math.round((storageUsed / storageQuota) * 100))
 
@@ -480,6 +481,18 @@ export default function DashboardPage() {
                         <span className="text-xs font-medium text-gray-700 dark:text-gray-200 truncate ml-4 max-w-[160px]">{profile.contact_email}</span>
                       </div>
                     )}
+                    {profile?.has_partner && profile?.partner_full_name && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Partner</span>
+                        <span className="text-xs font-medium text-violet-600 dark:text-violet-400 truncate ml-4 max-w-[160px]">{profile.partner_full_name}</span>
+                      </div>
+                    )}
+                    {profile?.has_partner && profile?.partner_email && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Partner email</span>
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-200 truncate ml-4 max-w-[160px]">{profile.partner_email}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Edit profile */}
@@ -560,16 +573,17 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Trial expiry notice */}
+                  {/* Trial notice */}
                   {(() => {
                     const trialEndsAt = profile?.trial_ends_at
-                    if (!trialEndsAt || isPaid) return null
+                    if (!trialEndsAt || profile?.tier === 'paid') return null
                     const daysLeft = Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)
                     if (daysLeft <= 0) return null
+                    const isExpiring = daysLeft <= 2
                     return (
                       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                          Trial ends in {daysLeft} day{daysLeft !== 1 ? 's' : ''}
+                        <p className={`text-xs font-medium ${isExpiring ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                          {isExpiring ? `Trial ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : `Free trial — ${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining`}
                           <span className="text-indigo-500 dark:text-indigo-400 ml-2 cursor-pointer hover:underline">Upgrade →</span>
                         </p>
                       </div>
