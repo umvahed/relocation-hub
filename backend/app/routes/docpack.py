@@ -60,7 +60,7 @@ def _image_to_pdf_bytes(image_bytes: bytes) -> bytes | None:
         return None
 
 
-def _build_cover_pdf(profile: dict, documents: list[dict], validations: dict) -> bytes:
+def _build_cover_pdf(profile: dict, documents: list[dict], validations: dict, failed_docs: list[dict] | None = None) -> bytes:
     pdf = FPDF()
     pdf.set_margins(20, 20, 20)
     pdf.add_page()
@@ -189,12 +189,21 @@ def _build_cover_pdf(profile: dict, documents: list[dict], validations: dict) ->
                 pdf.cell(w, 6, val, fill=fill, ln=False)
             pdf.ln()
 
-    if skipped:
+    if failed_docs:
         pdf.ln(3)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_text_color(220, 38, 38)
+        names = ", ".join(d.get("file_name", "unknown") for d in failed_docs)
+        pdf.set_x(pdf.l_margin)
+        pdf.cell(0, 5, f"Excluded (failed AI validation): {names}", border=0, ln=True)
+
+    if skipped:
+        pdf.ln(2)
         pdf.set_font("Helvetica", "I", 8)
         pdf.set_text_color(156, 163, 175)
         names = ", ".join(d.get("file_name", "unknown") for d in skipped)
-        pdf.multi_cell(0, 5, f"Not included (unsupported format): {names}")
+        pdf.set_x(pdf.l_margin)
+        pdf.cell(0, 5, f"Not included (unsupported format): {names}", border=0, ln=True)
 
     # Footer
     pdf.ln(6)
@@ -236,7 +245,10 @@ async def _build_merged_pdf(user_id: str) -> tuple[bytes, str]:
         for v in (v_res.data or []):
             validations[v["document_id"]] = v
 
-    cover_bytes = _build_cover_pdf(profile, documents, validations)
+    failed_docs = [d for d in documents if validations.get(d["id"], {}).get("status") == "fail"]
+    included_docs = [d for d in documents if validations.get(d["id"], {}).get("status") != "fail"]
+
+    cover_bytes = _build_cover_pdf(profile, included_docs, validations, failed_docs=failed_docs)
 
     writer = PdfWriter()
 
@@ -244,7 +256,7 @@ async def _build_merged_pdf(user_id: str) -> tuple[bytes, str]:
     for page in cover_reader.pages:
         writer.add_page(page)
 
-    for doc in documents:
+    for doc in included_docs:
         mime = doc.get("mime_type", "")
         if mime not in MERGEABLE_TYPES:
             continue
