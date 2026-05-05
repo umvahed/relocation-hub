@@ -131,12 +131,12 @@ export default function ResourcesWidget({ profile }: Props) {
           )}
 
           {hasContainer && (
-            <a href="https://www.ikea.com/nl/en/" target="_blank" rel="noopener noreferrer"
+            <a href="https://www.google.com/search?q=furniture+rental+expats+netherlands" target="_blank" rel="noopener noreferrer"
               className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-700 transition group">
               <span className="text-xl leading-none mt-0.5">🛋️</span>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-indigo-700 dark:group-hover:text-indigo-300">IKEA Netherlands</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">New furniture & essentials for your Dutch home</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-indigo-700 dark:group-hover:text-indigo-300">Rent furniture while you wait</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Short-term rental agencies — avoid buying while your container is in transit</p>
               </div>
               <ExternalIcon />
             </a>
