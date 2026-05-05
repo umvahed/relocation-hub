@@ -297,9 +297,12 @@ async def report_slot(body: ReportSlotRequest):
         .execute()
     )
 
+    notify_prefs = _fetch_notify_prefs(supabase, [s["user_id"] for s in subs.data or []])
     now = datetime.now(timezone.utc).isoformat()
     notified = 0
     for s in subs.data or []:
+        if not notify_prefs.get(s["user_id"], True):
+            continue
         if _send_community_report_email(s["email"]):
             supabase.table("ind_monitor_subscriptions").update(
                 {"last_notified_at": now}
@@ -360,6 +363,61 @@ async def get_status(user_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+def _build_status_text(slots_found: bool, available_slots: list) -> str:
+    if slots_found:
+        desks_str = " | ".join(
+            f"{s['desk_name']} ({s['product_label']}, first: {s['first_date']})"
+            for s in available_slots
+        )
+        return f"SLOTS AVAILABLE: {desks_str}"
+    proxy_active = bool(settings.SCRAPER_API_KEY)
+    return (
+        "No slots available (checked all desks)"
+        if proxy_active
+        else "No slots checked — SCRAPER_API_KEY not set (reminder mode)"
+    )
+
+
+def _fetch_notify_prefs(supabase, user_ids: list) -> dict:
+    if not user_ids:
+        return {}
+    res = supabase.table("profiles").select("id, notify_by_email").in_("id", user_ids).execute()
+    return {p["id"]: p.get("notify_by_email", True) for p in (res.data or [])}
+
+
+def _notify_subscriber(
+    supabase, sub: dict, slots_found: bool, available_slots: list, now: str, cutoff: str
+) -> bool:
+    """Sends a slots or reminder email. Returns True if sent and timestamp updated."""
+    if slots_found:
+        if not _send_slots_email(sub["email"], available_slots):
+            return False
+    else:
+        last = sub.get("last_notified_at")
+        if last and last > cutoff:
+            return False
+        if not _send_reminder_email(sub["email"]):
+            return False
+    supabase.table("ind_monitor_subscriptions").update(
+        {"last_notified_at": now}
+    ).eq("user_id", sub["user_id"]).execute()
+    return True
+
+
+def _prune_cache(supabase) -> None:
+    old_rows = (
+        supabase.table("ind_monitor_cache")
+        .select("id")
+        .order("checked_at", desc=True)
+        .offset(100)
+        .limit(500)
+        .execute()
+    )
+    if old_rows.data:
+        ids = [r["id"] for r in old_rows.data]
+        supabase.table("ind_monitor_cache").delete().in_("id", ids).execute()
+
+
 @router.post("/ind-monitor/check")
 async def check_ind(authorization: Annotated[str | None, Header()] = None):
     if authorization != f"Bearer {settings.RESEND_API_KEY}":
@@ -369,20 +427,7 @@ async def check_ind(authorization: Annotated[str | None, Header()] = None):
 
     available_slots = _check_oap_slots()
     slots_found = bool(available_slots)
-
-    if slots_found:
-        desks_str = " | ".join(
-            f"{s['desk_name']} ({s['product_label']}, first: {s['first_date']})"
-            for s in available_slots
-        )
-        status_text = f"SLOTS AVAILABLE: {desks_str}"
-    else:
-        proxy_active = bool(settings.SCRAPER_API_KEY)
-        status_text = (
-            "No slots available (checked all desks)"
-            if proxy_active
-            else "No slots checked — SCRAPER_API_KEY not set (reminder mode)"
-        )
+    status_text = _build_status_text(slots_found, available_slots)
 
     supabase.table("ind_monitor_cache").insert({
         "slots_available": slots_found,
@@ -396,41 +441,18 @@ async def check_ind(authorization: Annotated[str | None, Header()] = None):
         .execute()
     )
 
+    notify_prefs = _fetch_notify_prefs(supabase, [s["user_id"] for s in subs.data or []])
     now = datetime.now(timezone.utc).isoformat()
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=REMINDER_INTERVAL_HOURS)).isoformat()
     notified = 0
 
     for sub in subs.data or []:
-        last = sub.get("last_notified_at")
-        if slots_found:
-            # Bypass rate limit — send immediately when slots are found
-            if _send_slots_email(sub["email"], available_slots):
-                supabase.table("ind_monitor_subscriptions").update(
-                    {"last_notified_at": now}
-                ).eq("user_id", sub["user_id"]).execute()
-                notified += 1
-        else:
-            # Fallback: reminder every 8h when no slots detected
-            if last and last > cutoff:
-                continue
-            if _send_reminder_email(sub["email"]):
-                supabase.table("ind_monitor_subscriptions").update(
-                    {"last_notified_at": now}
-                ).eq("user_id", sub["user_id"]).execute()
-                notified += 1
+        if not notify_prefs.get(sub["user_id"], True):
+            continue
+        if _notify_subscriber(supabase, sub, slots_found, available_slots, now, cutoff):
+            notified += 1
 
-    # Prune cache — keep last 100 rows
-    old_rows = (
-        supabase.table("ind_monitor_cache")
-        .select("id")
-        .order("checked_at", desc=True)
-        .offset(100)
-        .limit(500)
-        .execute()
-    )
-    if old_rows.data:
-        ids = [r["id"] for r in old_rows.data]
-        supabase.table("ind_monitor_cache").delete().in_("id", ids).execute()
+    _prune_cache(supabase)
 
     return {
         "slots_found": slots_found,

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { subscribeIndMonitor, unsubscribeIndMonitor, getIndMonitorStatus, reportIndSlot } from '@/lib/api'
+import { subscribeIndMonitor, unsubscribeIndMonitor, getIndMonitorStatus } from '@/lib/api'
 
 const IND_BOOKING_URL = 'https://oap.ind.nl/oap/en/#/doc'
 
@@ -15,26 +15,6 @@ const Spinner = ({ size }: { readonly size: string }) => (
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
   </svg>
 )
-
-const ReportButtonContent = ({ reporting, reported }: { readonly reporting: boolean; readonly reported: boolean }) => {
-  if (reporting) return <Spinner size="w-3 h-3" />
-  if (reported) return (
-    <>
-      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      All subscribers alerted!
-    </>
-  )
-  return (
-    <>
-      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-      </svg>
-      I found a slot — alert everyone!
-    </>
-  )
-}
 
 function formatCheckedAgo(checkedAt: string): string {
   const diff = Math.floor((Date.now() - new Date(checkedAt).getTime()) / 60000)
@@ -53,8 +33,6 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
   } | null>(null)
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
-  const [reporting, setReporting] = useState(false)
-  const [reported, setReported] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -86,45 +64,19 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
     }
   }
 
-  const handleReport = async () => {
-    setReporting(true)
-    setError('')
-    try {
-      await reportIndSlot(userId)
-      setReported(true)
-      const s = await getIndMonitorStatus(userId)
-      setLatestCheck(s.latest_check ?? null)
-    } catch (e: any) {
-      setError(e.message || 'Failed to send alert')
-    } finally {
-      setReporting(false)
-    }
-  }
-
-  // --- derived display values (no nested ternaries in JSX) ---
-
   const reminderAgo = lastReminder
     ? new Date(lastReminder).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
     : null
 
   const checkedAgo = latestCheck?.checked_at ? formatCheckedAgo(latestCheck.checked_at) : null
-
   const slotsAvailable = latestCheck?.slots_available ?? false
-  const isCommunityReport = slotsAvailable && !!latestCheck?.status_text?.startsWith('Community report:')
 
   let statusWrapperClass = 'bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700'
   let dotClass = 'bg-gray-300 dark:bg-gray-600'
   let labelClass = 'text-gray-500 dark:text-gray-400'
   let labelText = 'No slots right now'
-  let checkedAgoLabel = 'Last checked'
 
-  if (isCommunityReport) {
-    statusWrapperClass = 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'
-    dotClass = 'bg-amber-400'
-    labelClass = 'text-amber-700 dark:text-amber-400'
-    labelText = 'Reported by a user — check now!'
-    checkedAgoLabel = 'Reported'
-  } else if (slotsAvailable) {
+  if (slotsAvailable) {
     statusWrapperClass = 'bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800'
     dotClass = 'bg-green-500'
     labelClass = 'text-green-700 dark:text-green-400'
@@ -179,19 +131,14 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
               <span className={`flex-shrink-0 w-2 h-2 rounded-full ${dotClass}`} style={{ marginTop: '5px' }} />
               <div className="min-w-0">
                 <p className={`text-xs font-semibold ${labelClass}`}>{labelText}</p>
-                {isCommunityReport && (
-                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
-                    A fellow subscriber spotted slots and alerted everyone.
-                  </p>
-                )}
-                {slotsAvailable && !isCommunityReport && (
+                {slotsAvailable && (
                   <p className="text-xs text-green-600 dark:text-green-500 mt-0.5 truncate">
                     {latestCheck.status_text.replace('SLOTS AVAILABLE: ', '')}
                   </p>
                 )}
                 {checkedAgo && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    {checkedAgoLabel} {checkedAgo}
+                    Last checked {checkedAgo}
                   </p>
                 )}
               </div>
@@ -203,7 +150,7 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
             </div>
           )}
 
-          {/* Book now / check button */}
+          {/* Book / check button */}
           <a
             href={IND_BOOKING_URL}
             target="_blank"
@@ -215,17 +162,6 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </a>
-
-          {/* Community report button — subscribers only */}
-          {subscribed && (
-            <button
-              onClick={handleReport}
-              disabled={reporting || reported}
-              className="flex items-center justify-center gap-2 w-full px-3.5 py-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition disabled:opacity-60 text-xs font-medium text-amber-700 dark:text-amber-400"
-            >
-              <ReportButtonContent reporting={reporting} reported={reported} />
-            </button>
-          )}
 
           {/* Subscription status */}
           {subscribed ? (
@@ -240,7 +176,7 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
             </div>
           ) : (
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              Subscribe for instant email alerts when slots appear — plus a community alert if any subscriber spots one first.
+              Subscribe for instant email alerts and reminders every 4 hours when slots appear.
             </p>
           )}
         </div>

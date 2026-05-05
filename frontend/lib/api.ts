@@ -165,6 +165,7 @@ export async function updateProfile(user_id: string, data: Partial<{
   has_children: boolean
   number_of_children: number
   container_ship_date: string
+  notify_by_email: boolean
 }>) {
   const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`, {
     method: 'PATCH',
@@ -243,11 +244,11 @@ export async function downloadDocpack(user_id: string): Promise<void> {
   const a = document.createElement('a')
   a.href = url
   const disposition = res.headers.get('Content-Disposition') || ''
-  const match = disposition.match(/filename="(.+)"/)
+  const match = /filename="(.+)"/.exec(disposition)
   a.download = match ? match[1] : 'RelocationHub_DocPack.zip'
   document.body.appendChild(a)
   a.click()
-  document.body.removeChild(a)
+  a.remove()
   URL.revokeObjectURL(url)
 }
 

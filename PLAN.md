@@ -1,6 +1,6 @@
 # RelocationHub — Implementation Plan
 
-> Last updated: 2026-05-03. Phases 1–3 complete. Phase 4 (Stripe) is next.
+> Last updated: 2026-05-05. Phases 1–3 complete. Phase 4 (Stripe) is next.
 
 ---
 
@@ -8,10 +8,9 @@
 
 | Priority | Task | Notes |
 |---|---|---|
-| 1 | Run migration 006 in Supabase SQL editor | Adds `container_ship_date` to profiles |
-| 2 | Run migration 005 in Supabase SQL editor | Adds `destination_city`, `has_children`, `number_of_children` — if not already done |
-| 3 | Set up pytest for backend | Before Stripe — cover tier gating, rate limiting, profile CRUD, SA tasks, IND monitor |
-| 4 | Build Phase 4 — Stripe | See Phase 4 below |
+| 1 | Run migration 007 in Supabase SQL editor | Adds `notify_by_email BOOLEAN NOT NULL DEFAULT TRUE` to profiles |
+| 2 | Set up pytest for backend | Before Stripe — cover tier gating, rate limiting, profile CRUD, SA tasks, IND monitor |
+| 3 | Build Phase 4 — Stripe | See Phase 4 below |
 
 ---
 
@@ -20,7 +19,7 @@
 Run through this before any significant launch or after rebuilding infrastructure from scratch.
 
 ### Supabase
-- [ ] All migrations run in order: 000 → 001 → 002 → 003 → 004 → 005 → 006
+- [ ] All migrations run in order: 000 → 001 → 002 → 003 → 004 → 005 → 006 → 007
 - [ ] RLS enabled on all tables: `profiles`, `tasks`, `documents`, `document_validations`, `risk_scores`, `api_usage`, `ind_monitor_subscriptions`, `ind_monitor_cache`
 - [ ] Storage bucket `documents` exists with RLS policies (authenticated users can only access their own files)
 - [ ] `profiles.tier` default is `'free'`
@@ -101,6 +100,7 @@ Run through this before any significant launch or after rebuilding infrastructur
 - Notifies on state change only: unavailable → available
 - Cron every 4h via cron-job.org
 - `IndMonitorWidget.tsx` on dashboard
+- Community self-report endpoint (`POST /api/ind-monitor/report-slot`) kept in backend but UI button removed — users unlikely to alert competitors
 
 ### Feature 3 ✅ — 30% Ruling eligibility calculator
 - Public page `/tools/30-ruling` — no auth, no backend
@@ -120,11 +120,31 @@ Run through this before any significant launch or after rebuilding infrastructur
 - `ContainerArrivalBanner` on dashboard: origin-country-specific arrival estimate (min/max weeks), switches to "should have arrived" message once window passes
 - Task search bar: filters by title, description, category; live match count; clear button
 
+### Feature 6 ✅ — Document pack
+- Cover PDF (fpdf2): applicant info, relocation overview, household, shipping, HR contact, document table with validation status
+- ZIP download: `GET /api/docpack/{user_id}` streams cover PDF + all uploaded documents
+- Send to HR: `POST /api/docpack/{user_id}/send-to-hr` uploads ZIP to Supabase, emails HR 7-day signed URL
+- Document pack card on `/documents` page
+
+### Feature 7 ✅ — Document validation UX + task gate
+- Critical tasks block completion if any attached document has `fail` OR `warn` validation status
+- Background auto-validation fires after upload to a critical task (paid + consent users)
+- Validation badges (`✓ pass` / `⚠ warn` / `✗ fail`) inline on task document rows
+- "Details" link on each validated doc row → navigates to `/documents`
+- Backend email on critical-doc validation: notifies user + HR contact with result and issues
+- Passport prompt tightened: expiry within 6 months → hard `fail`/`error`, not `warn`
+- Quirky loading sayings during onboarding AI checklist generation (12 Dutch-themed messages, 2.4s cycle)
+
+### Feature 8 ✅ — Email notification preference
+- `notify_by_email BOOLEAN NOT NULL DEFAULT TRUE` on profiles (migration 007)
+- Toggle in dashboard settings dropdown — persisted via `PATCH /api/auth/profile/{user_id}`
+- Backend respects preference in: document validation emails, IND slot alerts, IND reminders
+
 ---
 
 ## Phase 4 — Monetisation 🔲 ← NEXT
 
-**Dependencies**: migration 005 + 006 run, pytest suite passing (recommended).
+**Dependencies**: migrations 005–007 run, pytest suite passing (recommended).
 
 | Task | Notes |
 |---|---|
@@ -138,12 +158,30 @@ Run through this before any significant launch or after rebuilding infrastructur
 
 ---
 
-## Phase 5 — B2B white-label 🔲
+## Phase 5 — B2B HR Portal 🔲
 
-- HR/Company Portal: companies pay per-employee; HR sees all relocatees' progress
-- Bulk onboarding, task annotation, admin controls
-- Requires: `companies` table, `company_id` FK on profiles, multi-tenant RLS policies
-- Pricing: per-seat (est. €5/employee/mo)
+**Goal:** Companies pay per-seat; HR admins manage multiple relocatees from one dashboard.
+
+### Data model additions
+- `companies` table: `id, name, domain, tier, created_at`
+- `company_users` junction: `company_id, user_id, role` (`hr_admin` | `employee`)
+
+### HR portal features
+| Feature | Notes |
+|---|---|
+| Separate `/hr` login | Google OAuth only; role-checked on sign-in |
+| Employee list | Progress bar, critical task status, doc count per employee |
+| Document visibility | HR reads docs via existing signed-URL mechanism; no new storage policies needed |
+| Task controls | HR can enable/disable per-employee tasks; create company-specific custom tasks |
+| Bulk onboarding | CSV upload → triggers onboarding + checklist generation per row |
+| Reminders | HR sets/overrides due dates; sends one-off email reminders to individuals |
+| Weekly digest | Already covers HR contacts — no new email infrastructure needed |
+
+### Architecture notes
+- RLS policies: `hr_admin` read on `tasks`, `documents`, `document_validations` scoped to `company_users`
+- All HR writes go through backend (audit trail)
+- **Design RLS before Stripe (Phase 4)** to avoid retrofitting after paying users exist
+- Pricing: per-employee seat fee via Stripe (separate product from €3.99/mo individual)
 - Higher value than consumer: 50 companies × 20 employees = 1,000 users from 50 deals
 
 ---

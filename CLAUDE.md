@@ -93,7 +93,7 @@ Not yet built: Stripe payments, B2B HR portal.
 
 ## Go-live checklist (quick reference — full version in PLAN.md)
 
-- Supabase: migrations 000–005 run, RLS on all tables, `documents` storage bucket with auth policies, Google OAuth redirect set to `/auth/callback`
+- Supabase: migrations 000–007 run, RLS on all tables, `documents` storage bucket with auth policies, Google OAuth redirect set to `/auth/callback`
 - Railway: all 8 core env vars set (SCRAPER_API_KEY optional), `GET /api/health` returns 200, CORS origin matches Vercel URL exactly
 - Vercel: 3 `NEXT_PUBLIC_*` env vars set, build passes
 - cron-job.org: 4 jobs active (keepalive 5min, reminders daily, digest weekly, IND monitor 4h)
@@ -134,6 +134,24 @@ Not yet built: Stripe payments, B2B HR portal.
 - Webhook: `checkout.session.completed` → `profiles.tier = 'paid'`
 - No frontend/backend guard changes needed (tier checks already in place)
 
-### Phase 5 — B2B white-label
-- HR/Company Portal: companies pay per-employee; HR sees all relocatees' progress
-- Bulk onboarding, task annotation, admin dashboard
+### Phase 5 — B2B HR Portal
+**Goal:** Companies pay per-seat; HR admins manage multiple relocatees from one dashboard.
+
+**Data model additions:**
+- `companies` table: `id, name, domain, tier, created_at`
+- `company_users` junction: `company_id, user_id, role` (role: `hr_admin` | `employee`)
+
+**HR portal features:**
+- Separate login flow at `/hr` — Google OAuth only, role-checked on sign-in
+- Employee list: progress bar per employee, critical task status, document count
+- Document visibility: HR can view (read-only) any employee document with existing signed-URL mechanism — no new storage policy needed
+- Task controls: HR can enable/disable tasks per employee, create company-specific custom tasks
+- Bulk onboarding: HR uploads CSV → triggers onboarding + checklist generation for each row
+- Reminders: HR can set/override due dates and send one-off email reminders to individual employees
+- Weekly digest already covers HR contacts — no new email infra needed
+
+**Architecture notes:**
+- RLS policies: add `hr_admin` read policies on `tasks`, `documents`, `document_validations` scoped to `company_users`
+- All HR writes go through backend (never direct Supabase from HR portal) to enforce audit trail
+- Design RLS before Stripe (Phase 4) to avoid retrofitting security after paying users exist
+- Pricing: per-employee seat fee billed through Stripe, separate product from individual €3.99/mo

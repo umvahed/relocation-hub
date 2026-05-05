@@ -155,7 +155,7 @@ async def validate_document(document_id: str, body: ValidateDocumentRequest):
 
     # Paywall check
     profile_res = supabase.table("profiles").select(
-        "tier, ai_validation_consent, origin_country, full_name, contact_name, contact_email"
+        "tier, ai_validation_consent, origin_country, full_name, contact_name, contact_email, notify_by_email"
     ).eq("id", body.user_id).execute()
     if not profile_res.data:
         raise HTTPException(status_code=404, detail="Profile not found")
@@ -278,6 +278,8 @@ def _build_validation_email_html(
 
 
 def _notify_critical_doc_validation(supabase, doc: dict, profile: dict, validation: dict, user_id: str) -> None:
+    if not profile.get("notify_by_email", True):
+        return
     task_id = doc.get("task_id")
     if not task_id:
         return

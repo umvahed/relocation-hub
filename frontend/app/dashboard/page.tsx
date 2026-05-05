@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, getDocumentValidation, validateDocument, type RiskScore, type ValidationResult } from '@/lib/api'
+import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, updateProfile, getDocumentValidation, validateDocument, type RiskScore, type ValidationResult } from '@/lib/api'
 import RiskScoreWidget from '@/app/components/RiskScoreWidget'
 import IndMonitorWidget from '@/app/components/IndMonitorWidget'
 import ResourcesWidget from '@/app/components/ResourcesWidget'
@@ -470,6 +470,30 @@ export default function DashboardPage() {
                     </div>
                   )}
 
+                  {/* Email alerts toggle */}
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-300">Email alerts</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Validation, IND slots, reminders</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const newVal = !(profile?.notify_by_email ?? true)
+                          await updateProfile(user.id, { notify_by_email: newVal })
+                          setProfile((p: any) => ({ ...p, notify_by_email: newVal }))
+                        }}
+                        className={`relative inline-flex w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
+                          (profile?.notify_by_email ?? true) ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-600'
+                        }`}
+                      >
+                        <span className={`inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform mt-0.5 ${
+                          (profile?.notify_by_email ?? true) ? 'translate-x-4' : 'translate-x-0.5'
+                        }`} />
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Support + sign out + theme */}
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 space-y-2">
                     <ThemeToggle />
@@ -750,10 +774,16 @@ export default function DashboardPage() {
                                             </span>
                                           )}
                                         </div>
-                                        <button onClick={() => openFile(doc.file_path)}
+                                                        <button onClick={() => openFile(doc.file_path)}
                                           className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium ml-2 flex-shrink-0">
                                           View
                                         </button>
+                                        {v && (
+                                          <button onClick={() => router.push('/documents')}
+                                            className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium ml-2 flex-shrink-0">
+                                            Details
+                                          </button>
+                                        )}
                                       </div>
                                     )
                                   })}
