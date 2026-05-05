@@ -95,6 +95,8 @@ backend/
 | POST | `/api/checklist/generate` | Hardcoded critical tasks + Claude AI tasks |
 | POST | `/api/checklist/regenerate` | Delete all tasks + re-generate from current profile |
 | GET | `/api/checklist/{user_id}` | All tasks for user |
+| POST | `/api/checklist/custom-task` | Create a custom (user-defined) task (source='custom') |
+| DELETE | `/api/checklist/task/{task_id}` | Delete a custom task (403 if source != 'custom') |
 | PATCH | `/api/checklist/task/{task_id}` | Update task status |
 | GET | `/api/usage/{user_id}` | Daily call counts per type: checklist/validation/risk_score |
 | GET | `/api/documents/{user_id}` | List uploaded documents |
@@ -111,6 +113,9 @@ backend/
 | POST | `/api/ind-monitor/subscribe` | Subscribe user to IND slot alerts |
 | DELETE | `/api/ind-monitor/subscribe/{user_id}` | Unsubscribe user |
 | POST | `/api/ind-monitor/check` | Check OAP API + notify subscribers (cron-protected) |
+| POST | `/api/ind-monitor/report-slot` | Community self-report: user found a slot, emails all other subscribers |
+| GET | `/api/docpack/{user_id}` | Build + stream merged PDF (cover page + non-failed docs) |
+| POST | `/api/docpack/{user_id}/send-to-hr` | Build merged PDF, upload to Supabase, email 7-day signed URL to HR contact |
 
 **Rate limits (per day, per user):**
 - Checklist: 5 calls (`DAILY_AI_CALL_LIMIT`)
@@ -145,8 +150,18 @@ id (UUID, FK to auth.users)
 email, full_name, origin_country, destination_country, employment_type
 move_date, has_pets, shipping_type, has_relocation_allowance
 contact_name, contact_email
+destination_city (text, nullable)
+has_children (boolean, default false)
+number_of_children (int, nullable)
+container_ship_date (date, nullable)
+notify_by_email (boolean, default true)
+has_partner (boolean, default false)
+partner_full_name (text, nullable)
+partner_email (text, nullable)
+partner_origin_country (text, nullable)
 tier ('free' | 'paid', default 'free')
 tier_granted_at (timestamptz)
+trial_ends_at (timestamptz)   -- set once on first onboard; isPaid = tier='paid' OR trial_ends_at > now()
 ai_validation_consent (boolean, default false)
 ai_validation_consent_at (timestamptz)
 stripe_customer_id, stripe_subscription_id
@@ -158,6 +173,7 @@ created_at, updated_at
 id, user_id, title, description
 category (critical/visa/admin/employment/housing/banking/healthcare/transport/shipping/pets)
 status (pending/completed), priority (100/90 = hardcoded critical, 1-10 = Claude)
+source ('hardcoded' | 'ai' | 'custom')   -- only 'custom' tasks are deletable via UI
 due_date, reminder_sent_at, external_link, depends_on
 created_at, updated_at
 ```
@@ -205,6 +221,11 @@ id, checked_at, slots_available (boolean), status_text
 - `002_document_validation_risk_score.sql` — document_validations, risk_scores, profiles tier/consent columns, api_usage call_type
 - `003_ind_monitor.sql` — ind_monitor_subscriptions, ind_monitor_cache
 - `004_profile_logistics_columns.sql` — employment_type, has_pets, shipping_type, has_relocation_allowance on profiles
+- `005_resource_links.sql` — destination_city, has_children, number_of_children on profiles
+- `006_container_ship_date.sql` — container_ship_date on profiles
+- `007_notify_by_email.sql` — notify_by_email BOOLEAN NOT NULL DEFAULT TRUE on profiles
+- `008_custom_tasks_and_partner.sql` — tasks.source column; has_partner, partner_full_name, partner_email, partner_origin_country on profiles
+- `009_trial_ends_at.sql` — trial_ends_at TIMESTAMPTZ on profiles
 
 **Supabase Storage:** `documents` bucket (private). RLS policies restrict to own folder.
 
@@ -239,7 +260,8 @@ id, checked_at, slots_available (boolean), status_text
 | `ValidationBadge.tsx` | Pill badge (pass/warn/fail) + expandable issues list |
 | `RiskScoreWidget.tsx` | Score card: progress bar, risk level, dimension breakdown, top risk items |
 | `IndMonitorWidget.tsx` | IND slot status + subscribe/unsubscribe toggle |
-| `EditProfileModal.tsx` | Edit all profile fields; Save profile or Save & regenerate checklist |
+| `EditProfileModal.tsx` | Edit all profile fields incl. partner section; Save profile or Save & regenerate checklist |
+| `ResourcesWidget.tsx` | City-aware housing (Pararius), ExpatGuide schools (if children), Marktplaats + IKEA (if container) |
 | `ThemeToggle.tsx` | Dark/light mode toggle |
 
 **Cron proxy routes (`app/api/`):**
@@ -320,11 +342,17 @@ RESEND_API_KEY    ← needed by cron proxy routes (server-side only, no NEXT_PUB
 ✅ Task completion → HR contact email notification
 ✅ Weekly digest email to HR contacts (cron-job.org)
 ✅ Task due-date reminders via Resend (cron-job.org)
-✅ **Profile editing + checklist regeneration** — EditProfileModal, PATCH /api/auth/profile, POST /api/checklist/regenerate
+✅ **Profile editing + checklist regeneration** — EditProfileModal (incl. partner section), PATCH /api/auth/profile, POST /api/checklist/regenerate
 ✅ **IND Appointment Slot Monitor** — OAP JSON API (4 desks), email alert on slot transition, IndMonitorWidget, cron every 4h (cron-job.org)
 ✅ **30% Ruling calculator** — `/tools/30-ruling`, public, 4 hard gates (employer/distance/timing/salary), linked from landing + dashboard
-🔲 Resource links (housing + schools, city-aware, migration 005)
-🔲 Stripe billing
+✅ **Resource links** — ResourcesWidget: Pararius deep-link (city-aware), ExpatGuide schools (if children), Marktplaats + IKEA (if container)
+✅ **Container shipping improvements + task search** — 3 shipping options, container_ship_date, ContainerArrivalBanner, task search bar
+✅ **Document pack** — merged PDF (cover page + non-failed docs via pypdf), download + send to HR with 7-day signed URL
+✅ **Custom tasks** — inline "+ Add a task" per category; `×` delete for source='custom' tasks only
+✅ **Partner support** — partner fields on profile; `[Partner]` prefixed tasks in checklist; violet Partner badge on dashboard; partner email for reminders + completion notifications
+✅ **7-day free trial** — trial_ends_at set on first onboard; all paid features accessible during trial
+✅ **Email notification preference** — notify_by_email toggle in settings; respected by validation emails, IND alerts, IND reminders
+🔲 Stripe billing (Phase 4)
 
 ---
 
@@ -341,16 +369,23 @@ RESEND_API_KEY    ← needed by cron proxy routes (server-side only, no NEXT_PUB
 - iCal feed (`GET /calendar/{user_id}/feed.ics`)
 - Keepalive + cron jobs running
 
-### Phase 3 — Innovation ← IN PROGRESS
+### Phase 3 — Innovation ✅ COMPLETE
 1. ✅ Checklist regeneration + profile editing
 2. ✅ IND Appointment Slot Monitor
-3. ✅ 30% Ruling eligibility calculator (`/tools/30-ruling`) — public, 4 hard gates, no auth, SEO + CTA
-4. 🔲 Resource links — Pararius housing (by city) + ExpatGuide schools (if has_children); needs `destination_city` + `has_children` + `number_of_children` + migration 005
+3. ✅ 30% Ruling eligibility calculator (`/tools/30-ruling`) — public, 4 hard gates, no auth
+4. ✅ Resource links — Pararius (city-aware), ExpatGuide schools (if children), Marktplaats + IKEA (if container)
+5. ✅ Container shipping improvements + task search — 3 shipping options, ship date, arrival banner, search bar
+6. ✅ Document pack — merged PDF (cover + non-failed docs), download + send to HR
+7. ✅ Custom tasks — inline add per category, × delete for custom tasks only
+8. ✅ Partner support — partner fields on profile, `[Partner]` tasks in checklist, violet badge, partner email for notifications
+9. ✅ 7-day free trial — set on first onboard, all paid features accessible
+10. ✅ Email notification preference — notify_by_email toggle, respected by all backend email sends
 
-### Phase 4 — Monetisation
+### Phase 4 — Monetisation ← NEXT
 - Stripe €3.99/mo
-- Webhook on `checkout.session.completed` → `profiles.tier = 'paid'`
-- No frontend/backend guard changes needed
+- `POST /api/billing/create-checkout` + `POST /api/billing/webhook`
+- Webhook: `checkout.session.completed` → `profiles.tier = 'paid'`
+- No frontend/backend guard changes needed (tier checks already in place)
 
 ### Phase 5 — B2B white-label
 - HR/Company Portal: companies pay per-employee; HR sees all relocatees' progress
@@ -376,7 +411,8 @@ relocation-hub/
 │   │       ├── notifications.py
 │   │       ├── reminders.py
 │   │       ├── calendar.py
-│   │       └── ind_monitor.py
+│   │       ├── ind_monitor.py
+│   │       └── docpack.py
 │   ├── requirements.txt
 │   └── railway.toml
 ├── frontend/
@@ -387,12 +423,15 @@ relocation-hub/
 │   │   ├── dashboard/
 │   │   ├── documents/
 │   │   ├── auth/callback/
+│   │   ├── tools/
+│   │   │   └── 30-ruling/
 │   │   ├── components/
 │   │   │   ├── AiConsentModal.tsx
 │   │   │   ├── ValidationBadge.tsx
 │   │   │   ├── RiskScoreWidget.tsx
 │   │   │   ├── IndMonitorWidget.tsx
 │   │   │   ├── EditProfileModal.tsx
+│   │   │   ├── ResourcesWidget.tsx
 │   │   │   └── ThemeToggle.tsx
 │   │   └── api/
 │   │       ├── keepalive/
@@ -406,5 +445,11 @@ relocation-hub/
 └── supabase/migrations/
     ├── 001_phase1_engagement.sql
     ├── 002_document_validation_risk_score.sql
-    └── 003_ind_monitor.sql
+    ├── 003_ind_monitor.sql
+    ├── 004_profile_logistics_columns.sql
+    ├── 005_resource_links.sql
+    ├── 006_container_ship_date.sql
+    ├── 007_notify_by_email.sql
+    ├── 008_custom_tasks_and_partner.sql
+    └── 009_trial_ends_at.sql
 ```

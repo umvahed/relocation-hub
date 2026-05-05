@@ -33,7 +33,7 @@ export default function Home() {
           <span className="text-indigo-600">planned and tracked.</span>
         </h1>
         <p className="text-sm sm:text-lg text-gray-500 dark:text-gray-400 mb-6 max-w-2xl mx-auto leading-relaxed">
-          AI checklist, document validation, risk scoring, IND appointment alerts, and a 30% ruling calculator — everything you need, in one place.
+          AI checklist, partner support, document validation, risk scoring, IND appointment alerts, and a 30% ruling calculator — everything you need, in one place.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link href="/login" className="w-full sm:w-auto bg-indigo-600 text-white px-7 py-3.5 rounded-xl text-base font-semibold hover:bg-indigo-700 transition shadow-sm">
@@ -43,7 +43,7 @@ export default function Home() {
             Check 30% ruling eligibility →
           </Link>
         </div>
-        <p className="text-sm text-gray-400 dark:text-gray-500 mt-4">Free to start · No credit card required</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500 mt-4">7-day free trial · No credit card required</p>
       </section>
 
       {/* Feature grid */}
@@ -164,7 +164,7 @@ export default function Home() {
               {
                 step: '1',
                 title: 'Tell us about your move',
-                desc: 'Origin country, visa type, move date, pets, shipping, and HR contact — 2 minutes.',
+                desc: 'Origin country, visa type, move date, partner, pets, shipping, and HR contact — 2 minutes.',
               },
               {
                 step: '2',
@@ -201,7 +201,8 @@ export default function Home() {
           <ul className="space-y-3 mb-7">
             {[
               'AI-generated, personalised checklist',
-              'Document upload & organisation',
+              'Partner support — joint relocation tasks & notifications',
+              'Document upload, organisation & document pack',
               'AI document validation (IND 2025 rules)',
               'Relocation risk score — 4 dimensions',
               'IND appointment slot monitor',
@@ -209,6 +210,8 @@ export default function Home() {
               'iCal feed for Google / Apple Calendar',
               'HR contact notifications & weekly digest',
               'Profile editing & checklist regeneration',
+              'Custom tasks per category',
+              '7-day free trial — no credit card needed',
             ].map((item) => (
               <li key={item} className="flex items-start gap-2.5 text-sm text-gray-700 dark:text-gray-200">
                 <span className="text-emerald-500 font-bold mt-0.5 flex-shrink-0">✓</span>
@@ -221,7 +224,7 @@ export default function Home() {
             className="block text-center bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition">
             Get started free
           </Link>
-          <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-3">No credit card required to start</p>
+          <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-3">7-day free trial · No credit card required</p>
         </div>
       </section>
 

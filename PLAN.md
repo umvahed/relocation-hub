@@ -1,6 +1,6 @@
 # RelocationHub — Implementation Plan
 
-> Last updated: 2026-05-05. Phases 1–3 complete. Phase 4 (Stripe) is next.
+> Last updated: 2026-05-06. Phases 1–3 complete. Phase 4 (Stripe) is next.
 
 ---
 
@@ -8,8 +8,8 @@
 
 | Priority | Task | Notes |
 |---|---|---|
-| 1 | Run migration 007 in Supabase SQL editor | Adds `notify_by_email BOOLEAN NOT NULL DEFAULT TRUE` to profiles |
-| 2 | Set up pytest for backend | Before Stripe — cover tier gating, rate limiting, profile CRUD, SA tasks, IND monitor |
+| 1 | Run migration 009 in Supabase SQL editor | Adds `trial_ends_at TIMESTAMPTZ` to profiles — fixes production onboarding crash |
+| 2 | Set up pytest for backend | Before Stripe — cover tier gating, rate limiting, profile CRUD, SA tasks, IND monitor, partner tasks |
 | 3 | Build Phase 4 — Stripe | See Phase 4 below |
 
 ---
@@ -19,7 +19,7 @@
 Run through this before any significant launch or after rebuilding infrastructure from scratch.
 
 ### Supabase
-- [ ] All migrations run in order: 000 → 001 → 002 → 003 → 004 → 005 → 006 → 007
+- [ ] All migrations run in order: 000 → 001 → 002 → 003 → 004 → 005 → 006 → 007 → 008 → 009
 - [ ] RLS enabled on all tables: `profiles`, `tasks`, `documents`, `document_validations`, `risk_scores`, `api_usage`, `ind_monitor_subscriptions`, `ind_monitor_cache`
 - [ ] Storage bucket `documents` exists with RLS policies (authenticated users can only access their own files)
 - [ ] `profiles.tier` default is `'free'`
@@ -50,8 +50,10 @@ Run through this before any significant launch or after rebuilding infrastructur
 
 ### End-to-end smoke test
 - [ ] Sign up with Google OAuth → redirects to onboarding
-- [ ] Complete onboarding (5 steps, including container ship date if applicable) → checklist generated
-- [ ] Mark a task complete → HR contact email sent (if configured)
+- [ ] Complete onboarding (5 steps, including container ship date, partner details if applicable) → checklist generated
+- [ ] Partner set → `[Partner]` prefixed tasks appear with violet Partner badge on dashboard
+- [ ] Add a custom task via "+ Add a task" → appears with `×` delete button; only custom tasks are deletable
+- [ ] Mark a task complete → HR contact email sent (if configured); partner email also notified for `[Partner]` tasks
 - [ ] Upload a document → AI validation returns result
 - [ ] Compute risk score → result displayed on dashboard
 - [ ] IND monitor subscribe → confirmation shown
@@ -61,6 +63,8 @@ Run through this before any significant launch or after rebuilding infrastructur
 - [ ] Edit profile → regenerate → new checklist generated
 - [ ] Container ship date set → arrival banner appears on dashboard
 - [ ] Task search → filters correctly, clear button works
+- [ ] Download document pack → merged PDF with cover page + all non-failed docs
+- [ ] New user → 7-day trial active → paid features accessible
 - [ ] Delete account → all data removed
 
 ---

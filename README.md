@@ -22,26 +22,32 @@ SaaS web app helping expats relocating to the Netherlands organise their entire 
 
 ## Features
 
-### Core (free to start)
+### Core (free to start — 7-day full trial)
 - **Google OAuth + email/password auth** — sign up, sign in, password reset
-- **5-step onboarding** — origin country, move date, employment type, shipping, pets, HR contact
-- **AI checklist generation** — hardcoded critical SA/VFS tasks + Claude-generated tasks per profile
-- **Dashboard** — category sections, dependency lock, countdown banner, progress bar, dark mode
+- **5-step onboarding** — origin country, employment type, shipping, pets, children, partner, move date, HR contact
+- **AI checklist generation** — hardcoded critical SA/VFS tasks + Claude-generated tasks per profile; partner-aware (`[Partner]` prefixed tasks for EU vs non-EU partners)
+- **Custom tasks** — inline "+ Add a task" per category on dashboard; `×` delete for custom tasks only
+- **Dashboard** — category sections, dependency lock, countdown banner, progress bar, dark mode, violet Partner badge
+- **Legal due dates** — pre-filled from move date for gemeente (5d), DigiD (17d), health insurance (125d), RDW exchange (190d)
+- **Document pack** — merged PDF (cover page + all non-failed docs) via pypdf; download or email to HR contact
 - **Profile editing + checklist regeneration** — update answers and regenerate the full plan
+- **Partner support** — partner name/email/country on profile; checklist generates partner tasks; partner email receives reminders and task-completion notifications
 
-### Premium AI (paid tier)
+### Premium AI (paid tier + 7-day trial)
 - **Document AI Validation** — Claude validates docs against IND 2025 rules (PDF + images); GDPR-compliant
 - **Relocation Risk Score** — 0–100 across 4 dimensions (critical tasks, timeline, documents, profile) with top risk items
+- **Inline validation nudges** — contextual "Validate it with AI" buttons on task document rows; auto-validates on upload for critical tasks
 
 ### Monitoring & notifications
 - **IND Appointment Slot Monitor** — polls OAP API every 4h across all 4 desks; emails subscribers when slots open
-- **Task reminders** — email alerts N days before due date via Resend
-- **HR contact notifications** — task completion alerts + weekly progress digest to relocation contact
+- **Task reminders** — email alerts N days before due date; partner email included for `[Partner]` tasks
+- **HR contact notifications** — task completion alerts + weekly progress digest; partner email included for partner tasks
 
 ### Tools & integrations
 - **iCal feed** — subscribe to task deadlines in Google Calendar / Apple Calendar
-- **Document hub** — upload and organise documents per task (Supabase Storage, RLS)
+- **Document hub** — upload and organise documents per task (Supabase Storage, RLS); back-navigation context from task
 - **30% Ruling Calculator** — public, multi-step eligibility calculator at `/tools/30-ruling` (no auth required)
+- **Resource links** — city-aware housing (Pararius), ExpatGuide schools (if children), Marktplaats + IKEA (if container)
 
 ---
 
