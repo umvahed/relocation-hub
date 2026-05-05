@@ -300,6 +300,11 @@ Generate 20-25 tasks. Return ONLY valid JSON array."""
             "external_link": task.get("external_link"),
         })
 
+    for task in tasks_to_insert:
+        title_lower = task.get("title", "").lower()
+        if "30%" in title_lower or "ruling" in title_lower:
+            task["external_link"] = "/tools/30-ruling"
+
     result = supabase.table("tasks").insert(tasks_to_insert).execute()
     return {"message": "Checklist generated", "task_count": len(result.data), "tasks": result.data}
 

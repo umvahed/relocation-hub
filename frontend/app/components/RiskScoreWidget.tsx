@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { computeRiskScore, updateConsent, type RiskScore } from '@/lib/api'
+import { computeRiskScore, type RiskScore } from '@/lib/api'
 import AiConsentModal from '@/app/components/AiConsentModal'
 
 const LEVEL_STYLES = {
@@ -80,7 +80,7 @@ export default function RiskScoreWidget({ userId, isPaid, hasConsent, initialSco
             onClick={() => setCollapsed(c => !c)}
             className="flex items-center gap-3 flex-1 text-left min-w-0"
           >
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">Risk Score</h2>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">Relocation Risk Score</h2>
             {score && s && collapsed && (
               <div className="flex items-center gap-2">
                 <span className="text-lg font-bold text-gray-900 dark:text-white leading-none">{score.score}</span>
@@ -100,7 +100,7 @@ export default function RiskScoreWidget({ userId, isPaid, hasConsent, initialSco
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               )}
-              {score ? 'Refresh' : 'Compute'}
+              {score ? 'Refresh' : "What's my score?"}
             </button>
             {score && (
               <button onClick={() => setCollapsed(c => !c)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
@@ -116,7 +116,10 @@ export default function RiskScoreWidget({ userId, isPaid, hasConsent, initialSco
         {!collapsed && (
           <div className="px-5 pb-5 space-y-4 border-t border-gray-100 dark:border-gray-700 pt-4">
             {!score && !loading && (
-              <p className="text-xs text-gray-400 dark:text-gray-500">Click "Compute" to analyse your relocation readiness across 4 dimensions.</p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Analyse your relocation risk</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Checks visa status, documents, timeline, and finances against common relocation failure patterns.</p>
+              </div>
             )}
 
             {score && s && (

@@ -182,6 +182,10 @@ export default function DocumentsPage() {
       </header>
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        <p className="text-sm text-gray-400 dark:text-gray-500">
+          Upload, validate with AI, and share with your HR contact.
+        </p>
+
         {!isPaid && docs.length > 0 && (
           <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-2xl px-4 py-3.5 flex items-center gap-3">
             <span className="text-xl flex-shrink-0">✨</span>

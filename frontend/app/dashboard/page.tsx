@@ -7,6 +7,7 @@ import RiskScoreWidget from '@/app/components/RiskScoreWidget'
 import IndMonitorWidget from '@/app/components/IndMonitorWidget'
 import ResourcesWidget from '@/app/components/ResourcesWidget'
 import ThemeToggle from '@/app/components/ThemeToggle'
+import AiConsentModal from '@/app/components/AiConsentModal'
 import EditProfileModal from '@/app/components/EditProfileModal'
 import { compressImage, formatBytes, MAX_FILE_SIZE_FREE, MAX_FILE_SIZE_PAID, STORAGE_QUOTA_FREE, STORAGE_QUOTA_PAID } from '@/lib/storage'
 import { useRouter } from 'next/navigation'
@@ -143,6 +144,8 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<any | null>(null)
   const [riskScore, setRiskScore] = useState<RiskScore | null>(null)
   const [showRiskNudge, setShowRiskNudge] = useState(false)
+  const [validatingDoc, setValidatingDoc] = useState<string | null>(null)
+  const [consentPendingDoc, setConsentPendingDoc] = useState<string | null>(null)
   const [storageUsed, setStorageUsed] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [showEditProfile, setShowEditProfile] = useState(false)
@@ -256,6 +259,19 @@ export default function DashboardPage() {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, due_date } : t))
   }
 
+  const handleInlineValidate = async (docId: string, skipConsentCheck = false) => {
+    if (!skipConsentCheck && !profile?.ai_validation_consent) {
+      setConsentPendingDoc(docId)
+      return
+    }
+    setValidatingDoc(docId)
+    try {
+      const result = await validateDocument(docId, user.id)
+      setTaskValidations(prev => ({ ...prev, [docId]: result }))
+    } catch { /* silent — user can validate from Documents page */ }
+    finally { setValidatingDoc(null) }
+  }
+
   const openFile = async (filePath: string) => {
     const { data } = await supabase.storage.from('documents').createSignedUrl(filePath, 3600)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
@@ -339,6 +355,19 @@ export default function DashboardPage() {
         />
       )}
 
+      {consentPendingDoc && user && (
+        <AiConsentModal
+          userId={user.id}
+          onConsent={() => {
+            setProfile((p: any) => ({ ...p, ai_validation_consent: true }))
+            const docId = consentPendingDoc
+            setConsentPendingDoc(null)
+            if (docId) handleInlineValidate(docId, true)
+          }}
+          onDecline={() => setConsentPendingDoc(null)}
+        />
+      )}
+
       {/* Header */}
       <header className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3.5 flex justify-between items-center">
@@ -353,6 +382,7 @@ export default function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               Documents
+              <span className="px-1 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-semibold leading-none">AI</span>
             </button>
             {user && (
               <a href={`${process.env.NEXT_PUBLIC_API_URL}/api/calendar/${user.id}/feed.ics`}
@@ -503,6 +533,22 @@ export default function DashboardPage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Trial expiry notice */}
+                  {(() => {
+                    const trialEndsAt = profile?.trial_ends_at
+                    if (!trialEndsAt || isPaid) return null
+                    const daysLeft = Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)
+                    if (daysLeft <= 0) return null
+                    return (
+                      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                          Trial ends in {daysLeft} day{daysLeft !== 1 ? 's' : ''}
+                          <span className="text-indigo-500 dark:text-indigo-400 ml-2 cursor-pointer hover:underline">Upgrade →</span>
+                        </p>
+                      </div>
+                    )
+                  })()}
 
                   {/* Support + sign out + theme */}
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 space-y-2">
@@ -747,7 +793,7 @@ export default function DashboardPage() {
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                               </svg>
-                              Official resource
+                              {task.external_link.startsWith('/tools/') ? 'Open calculator' : 'Official resource'}
                             </a>
                           )}
 
@@ -792,7 +838,11 @@ export default function DashboardPage() {
                             </div>
 
                             {docs.length === 0 ? (
-                              <p className="text-xs text-gray-400 dark:text-gray-500 italic">No documents attached yet.</p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500 italic">
+                                {task.category === 'critical' && isPaid
+                                  ? 'No documents yet — attach one and validate it with AI.'
+                                  : 'No documents attached yet.'}
+                              </p>
                             ) : (
                               <div className="space-y-1.5">
                                 {docs.map((doc: any) => {
@@ -817,13 +867,21 @@ export default function DashboardPage() {
                                           )}
                                         </div>
                                                         <button onClick={() => openFile(doc.file_path)}
-                                          className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium ml-2 flex-shrink-0">
+                                          className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium ml-2 flex-shrink-0">
                                           View
                                         </button>
                                         {v && (
                                           <button onClick={() => router.push('/documents')}
-                                            className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium ml-2 flex-shrink-0">
+                                            className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium ml-2 flex-shrink-0">
                                             Details
+                                          </button>
+                                        )}
+                                        {isPaid && v === null && VALIDATABLE_MIME_TYPES.has(doc.mime_type) && (
+                                          <button
+                                            onClick={() => handleInlineValidate(doc.id)}
+                                            disabled={validatingDoc === doc.id}
+                                            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium ml-2 flex-shrink-0 disabled:opacity-50 whitespace-nowrap">
+                                            {validatingDoc === doc.id ? 'Validating…' : 'Validate it with AI'}
                                           </button>
                                         )}
                                       </div>
