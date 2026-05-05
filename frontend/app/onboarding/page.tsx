@@ -45,6 +45,10 @@ export default function OnboardingPage() {
     has_children: false,
     number_of_children: 1,
     container_ship_date: '',
+    has_partner: false,
+    partner_full_name: '',
+    partner_email: '',
+    partner_origin_country: '',
   })
   const router = useRouter()
   const supabase = createClient()
@@ -89,6 +93,10 @@ export default function OnboardingPage() {
         has_children: form.has_children,
         number_of_children: form.has_children ? form.number_of_children : undefined,
         container_ship_date: form.container_ship_date || undefined,
+        has_partner: form.has_partner,
+        partner_full_name: form.has_partner ? form.partner_full_name || undefined : undefined,
+        partner_email: form.has_partner ? form.partner_email || undefined : undefined,
+        partner_origin_country: form.has_partner ? form.partner_origin_country || undefined : undefined,
       })
 
       const checklistResult = await generateChecklist({
@@ -100,6 +108,8 @@ export default function OnboardingPage() {
         shipping_type: form.shipping_type,
         has_relocation_allowance: form.has_relocation_allowance,
         container_ship_date: form.container_ship_date || undefined,
+        has_partner: form.has_partner,
+        partner_origin_country: form.has_partner ? form.partner_origin_country || undefined : undefined,
       })
 
       if (checklistResult.detail) {
@@ -277,7 +287,48 @@ export default function OnboardingPage() {
                 </select>
               </div>
             )}
-            {!form.has_children && <div className="mb-6" />}
+            {!form.has_children && <div className="mb-3" />}
+
+            <label className="block text-sm font-medium text-gray-700 mb-3">Is your partner relocating with you?</label>
+            <div className="flex gap-3 mb-3">
+              <button
+                onClick={() => setForm(f => ({ ...f, has_partner: true }))}
+                className={`flex-1 py-3 rounded-xl font-semibold border transition ${form.has_partner ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                Yes
+              </button>
+              <button
+                onClick={() => setForm(f => ({ ...f, has_partner: false }))}
+                className={`flex-1 py-3 rounded-xl font-semibold border transition ${!form.has_partner ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                No
+              </button>
+            </div>
+            {form.has_partner && (
+              <div className="mb-5 bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 space-y-2">
+                <p className="text-xs font-medium text-violet-800 mb-1">We'll generate partner-specific tasks and send them reminders too.</p>
+                <input
+                  type="text"
+                  placeholder="Partner's full name"
+                  value={form.partner_full_name}
+                  onChange={e => setForm(f => ({ ...f, partner_full_name: e.target.value }))}
+                  className="w-full border border-violet-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                />
+                <input
+                  type="email"
+                  placeholder="Partner's email address"
+                  value={form.partner_email}
+                  onChange={e => setForm(f => ({ ...f, partner_email: e.target.value }))}
+                  className="w-full border border-violet-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                />
+                <select
+                  value={form.partner_origin_country}
+                  onChange={e => setForm(f => ({ ...f, partner_origin_country: e.target.value }))}
+                  className="w-full border border-violet-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-400">
+                  <option value="">Partner's origin country</option>
+                  {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+            {!form.has_partner && <div className="mb-5" />}
 
             <div className="flex gap-3">
               <button onClick={() => setStep(2)}

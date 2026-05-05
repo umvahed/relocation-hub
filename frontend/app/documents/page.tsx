@@ -1,6 +1,6 @@
 'use client'
 export const dynamic = 'force-dynamic'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase'
 import { getDocuments, deleteDocument, getProfile, getDocumentValidation, validateDocument, downloadDocpack, sendDocpackToHr, type ValidationResult } from '@/lib/api'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -29,6 +29,18 @@ function formatDate(iso: string) {
 }
 
 export default function DocumentsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <p className="text-sm text-indigo-600 animate-pulse font-medium">Loading documents...</p>
+      </div>
+    }>
+      <DocumentsContent />
+    </Suspense>
+  )
+}
+
+function DocumentsContent() {
   const [docs, setDocs] = useState<any[]>([])
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)

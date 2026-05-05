@@ -34,6 +34,8 @@ export async function generateChecklist(data: {
   shipping_type?: string
   has_relocation_allowance?: boolean
   container_ship_date?: string
+  has_partner?: boolean
+  partner_origin_country?: string
 }) {
   const res = await fetch(`${API_URL}/api/checklist/generate`, {
     method: 'POST',
@@ -151,6 +153,22 @@ export async function setDueDate(task_id: string, due_date: string) {
   return handleResponse(res)
 }
 
+export async function createCustomTask(data: { user_id: string; title: string; category: string; description?: string }) {
+  const res = await fetch(`${API_URL}/api/checklist/custom-task`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res)
+}
+
+export async function deleteTask(task_id: string, user_id: string) {
+  const res = await fetch(`${API_URL}/api/checklist/task/${task_id}?user_id=${encodeURIComponent(user_id)}`, {
+    method: 'DELETE',
+  })
+  return handleResponse(res)
+}
+
 export async function updateProfile(user_id: string, data: Partial<{
   full_name: string
   origin_country: string
@@ -166,6 +184,10 @@ export async function updateProfile(user_id: string, data: Partial<{
   number_of_children: number
   container_ship_date: string
   notify_by_email: boolean
+  has_partner: boolean
+  partner_full_name: string
+  partner_email: string
+  partner_origin_country: string
 }>) {
   const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`, {
     method: 'PATCH',

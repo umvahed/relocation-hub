@@ -38,6 +38,10 @@ class ProfileUpdate(BaseModel):
     number_of_children: int | None = None
     container_ship_date: str | None = None
     notify_by_email: bool | None = None
+    has_partner: bool | None = None
+    partner_full_name: str | None = None
+    partner_email: str | None = None
+    partner_origin_country: str | None = None
 
 class ConsentUpdate(BaseModel):
     ai_validation_consent: bool
@@ -81,7 +85,8 @@ async def update_profile(user_id: str, data: ProfileUpdate):
     try:
         supabase = get_supabase()
         update_data = data.model_dump(exclude_unset=True)
-        for key in ('move_date', 'contact_name', 'contact_email', 'destination_city'):
+        for key in ('move_date', 'contact_name', 'contact_email', 'destination_city',
+                    'partner_full_name', 'partner_email', 'partner_origin_country'):
             if key in update_data:
                 update_data[key] = update_data[key] or None
         if not update_data:

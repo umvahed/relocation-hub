@@ -31,6 +31,10 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
     has_children: profile.has_children ?? false,
     number_of_children: profile.number_of_children ?? 1,
     container_ship_date: profile.container_ship_date || '',
+    has_partner: profile.has_partner ?? false,
+    partner_full_name: profile.partner_full_name || '',
+    partner_email: profile.partner_email || '',
+    partner_origin_country: profile.partner_origin_country || '',
   })
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
@@ -51,6 +55,9 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
         destination_city: form.destination_city || undefined,
         number_of_children: form.has_children ? form.number_of_children : undefined,
         container_ship_date: form.container_ship_date || undefined,
+        partner_full_name: form.has_partner ? form.partner_full_name || undefined : undefined,
+        partner_email: form.has_partner ? form.partner_email || undefined : undefined,
+        partner_origin_country: form.has_partner ? form.partner_origin_country || undefined : undefined,
       })
       onSave(updated)
       onClose()
@@ -73,6 +80,9 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
         destination_city: form.destination_city || undefined,
         number_of_children: form.has_children ? form.number_of_children : undefined,
         container_ship_date: form.container_ship_date || undefined,
+        partner_full_name: form.has_partner ? form.partner_full_name || undefined : undefined,
+        partner_email: form.has_partner ? form.partner_email || undefined : undefined,
+        partner_origin_country: form.has_partner ? form.partner_origin_country || undefined : undefined,
       })
       const result = await regenerateChecklist(userId)
       onRegenerate(result.tasks || [])
@@ -206,6 +216,27 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
                 <label className={labelClass}>How many?</label>
                 <select value={form.number_of_children} onChange={e => set('number_of_children', Number(e.target.value))} className={inputClass}>
                   {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Partner */}
+          <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+            <p className={labelClass}>Partner relocating with you?</p>
+            <div className="flex gap-2 mb-3">
+              <button onClick={() => set('has_partner', true)} className={toggleBtn(form.has_partner)}>Yes</button>
+              <button onClick={() => set('has_partner', false)} className={toggleBtn(!form.has_partner)}>No</button>
+            </div>
+            {form.has_partner && (
+              <div className="space-y-2">
+                <input type="text" value={form.partner_full_name} onChange={e => set('partner_full_name', e.target.value)}
+                  placeholder="Partner's full name" className={inputClass} />
+                <input type="email" value={form.partner_email} onChange={e => set('partner_email', e.target.value)}
+                  placeholder="Partner's email address" className={inputClass} />
+                <select value={form.partner_origin_country} onChange={e => set('partner_origin_country', e.target.value)} className={inputClass}>
+                  <option value="">Partner's origin country</option>
+                  {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
             )}

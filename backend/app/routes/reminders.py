@@ -36,7 +36,7 @@ async def send_reminders(authorization: str = Header(None)):
             if sent_date == today.isoformat():
                 continue
 
-        profile_res = supabase.table("profiles").select("full_name, email, contact_name, contact_email").eq("id", task["user_id"]).execute()
+        profile_res = supabase.table("profiles").select("full_name, email, contact_name, contact_email, partner_email").eq("id", task["user_id"]).execute()
         if not profile_res.data:
             continue
 
@@ -78,6 +78,16 @@ async def send_reminders(authorization: str = Header(None)):
                 f"this task on {user_name}'s relocation checklist"
             )
             _send_email(to=contact_email, subject=f"Reminder for {user_name}: {task['title']} due {due_label}", html=contact_html)
+
+        # For [Partner]-prefixed tasks, also notify the partner directly
+        if task["title"].startswith("[Partner]"):
+            partner_email = profile.get("partner_email")
+            if partner_email:
+                partner_html = html.replace(f"Hi {user_name},", "Hi,").replace(
+                    "this task on your relocation checklist",
+                    "this task on your relocation checklist"
+                )
+                _send_email(to=partner_email, subject=f"Reminder: {task['title']} due {due_label}", html=partner_html)
 
     return {"sent": sent, "checked": len(tasks_res.data or [])}
 

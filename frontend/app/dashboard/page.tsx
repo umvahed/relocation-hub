@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, updateProfile, getDocumentValidation, validateDocument, type RiskScore, type ValidationResult } from '@/lib/api'
+import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, updateProfile, getDocumentValidation, validateDocument, createCustomTask, deleteTask, type RiskScore, type ValidationResult } from '@/lib/api'
 import RiskScoreWidget from '@/app/components/RiskScoreWidget'
 import IndMonitorWidget from '@/app/components/IndMonitorWidget'
 import ResourcesWidget from '@/app/components/ResourcesWidget'
@@ -151,6 +151,9 @@ export default function DashboardPage() {
   const [validatingDoc, setValidatingDoc] = useState<string | null>(null)
   const [consentPendingDoc, setConsentPendingDoc] = useState<string | null>(null)
   const [storageUsed, setStorageUsed] = useState(0)
+  const [addingTaskCat, setAddingTaskCat] = useState<string | null>(null)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [savingTask, setSavingTask] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
@@ -279,6 +282,25 @@ export default function DashboardPage() {
   const openFile = async (filePath: string) => {
     const { data } = await supabase.storage.from('documents').createSignedUrl(filePath, 3600)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }
+
+  const handleAddCustomTask = async (category: string) => {
+    if (!newTaskTitle.trim() || !user) return
+    setSavingTask(true)
+    try {
+      const result = await createCustomTask({ user_id: user.id, title: newTaskTitle.trim(), category })
+      if (result.task) setTasks(prev => [...prev, result.task])
+      setNewTaskTitle('')
+      setAddingTaskCat(null)
+    } catch { /* silent */ }
+    finally { setSavingTask(false) }
+  }
+
+  const handleDeleteCustomTask = async (taskId: string) => {
+    if (!user) return
+    await deleteTask(taskId, user.id).catch(() => null)
+    setTasks(prev => prev.filter(t => t.id !== taskId))
+    setTaskDocs(prev => { const n = { ...prev }; delete n[taskId]; return n })
   }
 
   const googleCalendarUrl = (task: any) => {
@@ -735,7 +757,7 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2" id={`tasks-${cat}`}>
                 {sectionTasks.map(task => {
                   const done = task.status === 'completed'
                   const expanded = expandedId === task.id
@@ -771,12 +793,24 @@ export default function DashboardPage() {
 
                         <button onClick={() => toggleExpand(task.id)} className="flex-1 text-left min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <span className={`text-sm font-medium ${done ? 'line-through text-gray-400 dark:text-gray-600' : 'text-gray-900 dark:text-white'}`}>
-                              {task.title}
-                            </span>
+                            <div className="flex items-center gap-2 min-w-0">
+                              {task.title.startsWith('[Partner]') && (
+                                <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400">Partner</span>
+                              )}
+                              <span className={`text-sm font-medium ${done ? 'line-through text-gray-400 dark:text-gray-600' : 'text-gray-900 dark:text-white'}`}>
+                                {task.title.startsWith('[Partner]') ? task.title.slice(10) : task.title}
+                              </span>
+                            </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               {docs.length > 0 && (
                                 <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">{docs.length} doc{docs.length !== 1 ? 's' : ''}</span>
+                              )}
+                              {task.source === 'custom' && !expanded && (
+                                <button
+                                  onClick={e => { e.stopPropagation(); handleDeleteCustomTask(task.id) }}
+                                  className="text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-500 transition text-base leading-none">
+                                  ×
+                                </button>
                               )}
                               <svg className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
                                 fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -899,6 +933,43 @@ export default function DashboardPage() {
                     </div>
                   )
                 })}
+                {!search && !locked && (
+                  <div className="mt-1">
+                    {addingTaskCat === cat ? (
+                      <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl border border-indigo-200 dark:border-indigo-600 px-3 py-2">
+                        <input
+                          type="text"
+                          value={newTaskTitle}
+                          onChange={e => setNewTaskTitle(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') handleAddCustomTask(cat)
+                            if (e.key === 'Escape') { setAddingTaskCat(null); setNewTaskTitle('') }
+                          }}
+                          placeholder="Task title…"
+                          autoFocus
+                          className="flex-1 text-sm text-gray-900 dark:text-white bg-transparent outline-none placeholder-gray-400"
+                        />
+                        <button
+                          onClick={() => handleAddCustomTask(cat)}
+                          disabled={savingTask || !newTaskTitle.trim()}
+                          className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 disabled:opacity-40 transition">
+                          {savingTask ? 'Adding…' : 'Add'}
+                        </button>
+                        <button
+                          onClick={() => { setAddingTaskCat(null); setNewTaskTitle('') }}
+                          className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setAddingTaskCat(cat); setNewTaskTitle('') }}
+                        className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition flex items-center gap-1 py-1 px-1">
+                        + Add a task
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -124,6 +124,8 @@ class GenerateChecklistRequest(BaseModel):
     shipping_type: str = "luggage_only"  # "luggage_only", "container", "both"
     has_relocation_allowance: bool = False
     container_ship_date: str | None = None
+    has_partner: bool = False
+    partner_origin_country: str | None = None
 
 def _check_and_increment_usage(supabase, user_id: str, call_type: str = "checklist"):
     today = date.today().isoformat()
@@ -153,7 +155,7 @@ def _check_and_increment_usage(supabase, user_id: str, call_type: str = "checkli
         supabase.table("api_usage").insert({"user_id": user_id, "date": today, "call_count": 1, "call_type": call_type}).execute()
 
 
-async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country: str, move_date, employment_type: str, has_pets: bool, shipping_type: str, has_relocation_allowance: bool, container_ship_date: str | None = None) -> dict:
+async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country: str, move_date, employment_type: str, has_pets: bool, shipping_type: str, has_relocation_allowance: bool, container_ship_date: str | None = None, has_partner: bool = False, partner_origin_country: str | None = None) -> dict:
     conditional_notes = []
 
     if has_pets:
@@ -184,6 +186,20 @@ async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country
         conditional_notes.append("- The user is moving as a student — include tasks for university/institution enrollment confirmation, student residence permit (applied for by the institution on their behalf), arranging student accommodation, and opening a student bank account. Do NOT include employment-related tasks like 30% ruling, payroll, or employer onboarding.")
     elif employment_type == "family":
         conditional_notes.append("- The user is moving for family reunification — include tasks for the family reunification residence permit (applied by the Dutch resident sponsor), obtaining an MVV if required, and registering at gemeente after arrival. Do NOT include employment or student-specific tasks.")
+
+    if has_partner:
+        partner_note = "- The user's partner IS relocating with them"
+        if partner_origin_country:
+            partner_note += f" from {partner_origin_country}"
+        eu_eea = {"germany", "france", "belgium", "netherlands", "spain", "italy", "portugal", "ireland", "sweden", "denmark", "norway", "austria", "switzerland", "finland", "luxembourg", "poland", "czech republic", "hungary", "romania", "bulgaria", "greece", "croatia"}
+        partner_is_eu = partner_origin_country and partner_origin_country.lower() in eu_eea
+        if partner_is_eu:
+            partner_note += " (EU/EEA national — free movement applies, no MVV needed, partner registers at gemeente directly). Generate partner tasks prefixed with '[Partner]' covering: gemeente registration, DigiD, health insurance, bank account, and driving licence exchange."
+        else:
+            partner_note += " (non-EU national — partner needs their own residence permit via the TEV/family reunification procedure, MVV if required, then gemeente registration, DigiD, health insurance, bank account, and driving licence exchange). Generate partner tasks prefixed with '[Partner]' for all of these."
+        conditional_notes.append(partner_note)
+    else:
+        conditional_notes.append("- The user is relocating alone — do NOT generate any '[Partner]' prefixed tasks.")
 
     conditional_block = "\n".join(conditional_notes)
     is_south_africa = origin_country.strip().lower() in ("south africa", "za")
@@ -284,7 +300,7 @@ Generate 20-25 tasks. Return ONLY valid JSON array."""
     else:
         hardcoded = GENERAL_CRITICAL_TASKS
 
-    tasks_to_insert = [{**doc, "user_id": user_id, "status": "pending"} for doc in hardcoded]
+    tasks_to_insert = [{**doc, "user_id": user_id, "status": "pending", "source": "hardcoded"} for doc in hardcoded]
 
     for task in tasks:
         category = task.get("category", "admin")
@@ -297,6 +313,7 @@ Generate 20-25 tasks. Return ONLY valid JSON array."""
             "category": category,
             "priority": task.get("priority", 5),
             "status": "pending",
+            "source": "ai",
             "external_link": task.get("external_link"),
         })
 
@@ -344,6 +361,7 @@ async def generate_checklist(request: GenerateChecklistRequest):
             request.user_id, request.origin_country, request.move_date,
             request.employment_type, request.has_pets, request.shipping_type,
             request.has_relocation_allowance, request.container_ship_date,
+            request.has_partner, request.partner_origin_country,
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -371,6 +389,8 @@ async def regenerate_checklist(request: RegenerateRequest):
             p.get("shipping_type", "luggage_only"),
             p.get("has_relocation_allowance", False),
             p.get("container_ship_date"),
+            p.get("has_partner", False),
+            p.get("partner_origin_country"),
         )
     except HTTPException:
         raise
@@ -407,6 +427,52 @@ async def get_usage(user_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+class CustomTaskRequest(BaseModel):
+    user_id: str
+    title: str
+    category: str
+    description: str | None = None
+
+@router.post("/checklist/custom-task")
+async def create_custom_task(request: CustomTaskRequest):
+    try:
+        supabase = get_supabase()
+        valid_categories = {"critical", "visa", "admin", "employment", "housing", "banking", "healthcare", "transport", "shipping", "pets"}
+        category = request.category if request.category in valid_categories else "admin"
+        result = supabase.table("tasks").insert({
+            "user_id": request.user_id,
+            "title": request.title,
+            "description": request.description or "",
+            "category": category,
+            "priority": 5,
+            "status": "pending",
+            "source": "custom",
+        }).execute()
+        return {"task": result.data[0] if result.data else None}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/checklist/task/{task_id}")
+async def delete_task(task_id: str, user_id: str):
+    try:
+        supabase = get_supabase()
+        task_res = supabase.table("tasks").select("source, user_id").eq("id", task_id).execute()
+        if not task_res.data:
+            raise HTTPException(status_code=404, detail="Task not found")
+        t = task_res.data[0]
+        if t["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        if t.get("source") != "custom":
+            raise HTTPException(status_code=403, detail="Only custom tasks can be deleted")
+        supabase.table("tasks").delete().eq("id", task_id).execute()
+        return {"message": "Task deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.patch("/checklist/task/{task_id}")
 async def update_task(task_id: str, status: str):
     try:
@@ -417,7 +483,7 @@ async def update_task(task_id: str, status: str):
         if status == "completed" and result.data:
             task = result.data[0]
             if task.get("category") in HR_NOTIFY_CATEGORIES:
-                profile_res = supabase.table("profiles").select("full_name, contact_name, contact_email").eq("id", task["user_id"]).execute()
+                profile_res = supabase.table("profiles").select("full_name, contact_name, contact_email, partner_email, partner_full_name").eq("id", task["user_id"]).execute()
                 if profile_res.data:
                     notify_task_complete(task, profile_res.data[0])
         return {"message": "Task updated", "task": result.data}
