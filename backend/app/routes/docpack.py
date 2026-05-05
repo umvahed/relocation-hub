@@ -92,11 +92,14 @@ def _build_cover_pdf(profile: dict, documents: list[dict], validations: dict) ->
         pdf.ln(3)
 
     def kv_row(label: str, value: str) -> None:
+        val_w = effective_w - 48
         pdf.set_font("Helvetica", "", 9)
+        pdf.set_x(pdf.l_margin)
         pdf.set_text_color(107, 114, 128)
         pdf.cell(48, 6, label, border=0, ln=False)
         pdf.set_text_color(26, 26, 26)
-        pdf.multi_cell(effective_w - 48, 6, value or "—")
+        display = _truncate_text(pdf, value or "—", val_w - 2)
+        pdf.cell(val_w, 6, display, border=0, ln=True)
 
     # Applicant
     section_title("Applicant Information")

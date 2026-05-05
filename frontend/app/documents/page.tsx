@@ -200,7 +200,7 @@ export default function DocumentsPage() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 px-4 py-3.5 flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-gray-900 dark:text-white">Document Pack</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Cover page + all files bundled in one ZIP</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Cover page + all files merged into one PDF</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {profile?.contact_email && (
