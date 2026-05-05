@@ -91,6 +91,10 @@ async def send_weekly_digest(authorization: str = Header(None)):
             pending = [t for t in all_tasks if t["status"] == "pending"]
             progress = round(len(completed) / total * 100) if total else 0
 
+            # No digest for fully-moved users — the loop is closed
+            if progress == 100:
+                continue
+
             recent_done = completed[-5:]
             upcoming = pending[:5]
 

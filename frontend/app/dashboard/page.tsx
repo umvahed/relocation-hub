@@ -142,6 +142,7 @@ export default function DashboardPage() {
   const [usage, setUsage] = useState<any | null>(null)
   const [profile, setProfile] = useState<any | null>(null)
   const [riskScore, setRiskScore] = useState<RiskScore | null>(null)
+  const [showRiskNudge, setShowRiskNudge] = useState(false)
   const [storageUsed, setStorageUsed] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [showEditProfile, setShowEditProfile] = useState(false)
@@ -184,7 +185,14 @@ export default function DashboardPage() {
     setTaskBlockMsg(prev => { const n = { ...prev }; delete n[task.id]; return n })
     const newStatus = task.status === 'completed' ? 'pending' : 'completed'
     await updateTask(task.id, newStatus)
-    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
+    setTasks(prev => {
+      const updated = prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t)
+      if (isPaid && newStatus === 'completed' && task.category === 'critical') {
+        const allCriticalDone = updated.filter(t => t.category === 'critical').every(t => t.status === 'completed')
+        if (allCriticalDone) setShowRiskNudge(true)
+      }
+      return updated
+    })
   }
 
   const toggleExpand = async (taskId: string) => {
@@ -562,6 +570,16 @@ export default function DashboardPage() {
 
           {/* Sidebar */}
           <aside className="w-full lg:w-80 xl:w-96 flex-shrink-0 space-y-4 lg:sticky lg:top-[57px]">
+            {showRiskNudge && isPaid && (
+              <div className="flex items-start gap-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl px-4 py-3">
+                <span className="text-base flex-shrink-0">📊</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-indigo-800 dark:text-indigo-300">All critical tasks done — recompute your risk score</p>
+                  <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">Your score may have improved significantly.</p>
+                </div>
+                <button onClick={() => setShowRiskNudge(false)} className="text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 flex-shrink-0 text-lg leading-none">×</button>
+              </div>
+            )}
             {user && profile && (
               <RiskScoreWidget
                 userId={user.id}

@@ -385,11 +385,14 @@ async def update_task(task_id: str, status: str):
     try:
         supabase = get_supabase()
         result = supabase.table("tasks").update({"status": status}).eq("id", task_id).execute()
+        # Only notify HR for high-signal categories — not every admin/banking/shopping task
+        HR_NOTIFY_CATEGORIES = {"critical", "visa", "employment"}
         if status == "completed" and result.data:
             task = result.data[0]
-            profile_res = supabase.table("profiles").select("full_name, contact_name, contact_email").eq("id", task["user_id"]).execute()
-            if profile_res.data:
-                notify_task_complete(task, profile_res.data[0])
+            if task.get("category") in HR_NOTIFY_CATEGORIES:
+                profile_res = supabase.table("profiles").select("full_name, contact_name, contact_email").eq("id", task["user_id"]).execute()
+                if profile_res.data:
+                    notify_task_complete(task, profile_res.data[0])
         return {"message": "Task updated", "task": result.data}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
