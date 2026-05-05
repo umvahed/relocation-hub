@@ -43,7 +43,7 @@ export default function ResourcesWidget({ profile }: Props) {
     ? city === 'den-haag' ? 'Den Haag' : city.charAt(0).toUpperCase() + city.slice(1)
     : 'the Netherlands'
 
-  const linkCount = 1 + (hasChildren ? 1 : 0) + (hasContainer ? 2 : 0)
+  const linkCount = 2 + (hasChildren ? 1 : 0) + (hasContainer ? 2 : 0)
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
@@ -83,6 +83,24 @@ export default function ResourcesWidget({ profile }: Props) {
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                 {city ? `Listings in ${cityLabel}` : 'Listings across the Netherlands'}{hasChildren && numChildren > 0 ? `, ${1 + numChildren}-bedroom size` : ''}
+              </p>
+            </div>
+            <ExternalIcon />
+          </a>
+
+          <a
+            href="https://www.rdw.nl/en/motor-vehicle/driving-licence/exchange-foreign-driving-licence"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-700 transition group"
+          >
+            <span className="text-xl leading-none mt-0.5">🚗</span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-indigo-700 dark:group-hover:text-indigo-300">
+                Exchange your driving licence — RDW
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                You have 185 days from municipality registration — rules vary by country
               </p>
             </div>
             <ExternalIcon />

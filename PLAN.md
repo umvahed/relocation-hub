@@ -176,6 +176,7 @@ Run through this before any significant launch or after rebuilding infrastructur
 | Bulk onboarding | CSV upload → triggers onboarding + checklist generation per row |
 | Reminders | HR sets/overrides due dates; sends one-off email reminders to individuals |
 | Weekly digest | Already covers HR contacts — no new email infrastructure needed |
+| Team completion dashboard | "14/20 employees on track · 3 at risk · 2 not started" — surfaces who needs a nudge; the HR equivalent of a leaderboard without the gimmicks |
 
 ### Architecture notes
 - RLS policies: `hr_admin` read on `tasks`, `documents`, `document_validations` scoped to `company_users`
