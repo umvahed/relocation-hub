@@ -245,7 +245,7 @@ export async function downloadDocpack(user_id: string): Promise<void> {
   a.href = url
   const disposition = res.headers.get('Content-Disposition') || ''
   const match = /filename="(.+)"/.exec(disposition)
-  a.download = match ? match[1] : 'RelocationHub_DocPack.zip'
+  a.download = match ? match[1] : 'RelocationHub_DocPack.pdf'
   document.body.appendChild(a)
   a.click()
   a.remove()

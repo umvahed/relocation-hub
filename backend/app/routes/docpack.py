@@ -1,16 +1,18 @@
 import io
-import zipfile
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from fpdf import FPDF
+from pypdf import PdfWriter, PdfReader
 from supabase import create_client
 
 from app.config import settings
 
 router = APIRouter()
 _supabase = None
+
+MERGEABLE_TYPES = {"application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp"}
 
 
 def get_supabase():
@@ -45,17 +47,31 @@ def _truncate_text(pdf: FPDF, text: str, max_width: float) -> str:
     return text + "..."
 
 
+def _image_to_pdf_bytes(image_bytes: bytes) -> bytes | None:
+    """Wrap a single image in a full-page PDF using fpdf2."""
+    try:
+        page_pdf = FPDF()
+        page_pdf.set_margins(10, 10, 10)
+        page_pdf.add_page()
+        with io.BytesIO(image_bytes) as buf:
+            page_pdf.image(buf, x=10, y=10, w=190)
+        return bytes(page_pdf.output())
+    except Exception:
+        return None
+
+
 def _build_cover_pdf(profile: dict, documents: list[dict], validations: dict) -> bytes:
     pdf = FPDF()
     pdf.set_margins(20, 20, 20)
     pdf.add_page()
     effective_w = pdf.w - 40  # 170mm for A4
 
-    # Header
-    pdf.set_font("Helvetica", "B", 20)
+    # Header — measure logo width explicitly so "Document Pack" is never clipped
+    pdf.set_font("Helvetica", "B", 18)
     pdf.set_text_color(79, 70, 229)
-    pdf.cell(0, 10, "RelocationHub", ln=False)
-    pdf.set_font("Helvetica", "", 20)
+    logo_w = pdf.get_string_width("RelocationHub") + 2
+    pdf.cell(logo_w, 10, "RelocationHub", ln=False)
+    pdf.set_font("Helvetica", "", 18)
     pdf.set_text_color(26, 26, 26)
     pdf.cell(0, 10, "  Document Pack", ln=True)
 
@@ -78,12 +94,9 @@ def _build_cover_pdf(profile: dict, documents: list[dict], validations: dict) ->
     def kv_row(label: str, value: str) -> None:
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(107, 114, 128)
-        pdf.cell(55, 6, label, ln=False)
+        pdf.cell(48, 6, label, border=0, ln=False)
         pdf.set_text_color(26, 26, 26)
-        # multi_cell handles wrapping but always moves to next line
-        x_after = pdf.get_x()
-        pdf.multi_cell(effective_w - 55, 6, value or "—")
-        _ = x_after  # intentional — multi_cell always ends at left margin
+        pdf.multi_cell(effective_w - 48, 6, value or "—")
 
     # Applicant
     section_title("Applicant Information")
@@ -100,7 +113,7 @@ def _build_cover_pdf(profile: dict, documents: list[dict], validations: dict) ->
     kv_row("Relocation allowance", "Yes" if profile.get("has_relocation_allowance") else "No")
     pdf.ln(4)
 
-    # Household (only if we have data)
+    # Household
     has_children = profile.get("has_children")
     has_pets = profile.get("has_pets")
     if has_children is not None or has_pets is not None:
@@ -132,15 +145,16 @@ def _build_cover_pdf(profile: dict, documents: list[dict], validations: dict) ->
         pdf.ln(4)
 
     # Documents table
-    doc_count = len(documents)
-    section_title(f"Document Pack Contents  ({doc_count} file{'s' if doc_count != 1 else ''})")
+    mergeable = [d for d in documents if d.get("mime_type") in MERGEABLE_TYPES]
+    skipped = [d for d in documents if d.get("mime_type") not in MERGEABLE_TYPES]
+    doc_count = len(mergeable)
+    section_title(f"Documents included in this PDF  ({doc_count} file{'s' if doc_count != 1 else ''})")
 
-    if not documents:
+    if not mergeable:
         pdf.set_font("Helvetica", "I", 9)
         pdf.set_text_color(107, 114, 128)
         pdf.cell(0, 7, "No documents uploaded.", ln=True)
     else:
-        # col widths must sum to effective_w (170)
         col_w = [8, 65, 28, 27, 22, 20]
         headers = ["#", "Filename", "Category", "Uploaded", "Size", "Validation"]
 
@@ -151,20 +165,15 @@ def _build_cover_pdf(profile: dict, documents: list[dict], validations: dict) ->
             pdf.cell(w, 7, h, fill=True, ln=False)
         pdf.ln()
 
-        for i, doc in enumerate(documents, 1):
+        for i, doc in enumerate(mergeable, 1):
             v = validations.get(doc["id"])
             val_text = {"pass": "Pass", "warn": "Warn", "fail": "Fail"}.get(
                 (v or {}).get("status", ""), "Not validated"
             )
-
             fill = (i % 2 == 0)
-            if fill:
-                pdf.set_fill_color(249, 250, 251)
-            else:
-                pdf.set_fill_color(255, 255, 255)
+            pdf.set_fill_color(249, 250, 251) if fill else pdf.set_fill_color(255, 255, 255)
             pdf.set_text_color(26, 26, 26)
             pdf.set_font("Helvetica", "", 8)
-
             row_vals = [
                 str(i),
                 _truncate_text(pdf, doc.get("file_name", ""), col_w[1] - 2),
@@ -176,6 +185,13 @@ def _build_cover_pdf(profile: dict, documents: list[dict], validations: dict) ->
             for w, val in zip(col_w, row_vals):
                 pdf.cell(w, 6, val, fill=fill, ln=False)
             pdf.ln()
+
+    if skipped:
+        pdf.ln(3)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_text_color(156, 163, 175)
+        names = ", ".join(d.get("file_name", "unknown") for d in skipped)
+        pdf.multi_cell(0, 5, f"Not included (unsupported format): {names}")
 
     # Footer
     pdf.ln(6)
@@ -189,7 +205,7 @@ def _build_cover_pdf(profile: dict, documents: list[dict], validations: dict) ->
     return bytes(pdf.output())
 
 
-async def _build_zip(user_id: str) -> tuple[bytes, str]:
+async def _build_merged_pdf(user_id: str) -> tuple[bytes, str]:
     supabase = get_supabase()
 
     p_res = supabase.table("profiles").select("*").eq("id", user_id).execute()
@@ -219,32 +235,49 @@ async def _build_zip(user_id: str) -> tuple[bytes, str]:
 
     cover_bytes = _build_cover_pdf(profile, documents, validations)
 
-    zip_buf = io.BytesIO()
-    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("00_Cover_Page.pdf", cover_bytes)
-        for i, doc in enumerate(documents, 1):
-            try:
-                file_bytes = supabase.storage.from_("documents").download(doc["file_path"])
-                safe_name = "".join(c if c.isalnum() or c in "._- " else "_" for c in doc["file_name"])
-                zf.writestr(f"{i:02d}_{safe_name}", file_bytes)
-            except Exception:
-                pass
+    writer = PdfWriter()
+
+    cover_reader = PdfReader(io.BytesIO(cover_bytes))
+    for page in cover_reader.pages:
+        writer.add_page(page)
+
+    for doc in documents:
+        mime = doc.get("mime_type", "")
+        if mime not in MERGEABLE_TYPES:
+            continue
+        try:
+            file_bytes = supabase.storage.from_("documents").download(doc["file_path"])
+            if mime == "application/pdf":
+                reader = PdfReader(io.BytesIO(file_bytes))
+                for page in reader.pages:
+                    writer.add_page(page)
+            else:
+                img_pdf_bytes = _image_to_pdf_bytes(file_bytes)
+                if img_pdf_bytes:
+                    reader = PdfReader(io.BytesIO(img_pdf_bytes))
+                    for page in reader.pages:
+                        writer.add_page(page)
+        except Exception:
+            pass
+
+    output = io.BytesIO()
+    writer.write(output)
 
     full_name = (profile.get("full_name") or "relocation").replace(" ", "_")
-    return zip_buf.getvalue(), f"RelocationHub_DocPack_{full_name}.zip"
+    return output.getvalue(), f"RelocationHub_DocPack_{full_name}.pdf"
 
 
 @router.get("/docpack/{user_id}")
 async def download_docpack(user_id: str):
     try:
-        zip_bytes, filename = await _build_zip(user_id)
+        pdf_bytes, filename = await _build_merged_pdf(user_id)
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to build document pack: {e}")
     return StreamingResponse(
-        io.BytesIO(zip_bytes),
-        media_type="application/zip",
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
@@ -263,16 +296,16 @@ async def send_docpack_to_hr(user_id: str):
     if not profile.get("contact_email"):
         raise HTTPException(status_code=400, detail="No HR contact email set in your profile")
 
-    zip_bytes, _ = await _build_zip(user_id)
+    pdf_bytes, _ = await _build_merged_pdf(user_id)
 
-    storage_path = f"_docpacks/{user_id}/latest.zip"
+    storage_path = f"_docpacks/{user_id}/latest.pdf"
     try:
         supabase.storage.from_("documents").remove([storage_path])
     except Exception:
         pass
     supabase.storage.from_("documents").upload(
-        storage_path, zip_bytes,
-        file_options={"content-type": "application/zip"},
+        storage_path, pdf_bytes,
+        file_options={"content-type": "application/pdf"},
     )
 
     signed = supabase.storage.from_("documents").create_signed_url(storage_path, 7 * 24 * 3600)
@@ -289,13 +322,13 @@ async def send_docpack_to_hr(user_id: str):
       </div>
       <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 8px;">Hi {contact_name},</h2>
       <p style="color: #6b7280; margin: 0 0 24px; line-height: 1.6;">
-        {user_name} has shared their relocation document pack with you via RelocationHub.
-        It includes a cover page with their full profile and all uploaded supporting documents.
+        {user_name} has shared their relocation document pack with you.
+        It's a single PDF containing a cover page with their full profile followed by all uploaded supporting documents.
       </p>
       <a href="{url}" style="display: inline-block; background: #4f46e5; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; margin-bottom: 24px;">
-        Download Document Pack
+        Open Document Pack PDF
       </a>
-      <p style="color: #9ca3af; font-size: 12px; margin: 0 0 24px;">This download link expires in 7 days.</p>
+      <p style="color: #9ca3af; font-size: 12px; margin: 0 0 24px;">This link expires in 7 days.</p>
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0 0 16px;" />
       <p style="color: #9ca3af; font-size: 11px; margin: 0;">Sent via RelocationHub &middot; relocation-hub.vercel.app</p>
     </div>
