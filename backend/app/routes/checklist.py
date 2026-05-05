@@ -232,26 +232,28 @@ IMPORTANT FACTS about moving to the Netherlands — your tasks must reflect thes
 
 Generate tasks covering ONLY these phases (skip anything in the ALREADY HANDLED list):
 
-PHASE 3 — PRE-DEPARTURE LOGISTICS (before flying):
-- Book flight to Netherlands (MVV valid 90 days from issue — must enter within this window)
-- Arrange temporary accommodation for first 1-3 months (do NOT commit to permanent housing before arriving — Dutch rental market requires local presence)
-- Notify home country bank of move, arrange international transfer capability
-- Confirm employer 30% ruling application status (if applicable — highly skilled migrants only)
-- Antecedents declaration form for accompanying family members (their permits processed 3 months after arrival)
+PHASE A — EMPLOYMENT (before departure, after IND approval):
+- Review and sign employment contract — category: employment
+- Confirm 30% ruling application submitted by employer (highly skilled migrants only) — category: employment
+- Complete employer payroll onboarding paperwork — category: employment
 
-PHASE 4 — ARRIVAL (first 2 weeks):
-- Register at gemeente / inschrijving — MUST happen within 5 days of establishing a residential address (BSN issued here)
-- Open Dutch bank account (bunq or ING — requires BSN)
-- Apply for DigiD (requires BSN + Dutch address; ~5 days by post)
-- Register with a GP (huisarts)
-- Arrange zorgverzekering (mandatory health insurance — within 4 months of registration, backdated to registration date)
+PHASE B — PRE-DEPARTURE TRAVEL & LOGISTICS (before flying):
+- Book flight to Netherlands (MVV valid 90 days from issue — must enter within this window) — category: transport
+- Arrange temporary accommodation for first 1-3 months (do NOT commit to permanent housing before arriving — Dutch rental market requires local presence) — category: housing
+- Notify home country bank of move, arrange international transfer capability — category: banking
 
-PHASE 5 — SETTLING IN (weeks 2-8+):
-- Begin permanent housing search (Funda, Pararius — income must be 3-4x monthly rent; 2 months deposit typical)
-- Contents insurance (inboedelverzekering)
-- Exchange foreign driving licence for Dutch licence (within 6 months of gemeente registration)
-- Register children at school (basisschool) if applicable
-- Employment-specific tasks (payroll, 30% ruling, DigiD for tax portal)
+PHASE C — ARRIVAL (first 2 weeks in the Netherlands):
+- Register at gemeente / inschrijving — MUST happen within 5 days of establishing a residential address (BSN issued here) — category: admin
+- Apply for DigiD (requires BSN + Dutch address; ~5 days by post) — category: admin
+- Open Dutch bank account (bunq or ING — requires BSN) — category: banking
+- Register with a GP (huisarts) — category: healthcare
+- Arrange zorgverzekering (mandatory health insurance — within 4 months of registration, backdated to registration date) — category: healthcare
+
+PHASE D — SETTLING IN (weeks 2-8+):
+- Begin permanent housing search (Funda, Pararius — income must be 3-4x monthly rent; 2 months deposit typical) — category: housing
+- Contents insurance (inboedelverzekering) — category: admin
+- Exchange foreign driving licence for Dutch licence via RDW — must be done within 185 days of gemeente registration; rules vary by country of origin (some get direct exchange, others need theory or practical exam) — category: admin
+- Register children at school (basisschool) if applicable — category: admin
 
 Return ONLY a JSON array. No other text. Each task must have:
 - title: string (concise, action-oriented, starts with a verb)

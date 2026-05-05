@@ -11,13 +11,15 @@ import EditProfileModal from '@/app/components/EditProfileModal'
 import { compressImage, formatBytes, MAX_FILE_SIZE_FREE, MAX_FILE_SIZE_PAID, STORAGE_QUOTA_FREE, STORAGE_QUOTA_PAID } from '@/lib/storage'
 import { useRouter } from 'next/navigation'
 
-const SECTION_ORDER = ['critical', 'visa', 'admin', 'employment', 'housing', 'banking', 'healthcare', 'transport', 'shipping', 'pets']
+const SECTION_ORDER = ['critical', 'visa', 'employment', 'transport', 'shipping', 'admin', 'housing', 'banking', 'healthcare', 'pets']
+const PRE_DEPARTURE_CATS = new Set(['critical', 'visa', 'employment', 'transport', 'shipping'])
+const POST_ARRIVAL_CATS = new Set(['admin', 'housing', 'banking', 'healthcare', 'pets'])
 const VALIDATABLE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'])
 
 const SECTION_META: Record<string, { label: string; color: string; text: string; border: string }> = {
   critical:   { label: 'Critical — Required First', color: 'bg-rose-50 dark:bg-rose-900/20',    text: 'text-rose-700 dark:text-rose-300',    border: 'border-rose-400'   },
   visa:       { label: 'Visa & Immigration',         color: 'bg-red-50 dark:bg-red-900/20',      text: 'text-red-700 dark:text-red-300',      border: 'border-red-400'    },
-  admin:      { label: 'Administration',             color: 'bg-gray-100 dark:bg-gray-700',      text: 'text-gray-700 dark:text-gray-300',    border: 'border-gray-400'   },
+  admin:      { label: 'Dutch Administration',        color: 'bg-gray-100 dark:bg-gray-700',      text: 'text-gray-700 dark:text-gray-300',    border: 'border-gray-400'   },
   employment: { label: 'Employment',                 color: 'bg-purple-50 dark:bg-purple-900/20',text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-400' },
   housing:    { label: 'Housing',                    color: 'bg-blue-50 dark:bg-blue-900/20',    text: 'text-blue-700 dark:text-blue-300',    border: 'border-blue-400'   },
   banking:    { label: 'Banking & Finance',          color: 'bg-emerald-50 dark:bg-emerald-900/20',text: 'text-emerald-700 dark:text-emerald-300',border: 'border-emerald-400'},
@@ -625,10 +627,32 @@ export default function DashboardPage() {
             </div>
 
         {/* Category sections */}
-        {sections.map(({ cat, meta, tasks: sectionTasks }) => {
+        {(() => {
+          const firstPreCat = sections.find(s => PRE_DEPARTURE_CATS.has(s.cat))?.cat
+          const firstPostCat = sections.find(s => POST_ARRIVAL_CATS.has(s.cat))?.cat
+          return sections.map(({ cat, meta, tasks: sectionTasks }) => {
           const locked = cat !== 'critical' && !criticalAllDone
           return (
-            <div key={cat} id={`section-${cat}`} className={locked ? 'opacity-50 pointer-events-none select-none' : ''}>
+            <div key={cat}>
+              {!search && cat === firstPreCat && (
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+                  <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest whitespace-nowrap">
+                    ✈️ Before you leave
+                  </span>
+                  <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+                </div>
+              )}
+              {!search && cat === firstPostCat && (
+                <div className="flex items-center gap-3 mb-4 mt-2">
+                  <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+                  <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest whitespace-nowrap">
+                    🇳🇱 After you arrive
+                  </span>
+                  <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+                </div>
+              )}
+            <div id={`section-${cat}`} className={locked ? 'opacity-50 pointer-events-none select-none' : ''}>
               <div className={`flex items-center gap-2 mb-3 border-l-4 ${meta.border} pl-3`}>
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${meta.color} ${meta.text}`}>
                   {meta.label}
@@ -797,8 +821,10 @@ export default function DashboardPage() {
                 })}
               </div>
             </div>
+          </div>
           )
-        })}
+        })
+        })()}
           </main>
         </div>
       </div>

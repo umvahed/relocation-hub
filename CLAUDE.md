@@ -49,7 +49,13 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEN
 
 ## Task categories (fixed order)
 
-`critical → visa → admin → employment → housing → banking → healthcare → transport → shipping → pets`
+`critical → visa → employment → transport → shipping → admin → housing → banking → healthcare → pets`
+
+Dashboard splits these into two visual phases:
+- **Before you leave**: critical, visa, employment, transport, shipping
+- **After you arrive**: admin (Dutch Administration), housing, banking, healthcare, pets
+
+RDW driving licence exchange lives in `admin` (post-arrival), not `transport`.
 
 ## Current state
 
