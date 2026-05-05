@@ -1,3 +1,4 @@
+from datetime import date
 from fastapi import APIRouter, HTTPException, Header
 from app.config import settings
 from supabase import create_client
@@ -91,9 +92,14 @@ async def send_weekly_digest(authorization: str = Header(None)):
             pending = [t for t in all_tasks if t["status"] == "pending"]
             progress = round(len(completed) / total * 100) if total else 0
 
-            # No digest for fully-moved users — the loop is closed
+            # No digest once fully complete or settled (12+ weeks post move-date)
             if progress == 100:
                 continue
+            move_date_str = profile.get("move_date")
+            if move_date_str:
+                weeks_since_move = (date.today() - date.fromisoformat(move_date_str[:10])).days // 7
+                if weeks_since_move >= 12:
+                    continue
 
             recent_done = completed[-5:]
             upcoming = pending[:5]
