@@ -126,6 +126,27 @@ export default function OnboardingPage() {
     }
   }
 
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-indigo-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 text-center">
+          <div className="w-14 h-14 mx-auto mb-6 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Building your relocation plan...</h2>
+          <p className="text-sm text-gray-500 mb-5">Claude AI is generating your personalised checklist.</p>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
+            <p className="text-sm font-semibold text-amber-800">⚠️ Please don&apos;t close this tab</p>
+            <p className="text-xs text-amber-600 mt-1">This takes about 20 seconds — your plan will be lost if you leave now.</p>
+          </div>
+          <p className="text-xs text-gray-400 italic min-h-[16px]">{LOADING_SAYINGS[sayingIndex]}</p>
+          <p className="text-xs text-gray-300 mt-5">
+            Generated before?{' '}
+            <a href="/dashboard" className="text-indigo-400 underline">Go to dashboard →</a>
+          </p>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-lg w-full max-w-lg p-8">
@@ -399,15 +420,9 @@ export default function OnboardingPage() {
                 onClick={handleSubmit}
                 disabled={loading}
                 className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition disabled:opacity-50">
-                {loading ? 'Building your plan...' : 'Generate my plan →'}
+                Generate my plan →
               </button>
             </div>
-            {loading && (
-              <div className="mt-5 text-center space-y-2">
-                <p className="text-sm font-semibold text-indigo-600 animate-pulse">Building your personalised plan...</p>
-                <p className="text-xs text-gray-400 transition-opacity duration-500">{LOADING_SAYINGS[sayingIndex]}</p>
-              </div>
-            )}
           </div>
         )}
 

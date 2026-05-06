@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.routes.checklist import _check_and_increment_usage
+from app.utils import is_paid_or_trial
 from supabase import create_client
 
 router = APIRouter()
@@ -154,7 +155,7 @@ async def compute_risk_score(body: ComputeRiskScoreRequest):
         raise HTTPException(status_code=404, detail="Profile not found")
     profile = profile_res.data[0]
 
-    if profile["tier"] != "paid":
+    if not is_paid_or_trial(profile):
         raise HTTPException(status_code=402, detail="paid_tier_required")
     if not profile["ai_validation_consent"]:
         raise HTTPException(status_code=400, detail="consent_required")

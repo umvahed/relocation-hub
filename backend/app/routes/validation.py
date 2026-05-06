@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.routes.checklist import _check_and_increment_usage
+from app.utils import is_paid_or_trial
 from supabase import create_client
 
 router = APIRouter()
@@ -155,13 +156,13 @@ async def validate_document(document_id: str, body: ValidateDocumentRequest):
 
     # Paywall check
     profile_res = supabase.table("profiles").select(
-        "tier, ai_validation_consent, origin_country, full_name, contact_name, contact_email, notify_by_email"
+        "tier, trial_ends_at, ai_validation_consent, origin_country, full_name, contact_name, contact_email, notify_by_email"
     ).eq("id", body.user_id).execute()
     if not profile_res.data:
         raise HTTPException(status_code=404, detail="Profile not found")
     profile = profile_res.data[0]
 
-    if profile["tier"] != "paid":
+    if not is_paid_or_trial(profile):
         raise HTTPException(status_code=402, detail="paid_tier_required")
 
     if not profile["ai_validation_consent"]:

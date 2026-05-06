@@ -158,6 +158,9 @@ export default function DashboardPage() {
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
+  const [toggling, setToggling] = useState<Set<string>>(new Set())
+  const [confirmCompleteTaskId, setConfirmCompleteTaskId] = useState<string | null>(null)
+  const [recoverPoll, setRecoverPoll] = useState(0)
   const settingsRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -181,28 +184,51 @@ export default function DashboardPage() {
     })
   }, [])
 
+  const performToggle = async (task: any) => {
+    const newStatus = task.status === 'completed' ? 'pending' : 'completed'
+    setToggling(prev => { const n = new Set(prev); n.add(task.id); return n })
+    try {
+      await updateTask(task.id, newStatus)
+      setTasks(prev => {
+        const updated = prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t)
+        if (isPaid && newStatus === 'completed' && task.category === 'critical') {
+          const allCriticalDone = updated.filter(t => t.category === 'critical').every(t => t.status === 'completed')
+          if (allCriticalDone) setShowRiskNudge(true)
+        }
+        return updated
+      })
+    } finally {
+      setToggling(prev => { const n = new Set(prev); n.delete(task.id); return n })
+    }
+  }
+
   const toggleTask = async (task: any) => {
-    if (task.status !== 'completed' && task.category === 'critical' && isPaid) {
-      const docs = taskDocs[task.id] || []
-      const blockedDoc = docs.find(d => taskValidations[d.id]?.status === 'fail' || taskValidations[d.id]?.status === 'warn')
-      if (blockedDoc) {
-        const v = taskValidations[blockedDoc.id]
-        const reason = v?.status === 'fail' ? 'failed validation' : 'has unresolved warnings'
-        setTaskBlockMsg(prev => ({ ...prev, [task.id]: `"${blockedDoc.file_name}" ${reason} — resolve all document issues before marking this critical task complete.` }))
+    if (toggling.has(task.id)) return
+    setTaskBlockMsg(prev => { const n = { ...prev }; delete n[task.id]; return n })
+    if (task.status !== 'completed' && task.category === 'critical') {
+      // Ensure docs are loaded even if task was never expanded
+      let docs = taskDocs[task.id]
+      if (docs === undefined) {
+        const { data } = await supabase.from('documents').select('*').eq('task_id', task.id)
+        docs = data || []
+        setTaskDocs(prev => ({ ...prev, [task.id]: docs as any[] }))
+      }
+      if (isPaid) {
+        const blockedDoc = docs.find((d: any) => taskValidations[d.id]?.status === 'fail' || taskValidations[d.id]?.status === 'warn')
+        if (blockedDoc) {
+          const v = taskValidations[blockedDoc.id]
+          const reason = v?.status === 'fail' ? 'failed validation' : 'has unresolved warnings'
+          setTaskBlockMsg(prev => ({ ...prev, [task.id]: `"${blockedDoc.file_name}" ${reason} — resolve all document issues before marking this critical task complete.` }))
+          return
+        }
+      }
+      // No documents attached — require confirmation before completing
+      if (docs.length === 0) {
+        setConfirmCompleteTaskId(task.id)
         return
       }
     }
-    setTaskBlockMsg(prev => { const n = { ...prev }; delete n[task.id]; return n })
-    const newStatus = task.status === 'completed' ? 'pending' : 'completed'
-    await updateTask(task.id, newStatus)
-    setTasks(prev => {
-      const updated = prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t)
-      if (isPaid && newStatus === 'completed' && task.category === 'critical') {
-        const allCriticalDone = updated.filter(t => t.category === 'critical').every(t => t.status === 'completed')
-        if (allCriticalDone) setShowRiskNudge(true)
-      }
-      return updated
-    })
+    await performToggle(task)
   }
 
   const toggleExpand = async (taskId: string) => {
@@ -332,6 +358,17 @@ export default function DashboardPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  // If dashboard loads with no tasks (generation may still be in-flight), poll briefly
+  useEffect(() => {
+    if (loading || tasks.length > 0 || !user || recoverPoll >= 3) return
+    const timer = setTimeout(async () => {
+      const result = await getChecklist(user.id).catch(() => null)
+      if (result?.tasks?.length > 0) setTasks(result.tasks)
+      setRecoverPoll(c => c + 1)
+    }, 4000)
+    return () => clearTimeout(timer)
+  }, [loading, tasks.length, user, recoverPoll])
+
   const completed = tasks.filter(t => t.status === 'completed').length
   const progress = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'there'
@@ -394,6 +431,43 @@ export default function DashboardPage() {
           onDecline={() => setConsentPendingDoc(null)}
         />
       )}
+
+      {confirmCompleteTaskId && (() => {
+        const task = tasks.find(t => t.id === confirmCompleteTaskId)
+        if (!task) return null
+        const displayTitle = task.title.startsWith('[Partner]') ? task.title.slice(10) : task.title
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 px-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm p-6">
+              <div className="text-center mb-5">
+                <div className="text-3xl mb-3">📎</div>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">No documents attached</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">
+                  <span className="font-medium text-gray-800 dark:text-gray-200">&ldquo;{displayTitle}&rdquo;</span> is a critical task. IND applications require supporting documents.
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Have you completed all required steps and do you have the documents ready?</p>
+              </div>
+              <div className="space-y-2">
+                <button
+                  onClick={() => { const id = confirmCompleteTaskId; setConfirmCompleteTaskId(null); setExpandedId(id) }}
+                  className="w-full py-2.5 rounded-xl border border-indigo-200 dark:border-indigo-700 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition">
+                  Attach supporting documents first
+                </button>
+                <button
+                  onClick={async () => { const t = tasks.find(t => t.id === confirmCompleteTaskId); setConfirmCompleteTaskId(null); if (t) await performToggle(t) }}
+                  className="w-full py-2.5 rounded-xl bg-gray-800 dark:bg-gray-200 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-white transition">
+                  I confirm — mark as complete
+                </button>
+                <button
+                  onClick={() => setConfirmCompleteTaskId(null)}
+                  className="w-full py-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Header */}
       <header className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
@@ -730,6 +804,26 @@ export default function DashboardPage() {
               )}
             </div>
 
+        {/* Empty checklist recovery */}
+        {!loading && tasks.length === 0 && profile && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-12 text-center">
+            {recoverPoll < 3 ? (
+              <>
+                <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Looking for your checklist...</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Just generated? It&apos;ll appear in a few seconds.</p>
+              </>
+            ) : (
+              <>
+                <div className="text-4xl mb-3">📋</div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">No checklist found</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Generation may have been interrupted.</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Open <span className="font-medium text-gray-600 dark:text-gray-300">Settings ⚙</span> → <span className="font-medium text-gray-600 dark:text-gray-300">Edit profile &amp; plan</span> → <span className="font-medium text-gray-600 dark:text-gray-300">Save &amp; regenerate</span>.</p>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Category sections */}
         {(() => {
           const firstPreCat = sections.find(s => PRE_DEPARTURE_CATS.has(s.cat))?.cat
@@ -795,14 +889,20 @@ export default function DashboardPage() {
                       <div className="flex items-start gap-3 p-4">
                         <button
                           onClick={() => toggleTask(task)}
+                          disabled={toggling.has(task.id)}
                           className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition ${
-                            done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300 dark:border-gray-600 hover:border-indigo-500'
+                            toggling.has(task.id)
+                              ? 'border-gray-200 dark:border-gray-600 cursor-wait'
+                              : done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300 dark:border-gray-600 hover:border-indigo-500'
                           }`}>
-                          {done && (
-                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
+                          {toggling.has(task.id)
+                            ? <div className="w-2.5 h-2.5 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+                            : done && (
+                              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )
+                          }
                         </button>
 
                         <button onClick={() => toggleExpand(task.id)} className="flex-1 text-left min-w-0">
