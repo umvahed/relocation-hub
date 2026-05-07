@@ -82,7 +82,7 @@ async def get_allowance(user_id: str):
     sb = get_supabase()
     profile_res = sb.table("profiles").select(
         "relocation_allowance_amount, has_relocation_allowance"
-    ).eq("user_id", user_id).single().execute()
+    ).eq("id", user_id).single().execute()
     profile = profile_res.data or {}
 
     expenses_res = sb.table("allowance_expenses").select(
@@ -114,7 +114,7 @@ async def set_allowance_amount(user_id: str, body: SetAmountRequest):
     sb.table("profiles").update({
         "relocation_allowance_amount": body.amount,
         "has_relocation_allowance": True,
-    }).eq("user_id", user_id).execute()
+    }).eq("id", user_id).execute()
     return {"ok": True}
 
 
@@ -146,7 +146,7 @@ async def add_expense(user_id: str, body: AddExpenseRequest):
     # Compute new balance for the email
     profile_res = sb.table("profiles").select(
         "relocation_allowance_amount, contact_email, contact_name, full_name"
-    ).eq("user_id", user_id).single().execute()
+    ).eq("id", user_id).single().execute()
     profile = profile_res.data or {}
 
     expenses_res = sb.table("allowance_expenses").select("amount_eur").eq("user_id", user_id).execute()
@@ -184,7 +184,7 @@ async def export_allowance(user_id: str):
     sb = get_supabase()
     profile_res = sb.table("profiles").select(
         "full_name, relocation_allowance_amount"
-    ).eq("user_id", user_id).single().execute()
+    ).eq("id", user_id).single().execute()
     profile = profile_res.data or {}
 
     expenses_res = sb.table("allowance_expenses").select(

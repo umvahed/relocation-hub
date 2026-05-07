@@ -115,19 +115,19 @@ export default function AllowanceTrackerWidget({ userId, prefillExpense, onPrefi
   const overBudget = (data?.balance ?? 0) < 0
 
   if (loading) return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-pulse">
-      <div className="h-4 w-40 bg-gray-100 rounded mb-4" />
-      <div className="h-10 bg-gray-100 rounded" />
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 animate-pulse">
+      <div className="h-4 w-40 bg-gray-100 dark:bg-gray-700 rounded mb-4" />
+      <div className="h-10 bg-gray-100 dark:bg-gray-700 rounded" />
     </div>
   )
 
   return (
-    <div id="allowance-tracker" className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <div id="allowance-tracker" className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-base font-semibold text-gray-900">Relocation Allowance</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Track spend against your employer allowance</p>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white">Relocation Allowance</h3>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Track spend against your employer allowance</p>
         </div>
         {data && data.total > 0 && (
           <button
@@ -143,7 +143,7 @@ export default function AllowanceTrackerWidget({ userId, prefillExpense, onPrefi
       {/* Not configured yet */}
       {(!data || data.total === 0) && !settingAmount && (
         <div className="text-center py-6">
-          <p className="text-sm text-gray-500 mb-4">Enter your total relocation allowance to start tracking.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Enter your total relocation allowance to start tracking.</p>
           <button
             onClick={() => setSettingAmount(true)}
             className="bg-indigo-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition"
@@ -156,7 +156,7 @@ export default function AllowanceTrackerWidget({ userId, prefillExpense, onPrefi
       {/* Set / edit amount inline form */}
       {settingAmount && (
         <div className="mb-5">
-          <label htmlFor="allowance-amount" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="allowance-amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Total allowance (EUR)
           </label>
           <div className="flex gap-2">
@@ -170,7 +170,7 @@ export default function AllowanceTrackerWidget({ userId, prefillExpense, onPrefi
                 value={amountInput}
                 onChange={e => setAmountInput(e.target.value)}
                 placeholder="10000"
-                className="w-full border border-gray-300 rounded-xl pl-7 pr-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-xl pl-7 pr-4 py-2.5 text-sm text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <button
@@ -182,7 +182,7 @@ export default function AllowanceTrackerWidget({ userId, prefillExpense, onPrefi
             </button>
             <button
               onClick={() => { setSettingAmount(false); setAmountError('') }}
-              className="text-sm text-gray-500 hover:text-gray-700 px-2"
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-2"
             >
               Cancel
             </button>
@@ -196,19 +196,19 @@ export default function AllowanceTrackerWidget({ userId, prefillExpense, onPrefi
         <>
           {/* Progress bar */}
           <div className="mb-5">
-            <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1.5">
               <span>€{data.spent.toLocaleString('en-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} spent</span>
               <span className={overBudget ? 'text-red-500 font-semibold' : 'text-gray-500'}>
                 {overBudget ? `€${Math.abs(data.balance).toLocaleString('en-NL', { minimumFractionDigits: 2 })} over budget` : `€${data.balance.toLocaleString('en-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} remaining`}
               </span>
             </div>
-            <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${overBudget ? 'bg-red-500' : pct > 80 ? 'bg-amber-400' : 'bg-indigo-500'}`}
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1">
               <span>€0</span>
               <button onClick={() => setSettingAmount(true)} className="text-indigo-500 hover:text-indigo-600">
                 Total: €{data.total.toLocaleString('en-NL', { minimumFractionDigits: 2 })} ✎
@@ -221,13 +221,13 @@ export default function AllowanceTrackerWidget({ userId, prefillExpense, onPrefi
             <div className="mb-4">
               <div className="space-y-1">
                 {data.expenses.map((e: AllowanceExpense) => (
-                  <div key={e.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0 group">
+                  <div key={e.id} className="flex items-center justify-between py-2 border-b border-gray-50 dark:border-gray-700 last:border-0 group">
                     <div className="min-w-0 flex-1 pr-3">
-                      <p className="text-sm text-gray-800 truncate">{e.description}</p>
-                      <p className="text-xs text-gray-400">{fmtDate(e.created_at)}</p>
+                      <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{e.description}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">{fmtDate(e.created_at)}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-sm font-medium text-gray-700">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                         €{Number(e.amount_eur).toLocaleString('en-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                       <button
@@ -247,14 +247,14 @@ export default function AllowanceTrackerWidget({ userId, prefillExpense, onPrefi
 
           {/* Add expense form */}
           {showAddForm ? (
-            <div className="bg-gray-50 rounded-xl p-4 mt-2">
-              <p className="text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wide">Log expense</p>
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 mt-2">
+              <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3 uppercase tracking-wide">Log expense</p>
               <input
                 type="text"
                 placeholder="Description (e.g. Flight tickets)"
                 value={expDesc}
                 onChange={e => setExpDesc(e.target.value)}
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2"
               />
               <div className="relative mb-2">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
@@ -265,7 +265,7 @@ export default function AllowanceTrackerWidget({ userId, prefillExpense, onPrefi
                   placeholder="0.00"
                   value={expAmount}
                   onChange={e => setExpAmount(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl pl-7 pr-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-xl pl-7 pr-4 py-2 text-sm text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               {expError && <p className="text-xs text-red-500 mb-2">{expError}</p>}
@@ -279,7 +279,7 @@ export default function AllowanceTrackerWidget({ userId, prefillExpense, onPrefi
                 </button>
                 <button
                   onClick={() => { setShowAddForm(false); setExpDesc(''); setExpAmount(''); setExpTaskId(undefined); setExpError('') }}
-                  className="text-sm text-gray-500 hover:text-gray-700 px-3"
+                  className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-3"
                 >
                   Cancel
                 </button>
