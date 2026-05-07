@@ -126,6 +126,7 @@ class GenerateChecklistRequest(BaseModel):
     container_ship_date: str | None = None
     has_partner: bool = False
     partner_origin_country: str | None = None
+    additional_context: str | None = None  # free-text from onboarding; relocation-relevant parts injected into prompt
 
 def _check_and_increment_usage(supabase, user_id: str, call_type: str = "checklist"):
     today = date.today().isoformat()
@@ -155,7 +156,7 @@ def _check_and_increment_usage(supabase, user_id: str, call_type: str = "checkli
         supabase.table("api_usage").insert({"user_id": user_id, "date": today, "call_count": 1, "call_type": call_type}).execute()
 
 
-async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country: str, move_date, employment_type: str, has_pets: bool, shipping_type: str, has_relocation_allowance: bool, container_ship_date: str | None = None, has_partner: bool = False, partner_origin_country: str | None = None) -> dict:
+async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country: str, move_date, employment_type: str, has_pets: bool, shipping_type: str, has_relocation_allowance: bool, container_ship_date: str | None = None, has_partner: bool = False, partner_origin_country: str | None = None, additional_context: str | None = None) -> dict:
     conditional_notes = []
 
     if has_pets:
@@ -224,6 +225,18 @@ ALREADY HANDLED — do NOT generate tasks for any of the following (they are har
 - Passport validity check
 - IND residence permit application (employer submits this, not the user)"""
 
+    # Build optional user-context block — capped at 800 chars to prevent prompt injection abuse
+    if additional_context and additional_context.strip():
+        context_snippet = additional_context.strip()[:800]
+        user_context_block = f"""
+User-provided situation notes (entered during onboarding):
+"{context_snippet}"
+
+Instructions for the above notes: Extract only information relevant to this Dutch relocation (e.g. steps already completed, in-progress items, specific concerns, unusual circumstances). Use it to skip or deprioritise tasks the user has already completed, add tasks for specific needs they mention, or adjust descriptions to reflect current progress. Silently ignore anything unrelated to their relocation.
+"""
+    else:
+        user_context_block = ""
+
     prompt = f"""You are a senior relocation expert specialising in moves to the Netherlands. Generate a precise, correctly-sequenced relocation checklist for someone moving from {origin_country} to the Netherlands.
 
 User profile:
@@ -235,7 +248,7 @@ User profile:
 - Has employer relocation allowance: {has_relocation_allowance}
 
 {conditional_block}
-
+{user_context_block}
 {already_covered}
 
 IMPORTANT FACTS about moving to the Netherlands — your tasks must reflect these accurately:
@@ -362,6 +375,7 @@ async def generate_checklist(request: GenerateChecklistRequest):
             request.employment_type, request.has_pets, request.shipping_type,
             request.has_relocation_allowance, request.container_ship_date,
             request.has_partner, request.partner_origin_country,
+            request.additional_context,
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -49,6 +49,7 @@ export default function OnboardingPage() {
     partner_full_name: '',
     partner_email: '',
     partner_origin_country: '',
+    additional_context: '',
   })
   const router = useRouter()
   const supabase = createClient()
@@ -110,6 +111,7 @@ export default function OnboardingPage() {
         container_ship_date: form.container_ship_date || undefined,
         has_partner: form.has_partner,
         partner_origin_country: form.has_partner ? form.partner_origin_country || undefined : undefined,
+        additional_context: form.additional_context.trim() || undefined,
       })
 
       if (checklistResult.detail) {
@@ -132,10 +134,10 @@ export default function OnboardingPage() {
         <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 text-center">
           <div className="w-14 h-14 mx-auto mb-6 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Building your relocation plan...</h2>
-          <p className="text-sm text-gray-500 mb-5">Claude AI is generating your personalised checklist.</p>
+          <p className="text-sm text-gray-500 mb-5">We are generating your personalised checklist.</p>
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
             <p className="text-sm font-semibold text-amber-800">⚠️ Please don&apos;t close this tab</p>
-            <p className="text-xs text-amber-600 mt-1">This takes about 20 seconds — your plan will be lost if you leave now.</p>
+            <p className="text-xs text-amber-600 mt-1">This takes about 2 minutes — your plan will be lost if you leave now.</p>
           </div>
           <p className="text-xs text-gray-400 italic min-h-[16px]">{LOADING_SAYINGS[sayingIndex]}</p>
           <p className="text-xs text-gray-300 mt-5">
@@ -411,6 +413,28 @@ export default function OnboardingPage() {
               onChange={e => setForm(f => ({ ...f, contact_email: e.target.value }))}
               className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-6"
             />
+
+            <div className="mb-6">
+              <label htmlFor="additional-context" className="block text-sm font-medium text-gray-700 mb-1">
+                Anything specific about your situation? <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <p className="text-xs text-gray-400 mb-2">
+                Steps already done, concerns, or anything unusual about your move. We&apos;ll use it to tailor your plan.
+              </p>
+              <textarea
+                id="additional-context"
+                value={form.additional_context}
+                onChange={e => setForm(f => ({ ...f, additional_context: e.target.value }))}
+                maxLength={800}
+                rows={3}
+                placeholder={`e.g. "I already have my IND approval letter and MVV appointment booked for next week. I also have two cats and a horse."`}
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none placeholder-gray-400"
+              />
+              {form.additional_context.length > 600 && (
+                <p className="text-xs text-gray-400 text-right mt-1">{form.additional_context.length}/800</p>
+              )}
+            </div>
+
             <div className="flex gap-3">
               <button onClick={() => setStep(4)}
                 className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition">

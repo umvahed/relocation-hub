@@ -36,6 +36,7 @@ export async function generateChecklist(data: {
   container_ship_date?: string
   has_partner?: boolean
   partner_origin_country?: string
+  additional_context?: string
 }) {
   const res = await fetch(`${API_URL}/api/checklist/generate`, {
     method: 'POST',
