@@ -6,6 +6,7 @@ import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccou
 import RiskScoreWidget from '@/app/components/RiskScoreWidget'
 import IndMonitorWidget from '@/app/components/IndMonitorWidget'
 import ResourcesWidget from '@/app/components/ResourcesWidget'
+import AllowanceTrackerWidget from '@/app/components/AllowanceTrackerWidget'
 import ThemeToggle from '@/app/components/ThemeToggle'
 import AiConsentModal from '@/app/components/AiConsentModal'
 import EditProfileModal from '@/app/components/EditProfileModal'
@@ -161,6 +162,7 @@ export default function DashboardPage() {
   const [toggling, setToggling] = useState<Set<string>>(new Set())
   const [confirmCompleteTaskId, setConfirmCompleteTaskId] = useState<string | null>(null)
   const [recoverPoll, setRecoverPoll] = useState(0)
+  const [logExpensePrefill, setLogExpensePrefill] = useState<{ description: string; taskId: string } | null>(null)
   const settingsRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -197,6 +199,13 @@ export default function DashboardPage() {
         }
         return updated
       })
+      if (newStatus === 'completed' && profile?.has_relocation_allowance) {
+        const displayTitle = task.title.startsWith('[Partner] ') ? task.title.slice(10) : task.title
+        setLogExpensePrefill({ description: displayTitle, taskId: task.id })
+        setTimeout(() => {
+          document.getElementById('allowance-tracker')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 200)
+      }
     } finally {
       setToggling(prev => { const n = new Set(prev); n.delete(task.id); return n })
     }
@@ -754,6 +763,13 @@ export default function DashboardPage() {
             )}
             {profile && (
               <ResourcesWidget profile={profile} />
+            )}
+            {user && profile?.has_relocation_allowance && (
+              <AllowanceTrackerWidget
+                userId={user.id}
+                prefillExpense={logExpensePrefill}
+                onPrefillConsumed={() => setLogExpensePrefill(null)}
+              />
             )}
           </aside>
 

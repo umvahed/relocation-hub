@@ -282,6 +282,74 @@ export async function sendDocpackToHr(user_id: string): Promise<{ sent: boolean;
   return handleResponse(res)
 }
 
+// ── Allowance tracker ────────────────────────────────────────────────────────
+
+export interface AllowanceExpense {
+  id: string
+  task_id: string | null
+  description: string
+  amount_eur: number
+  created_at: string
+}
+
+export interface AllowanceSummary {
+  total: number
+  spent: number
+  balance: number
+  expenses: AllowanceExpense[]
+}
+
+export async function getAllowance(user_id: string): Promise<AllowanceSummary> {
+  const res = await fetch(`${API_URL}/api/allowance/${user_id}`)
+  return handleResponse(res)
+}
+
+export async function setAllowanceAmount(user_id: string, amount: number): Promise<void> {
+  const res = await fetch(`${API_URL}/api/allowance/${user_id}/amount`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount }),
+  })
+  return handleResponse(res)
+}
+
+export async function addAllowanceExpense(
+  user_id: string,
+  data: { description: string; amount_eur: number; task_id?: string }
+): Promise<AllowanceExpense> {
+  const res = await fetch(`${API_URL}/api/allowance/${user_id}/expense`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res)
+}
+
+export async function deleteAllowanceExpense(expense_id: string, user_id: string): Promise<void> {
+  const res = await fetch(
+    `${API_URL}/api/allowance/expense/${expense_id}?user_id=${encodeURIComponent(user_id)}`,
+    { method: 'DELETE' }
+  )
+  return handleResponse(res)
+}
+
+export async function downloadAllowanceStatement(user_id: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/allowance/${user_id}/export`)
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(error.detail || `Request failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'RelocationHub_Allowance_Statement.pdf'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export async function reportIndSlot(user_id: string) {
   const res = await fetch(`${API_URL}/api/ind-monitor/report-slot`, {
     method: 'POST',
