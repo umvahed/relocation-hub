@@ -4,7 +4,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS relocation_allowance_amount DECIMA
 -- Expense entries logged against the allowance
 CREATE TABLE IF NOT EXISTS allowance_expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
   description TEXT NOT NULL,
   amount_eur DECIMAL(10,2) NOT NULL CHECK (amount_eur > 0),
