@@ -234,28 +234,24 @@ def _build_statement_pdf(profile: dict, expenses: list, total: float, spent: flo
     pdf.cell(0, 6, profile.get("full_name", ""), ln=True)
     pdf.ln(4)
 
-    # Summary boxes
-    col_w = (w - 6) / 3
-    def _summary_box(label: str, value: str, color_rgb: tuple):
-        pdf.set_fill_color(*color_rgb)
-        pdf.set_draw_color(229, 231, 235)
-        x_start = pdf.get_x()
-        y_start = pdf.get_y()
-        pdf.rect(x_start, y_start, col_w, 18, style="FD")
-        pdf.set_xy(x_start + 4, y_start + 3)
-        pdf.set_font("Helvetica", "", 8)
-        pdf.set_text_color(107, 114, 128)
-        pdf.cell(col_w - 8, 5, label, ln=True)
-        pdf.set_xy(x_start + 4, y_start + 9)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.set_text_color(26, 26, 26)
-        pdf.cell(col_w - 8, 6, value, ln=False)
-        pdf.set_xy(x_start + col_w + 3, y_start)
+    # Summary section
+    label_w = 52
 
-    _summary_box("Total allowance", f"EUR {total:,.2f}", (239, 246, 255))
-    _summary_box("Amount spent", f"EUR {spent:,.2f}", (254, 242, 242) if spent > total else (249, 250, 251))
-    _summary_box("Remaining balance", f"EUR {balance:,.2f}", (240, 253, 244) if balance >= 0 else (254, 242, 242))
-    pdf.ln(22)
+    def kv(label: str, value: str, bold_value: bool = False) -> None:
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(107, 114, 128)
+        pdf.cell(label_w, 6, label, border=0, ln=False)
+        pdf.set_font("Helvetica", "B" if bold_value else "", 9)
+        pdf.set_text_color(26, 26, 26)
+        pdf.cell(0, 6, value, border=0, ln=True)
+
+    kv("Total allowance", f"EUR {total:,.2f}")
+    kv("Amount spent", f"EUR {spent:,.2f}")
+    kv("Remaining balance", f"EUR {balance:,.2f}", bold_value=True)
+    pdf.ln(4)
+    pdf.set_draw_color(229, 231, 235)
+    pdf.line(20, pdf.get_y(), pdf.w - 20, pdf.get_y())
+    pdf.ln(6)
 
     # Expense table
     if expenses:
