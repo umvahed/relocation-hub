@@ -181,28 +181,31 @@ async def delete_expense(expense_id: str, user_id: str):
 
 @router.get("/allowance/{user_id}/export")
 async def export_allowance(user_id: str):
-    sb = get_supabase()
-    profile_res = sb.table("profiles").select(
-        "full_name, relocation_allowance_amount"
-    ).eq("id", user_id).single().execute()
-    profile = profile_res.data or {}
+    try:
+        sb = get_supabase()
+        profile_res = sb.table("profiles").select(
+            "full_name, relocation_allowance_amount"
+        ).eq("id", user_id).single().execute()
+        profile = profile_res.data or {}
 
-    expenses_res = sb.table("allowance_expenses").select(
-        "description, amount_eur, created_at"
-    ).eq("user_id", user_id).order("created_at").execute()
-    expenses = expenses_res.data or []
+        expenses_res = sb.table("allowance_expenses").select(
+            "description, amount_eur, created_at"
+        ).eq("user_id", user_id).order("created_at").execute()
+        expenses = expenses_res.data or []
 
-    total = float(profile.get("relocation_allowance_amount") or 0)
-    spent = sum(float(e["amount_eur"]) for e in expenses)
-    balance = total - spent
+        total = float(profile.get("relocation_allowance_amount") or 0)
+        spent = sum(float(e["amount_eur"]) for e in expenses)
+        balance = total - spent
 
-    pdf_bytes = _build_statement_pdf(profile, expenses, total, spent, balance)
-    filename = f"RelocationHub_Allowance_Statement.pdf"
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+        pdf_bytes = _build_statement_pdf(profile, expenses, total, spent, balance)
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename="RelocationHub_Allowance_Statement.pdf"'},
+        )
+    except Exception as exc:
+        import traceback
+        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}")
 
 
 def _build_statement_pdf(profile: dict, expenses: list, total: float, spent: float, balance: float) -> bytes:
