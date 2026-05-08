@@ -11,11 +11,14 @@ export default function Home() {
             Relocation<span className="text-indigo-600">Hub</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/tools/30-ruling" className="hidden sm:block text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-300 transition">
+            <Link href="/tools/30-ruling" className="hidden sm:block text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-600 transition">
               30% Ruling Calculator
             </Link>
+            <a href="#how-it-works" className="hidden sm:block text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition">
+              The process
+            </a>
             <Link href="/login" className="text-sm font-medium bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
-              Get started free
+              Get started
             </Link>
           </div>
         </div>
@@ -32,22 +35,123 @@ export default function Home() {
           <br className="hidden sm:block" />
           <span className="text-indigo-600">planned and tracked.</span>
         </h1>
-        <p className="text-sm sm:text-lg text-gray-500 dark:text-gray-400 mb-6 max-w-2xl mx-auto leading-relaxed">
-          AI checklist, partner support, document validation, risk scoring, IND appointment alerts, and a 30% ruling calculator — everything you need, in one place.
+        <p className="text-sm sm:text-lg text-gray-500 dark:text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">
+          A personalised checklist, document organiser, IND appointment alerts, and a 30% ruling calculator — everything you need, in one place.
         </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link href="/login" className="w-full sm:w-auto bg-indigo-600 text-white px-7 py-3.5 rounded-xl text-base font-semibold hover:bg-indigo-700 transition shadow-sm">
-            Start your relocation plan →
-          </Link>
-          <Link href="/tools/30-ruling" className="w-full sm:w-auto bg-emerald-600 text-white px-7 py-3.5 rounded-xl text-base font-semibold hover:bg-emerald-700 transition shadow-sm">
-            Check 30% ruling eligibility →
+
+        {/* Three CTAs */}
+        <div className="flex flex-col sm:flex-row items-stretch justify-center gap-3 max-w-xl mx-auto">
+          <div className="flex-1 flex flex-col gap-1">
+            <Link href="/login" className="w-full bg-indigo-600 text-white px-6 py-3.5 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition shadow-sm text-center">
+              Start your relocation plan →
+            </Link>
+            <p className="text-xs text-center text-gray-400 dark:text-gray-500">Paid · one-time €19.99</p>
+          </div>
+          <div className="flex-1 flex flex-col gap-1">
+            <Link href="/tools/30-ruling" className="w-full bg-emerald-600 text-white px-6 py-3.5 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition shadow-sm text-center">
+              Check 30% ruling eligibility →
+            </Link>
+            <p className="text-xs text-center text-gray-400 dark:text-gray-500">Free · no sign-up needed</p>
+          </div>
+          <div className="flex-1 flex flex-col gap-1">
+            <a href="#how-it-works" className="w-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 px-6 py-3.5 rounded-xl text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition text-center">
+              How the process works ↓
+            </a>
+            <p className="text-xs text-center text-gray-400 dark:text-gray-500">Free guide · no sign-up</p>
+          </div>
+        </div>
+      </section>
+
+      {/* The relocation process — free educational section */}
+      <section id="how-it-works" className="max-w-5xl mx-auto px-5 py-16">
+        <div className="text-center mb-10">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">What relocating to the Netherlands actually involves</h2>
+          <p className="text-gray-500 dark:text-gray-400 max-w-2xl mx-auto text-sm leading-relaxed">
+            This is all publicly available information — we just built the tools to track every step of it for you.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {[
+            {
+              phase: 'Phase 1',
+              label: 'Before you leave',
+              color: 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-100 dark:border-indigo-900',
+              headingColor: 'text-indigo-700 dark:text-indigo-400',
+              steps: [
+                'Get a job offer with an IND-registered sponsor employer',
+                'Apply for MVV entry visa (non-EU/EEA nationals)',
+                'Collect MVV from Dutch consulate in your country',
+                'Arrange moving & shipping logistics',
+                'Check 30% ruling eligibility with your employer',
+              ],
+            },
+            {
+              phase: 'Phase 2',
+              label: 'First weeks',
+              color: 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-100 dark:border-emerald-900',
+              headingColor: 'text-emerald-700 dark:text-emerald-400',
+              steps: [
+                'Register at your municipality (Gemeente) — get your BSN',
+                'Open a Dutch bank account (ING, ABN AMRO, Bunq)',
+                'Find short-term rental while searching for a permanent home',
+                'Collect your IND residence permit (biometrics appointment)',
+              ],
+            },
+            {
+              phase: 'Phase 3',
+              label: 'First months',
+              color: 'bg-amber-50 dark:bg-amber-950/50 border-amber-100 dark:border-amber-900',
+              headingColor: 'text-amber-700 dark:text-amber-400',
+              steps: [
+                'Apply for DigiD — your digital ID for all Dutch gov portals',
+                'Get Dutch health insurance (legally required within 4 months)',
+                'Exchange your driving licence at the RDW',
+                'Register with a GP (huisarts)',
+                'Confirm 30% ruling is applied on your payslip',
+              ],
+            },
+            {
+              phase: 'Phase 4',
+              label: 'Getting settled',
+              color: 'bg-purple-50 dark:bg-purple-950/50 border-purple-100 dark:border-purple-900',
+              headingColor: 'text-purple-700 dark:text-purple-400',
+              steps: [
+                'Sign a long-term rental or purchase agreement',
+                'Set up Dutch pension and employee benefits',
+                'Enrol children in school (if applicable)',
+                'File first Dutch tax return (aangifte) in March–April',
+              ],
+            },
+          ].map((phase) => (
+            <div key={phase.phase} className={`${phase.color} border rounded-2xl p-5`}>
+              <p className={`text-xs font-semibold uppercase tracking-widest mb-0.5 ${phase.headingColor}`}>{phase.phase}</p>
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">{phase.label}</h3>
+              <ul className="space-y-2">
+                {phase.steps.map((s) => (
+                  <li key={s} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                    <span className="mt-1 w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 flex-shrink-0" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-8 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200 mb-1">RelocationHub tracks every step above for you.</p>
+            <p className="text-sm text-indigo-700 dark:text-indigo-400">Personalised checklist, deadline reminders, document organiser, IND alerts — all in one place.</p>
+          </div>
+          <Link href="/login" className="flex-shrink-0 bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition whitespace-nowrap">
+            Start your plan →
           </Link>
         </div>
-        <p className="text-sm text-gray-400 dark:text-gray-500 mt-4">7-day free trial · No credit card required</p>
       </section>
 
       {/* Feature grid */}
-      <section className="max-w-5xl mx-auto px-5 py-16">
+      <section className="max-w-5xl mx-auto px-5 py-16 border-t border-gray-100 dark:border-gray-800">
         <div className="text-center mb-10">
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">Everything your move needs</h2>
           <p className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto text-sm leading-relaxed">
@@ -59,7 +163,7 @@ export default function Home() {
         <div className="grid sm:grid-cols-3 gap-5 mb-5">
           {[
             {
-              title: 'AI Checklist',
+              title: 'Smart Checklist',
               desc: 'Personalised, correctly-sequenced plan based on your country, visa type, pets, and employment. MVV → BSN → DigiD — nothing missed.',
               color: 'bg-indigo-50 dark:bg-indigo-950/50',
               iconColor: 'text-indigo-500',
@@ -71,7 +175,7 @@ export default function Home() {
             },
             {
               title: 'Document Validation',
-              desc: 'Upload your documents and let Claude AI check them against IND 2025 requirements before you show up. Pass, warn, or fail — with exact actions.',
+              desc: 'Upload your documents and get them checked against IND 2025 requirements before you show up. Pass, warn, or fail — with exact actions to take.',
               color: 'bg-emerald-50 dark:bg-emerald-950/50',
               iconColor: 'text-emerald-500',
               icon: (
@@ -152,7 +256,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How it works */}
+      {/* How the app works */}
       <section className="bg-gray-50 dark:bg-gray-800/40 py-16 px-5">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-10">
@@ -168,8 +272,8 @@ export default function Home() {
               },
               {
                 step: '2',
-                title: 'Get your AI checklist',
-                desc: 'Claude generates a sequenced, personalised plan covering every stage of your Dutch relocation.',
+                title: 'Get your personalised plan',
+                desc: 'A sequenced, personalised checklist covering every stage of your Dutch relocation — nothing missed.',
               },
               {
                 step: '3',
@@ -190,41 +294,93 @@ export default function Home() {
       </section>
 
       {/* Pricing */}
+      {/*
+        Pricing model: one-time payment per individual user.
+        Rationale: relocation is a bounded process (6-18 months), not ongoing like SaaS.
+        Monthly billing creates anxiety about when to cancel; one-time removes that friction.
+
+        B2B / HR portal (Phase 5): per-seat monthly billing for company accounts.
+        HR admins manage multiple relocatees. Separate product tier stored in profiles.tier
+        and a future companies + company_users table. Do NOT merge with individual pricing.
+      */}
       <section className="py-16 px-5">
-        <div className="max-w-sm mx-auto bg-white dark:bg-gray-800 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-sm">
-          <div className="text-xs font-semibold tracking-widest text-indigo-600 dark:text-indigo-400 uppercase mb-4">Pricing</div>
-          <div className="flex items-end gap-1 mb-1">
-            <span className="text-5xl font-bold text-gray-900 dark:text-white">€3.99</span>
-            <span className="text-gray-400 dark:text-gray-500 mb-1.5">/month</span>
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Simple, honest pricing</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Pay once. Use it for as long as your relocation takes.</p>
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Everything you need until you're settled.</p>
-          <ul className="space-y-3 mb-7">
-            {[
-              'AI-generated, personalised checklist',
-              'Partner support — joint relocation tasks & notifications',
-              'Document upload, organisation & document pack',
-              'AI document validation (IND 2025 rules)',
-              'Relocation risk score — 4 dimensions',
-              'IND appointment slot monitor',
-              'Email reminders & deadline tracking',
-              'iCal feed for Google / Apple Calendar',
-              'HR contact notifications & weekly digest',
-              'Profile editing & checklist regeneration',
-              'Custom tasks per category',
-              '7-day free trial — no credit card needed',
-            ].map((item) => (
-              <li key={item} className="flex items-start gap-2.5 text-sm text-gray-700 dark:text-gray-200">
-                <span className="text-emerald-500 font-bold mt-0.5 flex-shrink-0">✓</span>
-                {item}
-              </li>
-            ))}
-          </ul>
-          <Link
-            href="/login"
-            className="block text-center bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition">
-            Get started free
-          </Link>
-          <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-3">7-day free trial · No credit card required</p>
+
+          <div className="grid sm:grid-cols-2 gap-5 items-start">
+            {/* Individual plan */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-sm">
+              <div className="text-xs font-semibold tracking-widest text-indigo-600 dark:text-indigo-400 uppercase mb-4">Individual</div>
+              <div className="flex items-end gap-1 mb-1">
+                <span className="text-5xl font-bold text-gray-900 dark:text-white">€19.99</span>
+                <span className="text-gray-400 dark:text-gray-500 mb-1.5">one-time</span>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Full access for your entire relocation — no recurring charges.</p>
+              <ul className="space-y-3 mb-7">
+                {[
+                  'Personalised relocation checklist',
+                  'Partner support — joint tasks & notifications',
+                  'Document upload, organiser & document pack',
+                  'Document validation (IND 2025 rules)',
+                  'Relocation risk score — 4 dimensions',
+                  'IND appointment slot monitor',
+                  'Email reminders & deadline tracking',
+                  'iCal feed for Google / Apple Calendar',
+                  'HR contact notifications & weekly digest',
+                  'Allowance tracker with PDF export',
+                  'Profile editing & checklist regeneration',
+                  'Custom tasks per category',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm text-gray-700 dark:text-gray-200">
+                    <span className="text-emerald-500 font-bold mt-0.5 flex-shrink-0">✓</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/login"
+                className="block text-center bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition">
+                Get started
+              </Link>
+            </div>
+
+            {/* B2B / Teams — coming soon */}
+            <div className="bg-gray-50 dark:bg-gray-800/60 rounded-2xl p-8 border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-semibold tracking-widest text-purple-600 dark:text-purple-400 uppercase">Teams & HR</span>
+                <span className="text-xs font-semibold bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full">Coming soon</span>
+              </div>
+              <div className="flex items-end gap-1 mb-1">
+                <span className="text-3xl font-bold text-gray-400 dark:text-gray-500">Per seat</span>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">For companies managing multiple relocatees at once.</p>
+              <ul className="space-y-3 mb-7">
+                {[
+                  'HR admin dashboard — all relocatees in one view',
+                  'Progress tracking per employee',
+                  'Bulk onboarding from CSV',
+                  'Override due dates & tasks per employee',
+                  'Document visibility for HR (read-only)',
+                  'Consolidated weekly digest',
+                  'Everything in the Individual plan',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm text-gray-500 dark:text-gray-400">
+                    <span className="text-purple-400 font-bold mt-0.5 flex-shrink-0">✓</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href="mailto:support@relocationhub.app?subject=HR portal waitlist"
+                className="block text-center bg-purple-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-purple-700 transition">
+                Join the waitlist
+              </a>
+              <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-3">We'll reach out when the HR portal launches.</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -248,6 +404,7 @@ export default function Home() {
           <span className="font-semibold text-gray-700 dark:text-gray-300">Relocation<span className="text-indigo-600">Hub</span></span>
           <div className="flex items-center gap-6">
             <Link href="/tools/30-ruling" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">30% Ruling Calculator</Link>
+            <a href="#how-it-works" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">The process</a>
             <Link href="/login" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">Sign in</Link>
             <a href="mailto:support@relocationhub.app" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">support@relocationhub.app</a>
           </div>

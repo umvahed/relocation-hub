@@ -121,6 +121,17 @@ export default function RulingCalculator() {
   const estimatedAnnualSaving = taxFreeAllowance * INCOME_TAX_RATE
   const meetsThreshold = grossSalary >= threshold
 
+  // Net monthly estimates (simplified two-bracket Dutch income tax)
+  const NL_BRACKET_1_LIMIT = 75518
+  const NL_BRACKET_1_RATE  = 0.3697
+  const NL_BRACKET_2_RATE  = 0.495
+  const simpleTax = (gross: number) =>
+    gross <= NL_BRACKET_1_LIMIT
+      ? gross * NL_BRACKET_1_RATE
+      : NL_BRACKET_1_LIMIT * NL_BRACKET_1_RATE + (gross - NL_BRACKET_1_LIMIT) * NL_BRACKET_2_RATE
+  const estimatedNetMonthlyWith    = grossSalary > 0 ? Math.round((grossSalary - simpleTax(grossSalary * 0.7)) / 12) : 0
+  const estimatedNetMonthlyWithout = grossSalary > 0 ? Math.round((grossSalary - simpleTax(grossSalary)) / 12) : 0
+
   // Timing logic
   const getTimingStatus = () => {
     if (!startDate) return 'unknown'
@@ -427,6 +438,22 @@ export default function RulingCalculator() {
                   <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">€{Math.round(estimatedAnnualSaving).toLocaleString('nl-NL')}</p>
                   <p className="text-xs text-emerald-500 dark:text-emerald-400 mt-0.5">at 49.5% tax rate</p>
                 </div>
+              </div>
+
+              {/* Net monthly take-home comparison */}
+              <div className="bg-gray-50 dark:bg-gray-700/40 rounded-xl p-4">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Est. net monthly take-home</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">With 30% ruling</p>
+                    <p className="text-xl font-bold text-gray-900 dark:text-white">€{estimatedNetMonthlyWith.toLocaleString('nl-NL')}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Without ruling</p>
+                    <p className="text-xl font-bold text-gray-400 dark:text-gray-500">€{estimatedNetMonthlyWithout.toLocaleString('nl-NL')}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Indicative estimate using 2025 Dutch income tax brackets. Excludes social contributions, holiday allowance, and employer pension.</p>
               </div>
 
               <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-2">
