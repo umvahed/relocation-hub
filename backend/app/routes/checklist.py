@@ -392,8 +392,22 @@ async def regenerate_checklist(request: RegenerateRequest):
         if not profile_res.data:
             raise HTTPException(status_code=404, detail="Profile not found")
         p = profile_res.data[0]
-        supabase.table("tasks").delete().eq("user_id", request.user_id).execute()
-        return await _build_and_insert_tasks(
+
+        # Snapshot state of existing tasks before wiping them
+        existing_res = supabase.table("tasks").select("title, status, due_date, source").eq("user_id", request.user_id).execute()
+        state_snapshot: dict[str, dict] = {}
+        for t in (existing_res.data or []):
+            if t.get("source") != "custom":
+                key = t["title"].lower().strip()
+                state_snapshot[key] = {
+                    "status": t.get("status", "pending"),
+                    "due_date": t.get("due_date"),
+                }
+
+        # Delete only non-custom tasks — custom tasks survive regeneration
+        supabase.table("tasks").delete().eq("user_id", request.user_id).neq("source", "custom").execute()
+
+        result = await _build_and_insert_tasks(
             supabase, get_claude(),
             request.user_id,
             p["origin_country"],
@@ -406,8 +420,69 @@ async def regenerate_checklist(request: RegenerateRequest):
             p.get("has_partner", False),
             p.get("partner_origin_country"),
         )
+
+        # Restore completed status and manually-set due dates for title-matched tasks
+        for task in (result.get("tasks") or []):
+            key = task["title"].lower().strip()
+            prev = state_snapshot.get(key)
+            if not prev:
+                continue
+            updates: dict = {}
+            if prev["status"] == "completed":
+                updates["status"] = "completed"
+            # Restore old due_date if user had one set (takes priority over auto-generated)
+            if prev["due_date"]:
+                updates["due_date"] = prev["due_date"]
+            if updates:
+                supabase.table("tasks").update(updates).eq("id", task["id"]).execute()
+
+        # Return full refreshed task list (including custom tasks that were kept)
+        final = supabase.table("tasks").select("*").eq("user_id", request.user_id).order("priority", desc=True).execute()
+        return {"message": "Checklist regenerated", "task_count": len(final.data), "tasks": final.data}
+
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/checklist/{user_id}/apply-dates")
+async def apply_due_dates(user_id: str):
+    """Apply legal due-date offsets to tasks that have no due_date, based on the profile's move_date.
+    Safe to call any time move_date is set or changed — never overwrites existing due dates."""
+    try:
+        from datetime import timedelta
+        supabase = get_supabase()
+        profile_res = supabase.table("profiles").select("move_date").eq("id", user_id).single().execute()
+        move_date_str = (profile_res.data or {}).get("move_date")
+        if not move_date_str:
+            return {"updated": []}
+        try:
+            move_dt = date.fromisoformat(str(move_date_str)[:10])
+        except Exception:
+            return {"updated": []}
+
+        tasks_res = supabase.table("tasks").select("id, title, description, due_date").eq("user_id", user_id).execute()
+        tasks = [t for t in (tasks_res.data or []) if not t.get("due_date")]
+
+        LEGAL_OFFSETS: list[tuple[list[str], int]] = [
+            (["gemeente", "inschrijving", "register at gemeente"], 5),
+            (["digid"], 17),
+            (["zorgverzekering", "health insurance", "mandatory health"], 125),
+            (["driving licen", "rdw", "exchange your driving"], 190),
+        ]
+
+        updated = []
+        for task in tasks:
+            combined = (task.get("title", "") + " " + task.get("description", "")).lower()
+            for keywords, offset in LEGAL_OFFSETS:
+                if any(kw in combined for kw in keywords):
+                    new_date = (move_dt + timedelta(days=offset)).isoformat()
+                    supabase.table("tasks").update({"due_date": new_date}).eq("id", task["id"]).execute()
+                    updated.append({"id": task["id"], "due_date": new_date})
+                    break
+
+        return {"updated": updated}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

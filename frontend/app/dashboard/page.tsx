@@ -418,7 +418,15 @@ export default function DashboardPage() {
         <EditProfileModal
           userId={user.id}
           profile={profile}
-          onSave={(updated) => { setProfile(updated) }}
+          onSave={(updated, dateUpdates) => {
+            setProfile(updated)
+            if (dateUpdates?.length) {
+              setTasks(prev => prev.map(t => {
+                const upd = dateUpdates.find(d => d.id === t.id)
+                return upd ? { ...t, due_date: upd.due_date } : t
+              }))
+            }
+          }}
           onRegenerate={(newTasks) => {
             setTasks(newTasks)
             setTaskDocs({})

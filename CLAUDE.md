@@ -49,6 +49,8 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEN
 - Model in use: `claude-sonnet-4-6` for validation + risk score; `claude-sonnet-4-5` for checklist generation
 - `tasks.source` column: `'hardcoded'` (SA/general critical tasks), `'ai'` (Claude-generated), `'custom'` (user-added). Only `custom` tasks are deletable via `DELETE /api/checklist/task/{task_id}`
 - Partner tasks: titled `[Partner] ...` — displayed with a violet "Partner" badge on the dashboard (prefix stripped from display). Partner email receives reminders and completion notifications for these tasks
+- Regeneration preserves state: `source='custom'` tasks are never deleted; completed status + manually-set due dates are restored by title-matching after regeneration
+- Legal due dates auto-applied at generation and on demand: `LEGAL_OFFSETS` maps keywords (gemeente, digid, health insurance, rdw) to days-after-move_date; only applied to tasks with `due_date IS NULL`
 - Document pack is a merged PDF (not ZIP) — cover page + all non-failed documents merged via pypdf. `GET /api/docpack/{user_id}` streams `application/pdf`
 
 ## Task categories (fixed order)
@@ -82,6 +84,7 @@ Not yet built: Stripe payments, B2B HR portal.
 | POST | `/api/checklist/regenerate` | Delete all tasks + re-generate from current profile |
 | GET | `/api/checklist/{user_id}` | All tasks for user |
 | POST | `/api/checklist/custom-task` | Create a custom (user-defined) task |
+| POST | `/api/checklist/{user_id}/apply-dates` | Apply legal due-date offsets to tasks with no due_date (safe to call on move_date change) |
 | DELETE | `/api/checklist/task/{task_id}` | Delete a custom task (source='custom' only) |
 | PATCH | `/api/checklist/task/{task_id}` | Update task status |
 | GET | `/api/usage/{user_id}` | Daily call counts per type |

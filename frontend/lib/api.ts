@@ -207,6 +207,11 @@ export async function regenerateChecklist(user_id: string) {
   return handleResponse(res)
 }
 
+export async function applyDueDates(user_id: string): Promise<{ updated: { id: string; due_date: string }[] }> {
+  const res = await fetch(`${API_URL}/api/checklist/${user_id}/apply-dates`, { method: 'POST' })
+  return handleResponse(res)
+}
+
 export async function getProfile(user_id: string) {
   const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`)
   return handleResponse(res)

@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { updateProfile, regenerateChecklist } from '@/lib/api'
+import { updateProfile, regenerateChecklist, applyDueDates } from '@/lib/api'
 
 const COUNTRIES = [
   'South Africa', 'United Kingdom', 'United States', 'Germany',
@@ -11,7 +11,7 @@ const COUNTRIES = [
 interface Props {
   userId: string
   profile: any
-  onSave: (updatedProfile: any) => void
+  onSave: (updatedProfile: any, dateUpdates?: { id: string; due_date: string }[]) => void
   onRegenerate: (newTasks: any[]) => void
   onClose: () => void
 }
@@ -59,7 +59,13 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
         partner_email: form.has_partner ? form.partner_email || undefined : undefined,
         partner_origin_country: form.has_partner ? form.partner_origin_country || undefined : undefined,
       })
-      onSave(updated)
+      // If move_date was added or changed, apply legal due-date offsets to tasks that have none
+      let dateUpdates: { id: string; due_date: string }[] | undefined
+      if (form.move_date && form.move_date !== profile.move_date) {
+        const result = await applyDueDates(userId).catch(() => ({ updated: [] }))
+        if (result.updated.length > 0) dateUpdates = result.updated
+      }
+      onSave(updated, dateUpdates)
       onClose()
     } catch (e: any) {
       setError(e.message || 'Failed to save')
@@ -275,7 +281,7 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
             <div className="space-y-3">
               <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
                 <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Regenerate checklist?</p>
-                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">This will delete all your current tasks and create a fresh plan from your updated profile. Completed tasks and attached documents will be lost.</p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">This rebuilds your plan from your updated profile — new sections will be added or removed to match. Previously completed tasks stay marked as done. Custom tasks you've added are kept. Due dates you've set manually are preserved. Documents remain attached.</p>
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setShowRegenConfirm(false)} disabled={regenerating}
