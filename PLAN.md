@@ -1,6 +1,6 @@
 # RelocationHub — Implementation Plan
 
-> Last updated: 2026-05-06. Phases 1–3 complete. Phase 4 (Stripe) is next.
+> Last updated: 2026-05-09. Phases 1–3 complete + allowance tracker. Phase 4 (Stripe) is next.
 
 ---
 
@@ -8,8 +8,8 @@
 
 | Priority | Task | Notes |
 |---|---|---|
-| 1 | Run migration 009 in Supabase SQL editor | Adds `trial_ends_at TIMESTAMPTZ` to profiles — fixes production onboarding crash |
-| 2 | Set up pytest for backend | Before Stripe — cover tier gating, rate limiting, profile CRUD, SA tasks, IND monitor, partner tasks |
+| 1 | Run migration 010 in Supabase SQL editor | Adds `relocation_allowance_amount` to profiles + `allowance_expenses` table with RLS |
+| 2 | Set up pytest for backend | Before Stripe — cover tier gating, rate limiting, profile CRUD, SA tasks, IND monitor, partner tasks, allowance |
 | 3 | Build Phase 4 — Stripe | See Phase 4 below |
 
 ---
@@ -19,7 +19,7 @@
 Run through this before any significant launch or after rebuilding infrastructure from scratch.
 
 ### Supabase
-- [ ] All migrations run in order: 000 → 001 → 002 → 003 → 004 → 005 → 006 → 007 → 008 → 009
+- [ ] All migrations run in order: 000 → 001 → 002 → 003 → 004 → 005 → 006 → 007 → 008 → 009 → 010
 - [ ] RLS enabled on all tables: `profiles`, `tasks`, `documents`, `document_validations`, `risk_scores`, `api_usage`, `ind_monitor_subscriptions`, `ind_monitor_cache`
 - [ ] Storage bucket `documents` exists with RLS policies (authenticated users can only access their own files)
 - [ ] `profiles.tier` default is `'free'`
@@ -64,6 +64,7 @@ Run through this before any significant launch or after rebuilding infrastructur
 - [ ] Container ship date set → arrival banner appears on dashboard
 - [ ] Task search → filters correctly, clear button works
 - [ ] Download document pack → merged PDF with cover page + all non-failed docs
+- [ ] Allowance tracker → set amount → log expense → balance updates → PDF export downloads
 - [ ] New user → 7-day trial active → paid features accessible
 - [ ] Delete account → all data removed
 
@@ -126,8 +127,8 @@ Run through this before any significant launch or after rebuilding infrastructur
 
 ### Feature 6 ✅ — Document pack
 - Cover PDF (fpdf2): applicant info, relocation overview, household, shipping, HR contact, document table with validation status
-- ZIP download: `GET /api/docpack/{user_id}` streams cover PDF + all uploaded documents
-- Send to HR: `POST /api/docpack/{user_id}/send-to-hr` uploads ZIP to Supabase, emails HR 7-day signed URL
+- Merged PDF download: `GET /api/docpack/{user_id}` streams cover page + all non-failed documents merged into a single PDF (not a ZIP)
+- Send to HR: `POST /api/docpack/{user_id}/send-to-hr` uploads merged PDF to Supabase, emails HR 7-day signed URL
 - Document pack card on `/documents` page
 
 ### Feature 7 ✅ — Document validation UX + task gate
@@ -148,7 +149,7 @@ Run through this before any significant launch or after rebuilding infrastructur
 
 ## Phase 4 — Monetisation 🔲 ← NEXT
 
-**Dependencies**: migrations 005–007 run, pytest suite passing (recommended).
+**Dependencies**: migrations 000–010 run, pytest suite passing (recommended).
 
 | Task | Notes |
 |---|---|
@@ -158,7 +159,7 @@ Run through this before any significant launch or after rebuilding infrastructur
 | Upgrade CTA in paywall modal | "Upgrade" button → POST `/api/billing/create-checkout` → redirect to Stripe Checkout |
 | Success redirect | Stripe returns to `/dashboard?upgraded=1` → show success toast |
 | No guard logic changes | Frontend + backend already check `profiles.tier === 'paid'` / `'free'` |
-| Price | €3.99/mo |
+| Price | €19.99 one-time (relocation is bounded 6–18 months; monthly billing creates cancellation anxiety) |
 
 ---
 

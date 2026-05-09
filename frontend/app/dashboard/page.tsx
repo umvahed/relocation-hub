@@ -667,7 +667,7 @@ export default function DashboardPage() {
                       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                         <p className={`text-xs font-medium ${isExpiring ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                           {isExpiring ? `Trial ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : `Free trial — ${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining`}
-                          <span className="text-indigo-500 dark:text-indigo-400 ml-2 cursor-pointer hover:underline">Upgrade →</span>
+                          <a href="mailto:support@relocationhub.app?subject=Upgrade to paid plan" className="text-indigo-500 dark:text-indigo-400 ml-2 hover:underline">Upgrade →</a>
                         </p>
                       </div>
                     )

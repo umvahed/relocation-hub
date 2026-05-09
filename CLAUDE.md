@@ -63,7 +63,7 @@ RDW driving licence exchange lives in `admin` (post-arrival), not `transport`.
 
 ## Current state
 
-Working end-to-end: Google OAuth / email auth → onboarding (5 steps, destination city, children, container ship date, partner) → AI checklist (partner-aware, `[Partner]` prefixed tasks) → dashboard → task search → custom task add/delete → document upload → AI validation → risk score → iCal feed → task reminders (partner email) → HR contact notifications (partner email for `[Partner]` tasks) → profile editing (partner section) → checklist regeneration → IND appointment slot monitor → 30% ruling calculator (public) → resource links (Pararius, ExpatGuide, Marktplaats, IKEA) → container arrival estimate → document pack (merged PDF download + send to HR, failed docs excluded).
+Working end-to-end: Google OAuth / email auth → onboarding (5 steps, destination city, children, container ship date, partner, additional context) → AI checklist (partner-aware, `[Partner]` prefixed tasks) → dashboard → task search → custom task add/delete → document upload → AI validation → risk score → iCal feed → task reminders (partner email) → HR contact notifications (partner email for `[Partner]` tasks) → profile editing (partner section) → checklist regeneration → IND appointment slot monitor → 30% ruling calculator (public, net monthly estimate) → resource links (Pararius, ExpatGuide, Marktplaats, IKEA) → container arrival estimate → document pack (merged PDF download + send to HR, failed docs excluded) → relocation allowance tracker (set total, log expenses, balance, PDF statement, HR email on each expense).
 
 Not yet built: Stripe payments, B2B HR portal.
 
@@ -102,10 +102,15 @@ Not yet built: Stripe payments, B2B HR portal.
 | POST | `/api/ind-monitor/report-slot` | Community self-report: user found a slot, emails all other subscribers |
 | GET | `/api/docpack/{user_id}` | Build + stream merged PDF (cover page + non-failed docs) |
 | POST | `/api/docpack/{user_id}/send-to-hr` | Build merged PDF, upload to Supabase, email 7-day signed URL to HR contact |
+| GET | `/api/allowance/{user_id}` | Get allowance summary: total, spent, balance, expenses list |
+| PATCH | `/api/allowance/{user_id}/amount` | Set/update total allowance amount |
+| POST | `/api/allowance/{user_id}/expense` | Add expense; emails HR contact with balance update |
+| DELETE | `/api/allowance/expense/{expense_id}` | Delete an expense (query param: user_id) |
+| GET | `/api/allowance/{user_id}/export` | Stream PDF allowance statement |
 
 ## Go-live checklist (quick reference — full version in PLAN.md)
 
-- Supabase: migrations 000–008 run, RLS on all tables, `documents` storage bucket with auth policies, Google OAuth redirect set to `/auth/callback`
+- Supabase: migrations 000–010 run, RLS on all tables, `documents` storage bucket with auth policies, Google OAuth redirect set to `/auth/callback`
 - Railway: all 8 core env vars set (SCRAPER_API_KEY optional), `GET /api/health` returns 200, CORS origin matches Vercel URL exactly
 - Vercel: 3 `NEXT_PUBLIC_*` env vars set, build passes
 - cron-job.org: 4 jobs active (keepalive 5min, reminders daily, digest weekly, IND monitor 4h)
@@ -141,9 +146,10 @@ Not yet built: Stripe payments, B2B HR portal.
 6. ✅ Document pack (merged PDF with cover page + non-failed docs, download + send to HR)
 7. ✅ Custom tasks (inline "+ Add a task" per category, deletable with ×)
 8. ✅ Partner support (partner fields on profile, `[Partner]` tasks in checklist, partner email for reminders/notifications, violet badge on dashboard)
+9. ✅ Relocation allowance tracker (set total budget, log expenses per task, running balance, HR email on each expense, PDF statement export)
 
 ### Phase 4 — Monetisation ← NEXT
-- Stripe €3.99/mo
+- Stripe one-time payment €19.99 (individual; relocation is bounded, not ongoing — no monthly anxiety)
 - `POST /api/billing/create-checkout` + `POST /api/billing/webhook`
 - Webhook: `checkout.session.completed` → `profiles.tier = 'paid'`
 - No frontend/backend guard changes needed (tier checks already in place)

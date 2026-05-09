@@ -233,7 +233,7 @@ export default function AllowanceTrackerWidget({ userId, prefillExpense, onPrefi
                       <button
                         onClick={() => removeExpense(e.id)}
                         disabled={deleting === e.id}
-                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs transition disabled:opacity-50"
+                        className="text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-500 text-xs transition disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
                         aria-label="Delete expense"
                       >
                         {deleting === e.id ? '…' : '×'}

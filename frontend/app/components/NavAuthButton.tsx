@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 
 export default function NavAuthButton() {
-  const [loggedIn, setLoggedIn] = useState(false)
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -13,6 +13,9 @@ export default function NavAuthButton() {
       setLoggedIn(!!data.session)
     })
   }, [])
+
+  // Render nothing until auth state is known — prevents "Get started" flash for logged-in users
+  if (loggedIn === null) return <div className="w-24 h-9" />
 
   if (loggedIn) {
     return (

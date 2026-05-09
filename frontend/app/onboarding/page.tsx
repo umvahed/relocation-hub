@@ -130,17 +130,17 @@ export default function OnboardingPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-indigo-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 text-center">
+      <main className="min-h-screen bg-gradient-to-br from-indigo-50 dark:from-gray-900 to-indigo-100 dark:to-gray-800 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md p-8 text-center">
           <div className="w-14 h-14 mx-auto mb-6 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Building your relocation plan...</h2>
-          <p className="text-sm text-gray-500 mb-5">We are generating your personalised checklist.</p>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
-            <p className="text-sm font-semibold text-amber-800">⚠️ Please don&apos;t close this tab</p>
-            <p className="text-xs text-amber-600 mt-1">This takes about 2 minutes — your plan will be lost if you leave now.</p>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Building your relocation plan...</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">We are generating your personalised checklist.</p>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 mb-5">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">⚠️ Please don&apos;t close this tab</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">This takes about 2 minutes — your plan will be lost if you leave now.</p>
           </div>
-          <p className="text-xs text-gray-400 italic min-h-[16px]">{LOADING_SAYINGS[sayingIndex]}</p>
-          <p className="text-xs text-gray-300 mt-5">
+          <p className="text-xs text-gray-400 dark:text-gray-500 italic min-h-[16px]">{LOADING_SAYINGS[sayingIndex]}</p>
+          <p className="text-xs text-gray-300 dark:text-gray-600 mt-5">
             Generated before?{' '}
             <a href="/dashboard" className="text-indigo-400 underline">Go to dashboard →</a>
           </p>
@@ -150,27 +150,27 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-lg w-full max-w-lg p-8">
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 dark:from-gray-900 to-indigo-100 dark:to-gray-800 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg w-full max-w-lg p-8">
 
         {/* Progress */}
         <div className="flex gap-2 mb-8">
           {[1, 2, 3, 4, 5].map(s => (
-            <div key={s} className={`h-2 flex-1 rounded-full ${s <= step ? 'bg-indigo-600' : 'bg-gray-200'}`} />
+            <div key={s} className={`h-2 flex-1 rounded-full ${s <= step ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`} />
           ))}
         </div>
 
         {/* Step 1 — Name */}
         {step === 1 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome! What's your name?</h2>
-            <p className="text-gray-500 mb-6">Let's personalise your relocation plan.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Welcome! What's your name?</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">Let's personalise your relocation plan.</p>
             <input
               type="text"
               placeholder="Your full name"
               value={form.full_name}
               onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
             />
             <button
               onClick={() => setStep(2)}
@@ -184,19 +184,19 @@ export default function OnboardingPage() {
         {/* Step 2 — Origin & employment */}
         {step === 2 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Where are you moving from?</h2>
-            <p className="text-gray-500 mb-6">We'll tailor your checklist to your specific situation.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Where are you moving from?</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">We'll tailor your checklist to your specific situation.</p>
             <select
               value={form.origin_country}
               onChange={e => setForm(f => ({ ...f, origin_country: e.target.value }))}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4">
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4">
               <option value="">Select your country</option>
               {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <select
               value={form.employment_type}
               onChange={e => setForm(f => ({ ...f, employment_type: e.target.value }))}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4">
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4">
               <option value="employed">Moving for employment</option>
               <option value="self_employed">Self-employed / Freelance</option>
               <option value="student">Student</option>
@@ -205,7 +205,7 @@ export default function OnboardingPage() {
             <select
               value={form.destination_city}
               onChange={e => setForm(f => ({ ...f, destination_city: e.target.value }))}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4">
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4">
               <option value="">Which city are you moving to? (optional)</option>
               <option value="amsterdam">Amsterdam</option>
               <option value="rotterdam">Rotterdam</option>
@@ -216,7 +216,7 @@ export default function OnboardingPage() {
             </select>
             <div className="flex gap-3">
               <button onClick={() => setStep(1)}
-                className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition">
+                className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 py-3 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                 ← Back
               </button>
               <button
@@ -232,14 +232,14 @@ export default function OnboardingPage() {
         {/* Step 3 — Logistics */}
         {step === 3 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Tell us about your move</h2>
-            <p className="text-gray-500 mb-6">This helps us include the right tasks in your plan.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Tell us about your move</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">This helps us include the right tasks in your plan.</p>
 
-            <label className="block text-sm font-medium text-gray-700 mb-2">How are you moving your belongings?</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">How are you moving your belongings?</label>
             <select
               value={form.shipping_type}
               onChange={e => setForm(f => ({ ...f, shipping_type: e.target.value }))}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3">
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3">
               <option value="luggage_only">Luggage / air freight only</option>
               <option value="container">Full container (FCL/LCL)</option>
               <option value="both">Both — luggage now, container later</option>
@@ -258,7 +258,7 @@ export default function OnboardingPage() {
             )}
             <div className="mb-2" />
 
-            <label className="block text-sm font-medium text-gray-700 mb-3">Does your employer provide a relocation or housing allowance?</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Does your employer provide a relocation or housing allowance?</label>
             <div className="flex gap-3 mb-5">
               <button
                 onClick={() => setForm(f => ({ ...f, has_relocation_allowance: true }))}
@@ -272,7 +272,7 @@ export default function OnboardingPage() {
               </button>
             </div>
 
-            <label className="block text-sm font-medium text-gray-700 mb-3">Are you bringing pets?</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Are you bringing pets?</label>
             <div className="flex gap-3 mb-5">
               <button
                 onClick={() => setForm(f => ({ ...f, has_pets: true }))}
@@ -286,7 +286,7 @@ export default function OnboardingPage() {
               </button>
             </div>
 
-            <label className="block text-sm font-medium text-gray-700 mb-3">Are you bringing children?</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Are you bringing children?</label>
             <div className="flex gap-3 mb-3">
               <button
                 onClick={() => setForm(f => ({ ...f, has_children: true }))}
@@ -301,18 +301,18 @@ export default function OnboardingPage() {
             </div>
             {form.has_children && (
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">How many children?</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">How many children?</label>
                 <select
                   value={form.number_of_children}
                   onChange={e => setForm(f => ({ ...f, number_of_children: Number(e.target.value) }))}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                   {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
             )}
             {!form.has_children && <div className="mb-3" />}
 
-            <label className="block text-sm font-medium text-gray-700 mb-3">Is your partner relocating with you?</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Is your partner relocating with you?</label>
             <div className="flex gap-3 mb-3">
               <button
                 onClick={() => setForm(f => ({ ...f, has_partner: true }))}
@@ -355,7 +355,7 @@ export default function OnboardingPage() {
 
             <div className="flex gap-3">
               <button onClick={() => setStep(2)}
-                className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition">
+                className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 py-3 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                 ← Back
               </button>
               <button
@@ -370,19 +370,19 @@ export default function OnboardingPage() {
         {/* Step 4 — Move date */}
         {step === 4 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">When are you planning to move?</h2>
-            <p className="text-gray-500 mb-6">This helps us prioritise and sequence your tasks correctly.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">When are you planning to move?</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">This helps us prioritise and sequence your tasks correctly.</p>
             <input
               type="date"
               value={form.move_date}
               min={new Date().toISOString().split('T')[0]}
               onChange={e => setForm(f => ({ ...f, move_date: e.target.value }))}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
             />
-            <p className="text-sm text-gray-400 mb-6">Don't know yet? Skip this — you can set it from your dashboard later.</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">Don't know yet? Skip this — you can set it from your dashboard later.</p>
             <div className="flex gap-3">
               <button onClick={() => setStep(3)}
-                className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition">
+                className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 py-3 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                 ← Back
               </button>
               <button
@@ -397,25 +397,25 @@ export default function OnboardingPage() {
         {/* Step 5 — HR contact (optional) & generate */}
         {step === 5 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Do you have an HR or relocation contact?</h2>
-            <p className="text-gray-500 mb-6">They'll receive updates when you complete tasks. You can skip this.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Do you have an HR or relocation contact?</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">They'll receive updates when you complete tasks. You can skip this.</p>
             <input
               type="text"
               placeholder="Contact name (e.g. Sarah — HR)"
               value={form.contact_name}
               onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
             />
             <input
               type="email"
               placeholder="Contact email address"
               value={form.contact_email}
               onChange={e => setForm(f => ({ ...f, contact_email: e.target.value }))}
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-6"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-6"
             />
 
             <div className="mb-6">
-              <label htmlFor="additional-context" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="additional-context" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Anything specific about your situation? <span className="text-gray-400 font-normal">(optional)</span>
               </label>
               <p className="text-xs text-gray-400 mb-2">
@@ -428,7 +428,7 @@ export default function OnboardingPage() {
                 maxLength={800}
                 rows={3}
                 placeholder={`e.g. "I already have my IND approval letter and MVV appointment booked for next week. I also have two cats and a horse."`}
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none placeholder-gray-400"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none placeholder-gray-400 dark:placeholder-gray-500"
               />
               {form.additional_context.length > 600 && (
                 <p className="text-xs text-gray-400 text-right mt-1">{form.additional_context.length}/800</p>
@@ -437,7 +437,7 @@ export default function OnboardingPage() {
 
             <div className="flex gap-3">
               <button onClick={() => setStep(4)}
-                className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition">
+                className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 py-3 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                 ← Back
               </button>
               <button
