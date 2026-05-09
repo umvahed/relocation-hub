@@ -19,7 +19,7 @@
 Run through this before any significant launch or after rebuilding infrastructure from scratch.
 
 ### Supabase
-- [ ] All migrations run in order: 000 → 001 → 002 → 003 → 004 → 005 → 006 → 007 → 008 → 009 → 010
+- [ ] All migrations run in order: 000 → 001 → 002 → 003 → 004 → 005 → 006 → 007 → 008 → 009 → 010 → 011
 - [ ] RLS enabled on all tables: `profiles`, `tasks`, `documents`, `document_validations`, `risk_scores`, `api_usage`, `ind_monitor_subscriptions`, `ind_monitor_cache`
 - [ ] Storage bucket `documents` exists with RLS policies (authenticated users can only access their own files)
 - [ ] `profiles.tier` default is `'free'`

@@ -80,9 +80,16 @@ export default function RiskScoreWidget({ userId, isPaid, hasConsent, initialSco
             onClick={() => setCollapsed(c => !c)}
             className="flex items-center gap-3 flex-1 text-left min-w-0"
           >
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">Relocation Risk Score</h2>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">Relocation Risk Score</h2>
+              {score && s && collapsed && score.risk_items.length > 0 && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                  #{1} {score.risk_items[0].title}
+                </p>
+              )}
+            </div>
             {score && s && collapsed && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <span className="text-lg font-bold text-gray-900 dark:text-white leading-none">{score.score}</span>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.badge}`}>{s.label}</span>
               </div>
@@ -137,40 +144,41 @@ export default function RiskScoreWidget({ userId, isPaid, hasConsent, initialSco
                   <div className={`h-2 rounded-full transition-all duration-700 ${s.bar}`} style={{ width: `${score.score}%` }} />
                 </div>
 
-                {/* Dimension breakdown */}
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(score.dimension_scores).map(([key, val]) => (
-                    <div key={key} className="bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2">
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{DIM_LABELS[key] ?? key}</p>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <div className="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
-                          <div
-                            className={`h-1.5 rounded-full ${val >= 70 ? 'bg-emerald-500' : val >= 40 ? 'bg-amber-500' : 'bg-red-500'}`}
-                            style={{ width: `${val}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 w-6 text-right">{val}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Top risk items */}
+                {/* Top risk items — shown first, most actionable */}
                 {score.risk_items.length > 0 && (
-                  <div className="space-y-2 pt-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Top risks to address</p>
-                    {score.risk_items.map(item => (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">What to fix now</p>
+                    {score.risk_items.map(item => {
+                      const rankColor = item.rank === 1 ? 'text-red-400 dark:text-red-500' : item.rank === 2 ? 'text-amber-400 dark:text-amber-500' : 'text-gray-300 dark:text-gray-500'
+                      return (
                       <div key={item.rank} className="flex gap-3 bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2.5">
-                        <span className="text-xs font-bold text-gray-300 dark:text-gray-500 mt-0.5 flex-shrink-0">#{item.rank}</span>
+                        <span className={`text-xs font-bold mt-0.5 flex-shrink-0 ${rankColor}`}>#{item.rank}</span>
                         <div>
                           <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">{item.title}</p>
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.detail}</p>
                           <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5 font-medium">{item.action}</p>
                         </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )}
+
+                {/* Dimension breakdown */}
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(score.dimension_scores).map(([key, val]) => {
+                    const barColor = val >= 70 ? 'bg-emerald-500' : val >= 40 ? 'bg-amber-500' : 'bg-red-500'
+                    return (
+                    <div key={key} className="bg-gray-50 dark:bg-gray-700 rounded-xl px-3 py-2">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{DIM_LABELS[key] ?? key}</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <div className="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
+                          <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${val}%` }} />
+                        </div>
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 w-6 text-right">{val}</span>
+                      </div>
+                    </div>
+                  )})}
+                </div>
 
                 <p className="text-xs text-gray-300 dark:text-gray-600 text-right">
                   Last computed {new Date(score.computed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}

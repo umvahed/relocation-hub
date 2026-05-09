@@ -212,6 +212,11 @@ export async function applyDueDates(user_id: string): Promise<{ updated: { id: s
   return handleResponse(res)
 }
 
+export async function getShareData(token: string) {
+  const res = await fetch(`${API_URL}/api/share/${token}`)
+  return handleResponse(res)
+}
+
 export async function getProfile(user_id: string) {
   const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`)
   return handleResponse(res)

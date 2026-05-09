@@ -110,10 +110,11 @@ Not yet built: Stripe payments, B2B HR portal.
 | POST | `/api/allowance/{user_id}/expense` | Add expense; emails HR contact with balance update |
 | DELETE | `/api/allowance/expense/{expense_id}` | Delete an expense (query param: user_id) |
 | GET | `/api/allowance/{user_id}/export` | Stream PDF allowance statement |
+| GET | `/api/share/{token}` | Public read-only progress summary (no auth) — name, task progress by category, risk score, doc count |
 
 ## Go-live checklist (quick reference — full version in PLAN.md)
 
-- Supabase: migrations 000–010 run, RLS on all tables, `documents` storage bucket with auth policies, Google OAuth redirect set to `/auth/callback`
+- Supabase: migrations 000–011 run, RLS on all tables, `documents` storage bucket with auth policies, Google OAuth redirect set to `/auth/callback`
 - Railway: all 8 core env vars set (SCRAPER_API_KEY optional), `GET /api/health` returns 200, CORS origin matches Vercel URL exactly
 - Vercel: 3 `NEXT_PUBLIC_*` env vars set, build passes
 - cron-job.org: 4 jobs active (keepalive 5min, reminders daily, digest weekly, IND monitor 4h)
@@ -150,6 +151,9 @@ Not yet built: Stripe payments, B2B HR portal.
 7. ✅ Custom tasks (inline "+ Add a task" per category, deletable with ×)
 8. ✅ Partner support (partner fields on profile, `[Partner]` tasks in checklist, partner email for reminders/notifications, violet badge on dashboard)
 9. ✅ Relocation allowance tracker (set total budget, log expenses per task, running balance, HR email on each expense, PDF statement export)
+10. ✅ Shareable progress link (`/share/[token]`) — public read-only page for HR; print-friendly one-pager with overall %, per-category bars, risk score, doc count
+11. ✅ Risk score — top blocker surfaced in collapsed widget header; action list shown before dimension breakdown
+12. ✅ Copy reminder button on tasks with due dates — preformatted WhatsApp-ready message to clipboard
 
 ### Phase 4 — Monetisation ← NEXT
 - Stripe one-time payment €19.99 (individual; relocation is bounded, not ongoing — no monthly anxiety)
