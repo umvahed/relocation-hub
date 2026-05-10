@@ -79,23 +79,20 @@ def _parse_oap_response(text: str) -> list:
 
 
 async def _fetch_desk_slots(desk: dict) -> dict:
-    """Queries OAP for TKV slots at one desk via ScraperAPI render mode (headless browser)."""
+    """Queries OAP for TKV slots at one desk — plain GET with browser User-Agent."""
     import httpx
-    key = settings.ZENROWS_API_KEY
     oap_url = (
         f"{IND_OAP_BASE}/oap/api/desks/{desk['code']}/slots/"
         f"?productKey=TKV&persons=1"
     )
-    # antibot=true: ZenRows Cloudflare Bot Management bypass
-    # premium_proxy=true: residential IP pool
-    fetch_url = (
-        f"{ZENROWS_ENDPOINT}?apikey={key}"
-        f"&url={quote(oap_url, safe='')}&js_render=true&premium_proxy=true&antibot=true&proxy_country=nl"
-    ) if key else oap_url
-
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:97.0) Gecko/20100101 Firefox/97.0",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://oap.ind.nl/oap/en/",
+    }
     try:
-        async with httpx.AsyncClient(timeout=90) as client:
-            r = await client.get(fetch_url)
+        async with httpx.AsyncClient(timeout=30, verify=False) as client:
+            r = await client.get(oap_url, headers=headers)
         logger.info("OAP %s status=%s body_preview=%s", desk["code"], r.status_code, r.text[:300])
         if r.status_code != 200:
             return {"desk_code": desk["code"], "desk_name": desk["name"],
@@ -110,7 +107,7 @@ async def _fetch_desk_slots(desk: dict) -> dict:
             "checked": True,
         }
     except Exception as e:
-        logger.warning("OAP %s failed: %s | body=%s", desk["code"], e, r.text[:300] if "r" in dir() else "no response")
+        logger.warning("OAP %s failed: %s", desk["code"], e)
         return {"desk_code": desk["code"], "desk_name": desk["name"],
                 "first_date": None, "slot_count": 0, "checked": False}
 
