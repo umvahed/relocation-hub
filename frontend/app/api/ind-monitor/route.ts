@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+export const runtime = 'edge'
 
 const OAP_BASE = 'https://oap.ind.nl'
 const DESKS = [
