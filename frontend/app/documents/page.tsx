@@ -69,20 +69,18 @@ function DocumentsContent() {
       setDocs(fetchedDocs)
       setProfile(prof)
 
-      // Fetch existing validations for all documents
-      if (prof.tier === 'paid') {
-        const entries = await Promise.all(
-          fetchedDocs.map(async (doc: any) => {
-            try {
-              const v = await getDocumentValidation(doc.id, data.user.id)
-              return [doc.id, v] as const
-            } catch {
-              return null
-            }
-          })
-        )
-        setValidations(Object.fromEntries(entries.filter(Boolean) as [string, ValidationResult][]))
-      }
+      // Fetch existing validations for all documents (read-only — no tier gate)
+      const entries = await Promise.all(
+        fetchedDocs.map(async (doc: any) => {
+          try {
+            const v = await getDocumentValidation(doc.id, data.user.id)
+            return [doc.id, v] as const
+          } catch {
+            return null
+          }
+        })
+      )
+      setValidations(Object.fromEntries(entries.filter(Boolean) as [string, ValidationResult][]))
 
       setLoading(false)
     })

@@ -19,14 +19,31 @@ DESKS = [
     {"code": "ZW", "name": "Zwolle"},
     {"code": "DB", "name": "'s-Hertogenbosch"},
 ]
-PRODUCT_KEYS = [
-    {"key": "TKV", "label": "Residence permit biometrics"},
-    {"key": "DOC", "label": "Document pickup"},
-]
 
 REMINDER_INTERVAL_HOURS = 4
 SCRAPER_PROXY_HOST = "proxy.scraperapi.com"
 SCRAPER_PROXY_PORT = 8010
+
+# Maps lowercased city names to the nearest IND desk code.
+# Default (unknown city): DH (IND headquarters is in Den Haag).
+CITY_TO_DESK: dict[str, str] = {
+    # Amsterdam desk — Noord-Holland, Flevoland, Utrecht
+    "amsterdam": "AM", "haarlem": "AM", "alkmaar": "AM", "almere": "AM",
+    "zaandam": "AM", "amstelveen": "AM", "hilversum": "AM", "lelystad": "AM",
+    "utrecht": "AM",
+    # Den Haag desk — Zuid-Holland
+    "den haag": "DH", "the hague": "DH", "'s-gravenhage": "DH",
+    "rotterdam": "DH", "delft": "DH", "leiden": "DH", "zoetermeer": "DH",
+    "dordrecht": "DH", "gouda": "DH", "schiedam": "DH",
+    # Zwolle desk — Noord- and Oost-Nederland
+    "zwolle": "ZW", "groningen": "ZW", "enschede": "ZW", "arnhem": "ZW",
+    "apeldoorn": "ZW", "deventer": "ZW", "leeuwarden": "ZW", "nijmegen": "ZW",
+    "assen": "ZW",
+    # 's-Hertogenbosch desk — Zuid-Nederland
+    "'s-hertogenbosch": "DB", "den bosch": "DB", "eindhoven": "DB",
+    "tilburg": "DB", "breda": "DB", "maastricht": "DB", "venlo": "DB",
+    "hertogenbosch": "DB",
+}
 
 
 def get_supabase():
@@ -41,11 +58,14 @@ class SubscribeRequest(BaseModel):
     email: str
 
 
+def _city_to_desk(city: str) -> str:
+    return CITY_TO_DESK.get(city.lower().strip(), "DH")
+
+
 def _get_proxies() -> Optional[dict]:
     """
     ScraperAPI proxy mode — routes traffic through Dutch residential IPs while
-    curl_cffi preserves Chrome TLS fingerprint end-to-end (unlike URL mode which
-    loses the fingerprint because ScraperAPI makes its own HTTP request).
+    curl_cffi preserves Chrome TLS fingerprint end-to-end.
     """
     key = settings.SCRAPER_API_KEY
     if not key:
@@ -54,11 +74,22 @@ def _get_proxies() -> Optional[dict]:
     return {"http": proxy_url, "https": proxy_url}
 
 
+def _parse_oap_response(text: str) -> list:
+    """Strips the while(...) anti-CSRF wrapper and parses OAP JSON."""
+    text = text.strip()
+    if text.startswith("while("):
+        text = text[6:]
+        if text.endswith(")"):
+            text = text[:-1]
+    return json.loads(text).get("data") or []
+
+
 def _check_oap_slots() -> list[dict]:
     """
-    Returns list of dicts: {desk_code, desk_name, product_key, product_label,
-    first_date, slot_count} for every desk+type combination that has open slots.
-    Returns [] on any failure (gracefully falls back to reminder mode).
+    Queries OAP for TKV (biometrics) slots at all 4 desks.
+    Returns one result per desk: {desk_code, desk_name, first_date|None, slot_count, checked}.
+    checked=False means the API call failed for that desk.
+    Returns [] if ScraperAPI is not configured or curl_cffi is not installed.
     """
     try:
         from curl_cffi import requests as cf_requests
@@ -70,45 +101,47 @@ def _check_oap_slots() -> list[dict]:
         return []
 
     session = cf_requests.Session(impersonate="chrome120")
-
     # Establish PROFILE session cookie — required by Apache backend
     try:
         session.get(f"{IND_OAP_BASE}/oap/en/", proxies=proxies, timeout=15)
     except Exception:
         pass
 
-    found = []
+    results = []
     for desk in DESKS:
-        for pk in PRODUCT_KEYS:
-            url = (
-                f"{IND_OAP_BASE}/oap/api/desks/{desk['code']}/slots/"
-                f"?productKey={pk['key']}&persons=1"
-            )
-            try:
-                r = session.get(url, proxies=proxies, timeout=20)
-                if r.status_code != 200:
-                    continue
-                text = r.text.strip()
-                # OAP wraps responses in `while(...)` as an anti-CSRF measure
-                if text.startswith("while("):
-                    text = text[6:]
-                    if text.endswith(")"):
-                        text = text[:-1]
-                data = json.loads(text)
-                slots = data.get("data") or []
-                if slots:
-                    found.append({
-                        "desk_code": desk["code"],
-                        "desk_name": desk["name"],
-                        "product_key": pk["key"],
-                        "product_label": pk["label"],
-                        "first_date": slots[0].get("date"),
-                        "slot_count": len(slots),
-                    })
-            except Exception:
+        url = (
+            f"{IND_OAP_BASE}/oap/api/desks/{desk['code']}/slots/"
+            f"?productKey=TKV&persons=1"
+        )
+        try:
+            r = session.get(url, proxies=proxies, timeout=20)
+            if r.status_code != 200:
+                results.append({
+                    "desk_code": desk["code"],
+                    "desk_name": desk["name"],
+                    "first_date": None,
+                    "slot_count": 0,
+                    "checked": False,
+                })
                 continue
+            slots = _parse_oap_response(r.text)
+            results.append({
+                "desk_code": desk["code"],
+                "desk_name": desk["name"],
+                "first_date": slots[0].get("date") if slots else None,
+                "slot_count": len(slots),
+                "checked": True,
+            })
+        except Exception:
+            results.append({
+                "desk_code": desk["code"],
+                "desk_name": desk["name"],
+                "first_date": None,
+                "slot_count": 0,
+                "checked": False,
+            })
 
-    return found
+    return results
 
 
 def _send_slots_email(email: str, slots: list[dict]) -> bool:
@@ -119,7 +152,7 @@ def _send_slots_email(email: str, slots: list[dict]) -> bool:
         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
                     padding:12px 16px;margin-bottom:8px;">
           <p style="margin:0;font-size:14px;font-weight:600;color:#166534;">
-            {s['desk_name']} — {s['product_label']}
+            {s['desk_name']} — Residence permit biometrics
           </p>
           <p style="margin:4px 0 0;font-size:13px;color:#374151;">
             First available: <strong>{s['first_date']}</strong> &nbsp;·&nbsp; {s['slot_count']} slot(s)
@@ -138,7 +171,7 @@ def _send_slots_email(email: str, slots: list[dict]) -> bool:
         </span>
       </div>
       <h2 style="font-size:20px;font-weight:600;margin:0 0 8px;">
-        🎉 IND appointment slots are available!
+        IND appointment slots are available!
       </h2>
       <p style="font-size:15px;color:#374151;margin:0 0 16px;">
         We found open slots — book immediately before they disappear.
@@ -148,12 +181,12 @@ def _send_slots_email(email: str, slots: list[dict]) -> bool:
          style="display:inline-block;background:#4f46e5;color:#fff;font-size:15px;
                 font-weight:600;padding:12px 24px;border-radius:10px;
                 text-decoration:none;margin:16px 0 24px;">
-        Book appointment now →
+        Book appointment now
       </a>
       <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;
                   padding:16px 20px;margin-bottom:24px;">
         <p style="font-size:13px;font-weight:600;color:#1a1a1a;margin:0 0 8px;">
-          💡 Act fast
+          Act fast
         </p>
         <ul style="font-size:13px;color:#374151;margin:0;padding-left:20px;line-height:1.8;">
           <li>Slots fill within minutes — open the link immediately</li>
@@ -193,12 +226,12 @@ def _send_reminder_email(email: str) -> bool:
          style="display:inline-block;background:#4f46e5;color:#fff;font-size:15px;
                 font-weight:600;padding:12px 24px;border-radius:10px;
                 text-decoration:none;margin-bottom:24px;">
-        Check slots now →
+        Check slots now
       </a>
       <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;
                   padding:16px 20px;margin-bottom:24px;">
         <p style="font-size:13px;font-weight:600;color:#1a1a1a;margin:0 0 8px;">
-          💡 Tips for finding slots
+          Tips for finding slots
         </p>
         <ul style="font-size:13px;color:#374151;margin:0;padding-left:20px;line-height:1.8;">
           <li>Monday mornings often have new slots after the weekend</li>
@@ -233,7 +266,7 @@ def _send_community_report_email(email: str) -> bool:
         </span>
       </div>
       <h2 style="font-size:20px;font-weight:600;margin:0 0 8px;">
-        🎉 Someone just found IND appointment slots!
+        Someone just found IND appointment slots!
       </h2>
       <p style="font-size:15px;color:#374151;margin:0 0 20px;">
         A fellow RelocationHub user spotted available slots and flagged it for everyone.
@@ -243,12 +276,12 @@ def _send_community_report_email(email: str) -> bool:
          style="display:inline-block;background:#4f46e5;color:#fff;font-size:15px;
                 font-weight:600;padding:12px 24px;border-radius:10px;
                 text-decoration:none;margin:0 0 24px;">
-        Book appointment now →
+        Book appointment now
       </a>
       <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;
                   padding:16px 20px;margin-bottom:24px;">
         <p style="font-size:13px;font-weight:600;color:#1a1a1a;margin:0 0 8px;">
-          💡 Act fast
+          Act fast
         </p>
         <ul style="font-size:13px;color:#374151;margin:0;padding-left:20px;line-height:1.8;">
           <li>Slots fill within minutes — open the link immediately</li>
@@ -271,7 +304,6 @@ async def report_slot(body: ReportSlotRequest):
     """User self-reports finding a slot — immediately alerts all subscribers."""
     supabase = get_supabase()
 
-    # Verify the reporter is an active subscriber
     sub = (
         supabase.table("ind_monitor_subscriptions")
         .select("email")
@@ -282,13 +314,12 @@ async def report_slot(body: ReportSlotRequest):
     if not sub.data:
         raise HTTPException(status_code=403, detail="Must be subscribed to report slots")
 
-    # Log to cache
     supabase.table("ind_monitor_cache").insert({
         "slots_available": True,
         "status_text": "Community report: user spotted available slots",
+        "slot_data": [],
     }).execute()
 
-    # Email all active subscribers except the reporter
     subs = (
         supabase.table("ind_monitor_subscriptions")
         .select("user_id, email")
@@ -363,10 +394,45 @@ async def get_status(user_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/ind-monitor/slots")
+async def get_slots(city: Optional[str] = None):
+    """
+    Public endpoint — returns per-desk TKV slot availability from the last cache entry.
+    Accepts optional city param to identify the nearest desk.
+    """
+    supabase = get_supabase()
+    nearest_code = _city_to_desk(city) if city else "DH"
+    nearest_desk = next((d for d in DESKS if d["code"] == nearest_code), DESKS[1])
+
+    latest = (
+        supabase.table("ind_monitor_cache")
+        .select("slot_data, checked_at, slots_available")
+        .order("checked_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    if not latest.data:
+        return {
+            "nearest_desk": nearest_desk,
+            "desks": [],
+            "last_checked": None,
+            "scraper_active": bool(settings.SCRAPER_API_KEY),
+        }
+
+    entry = latest.data[0]
+    return {
+        "nearest_desk": nearest_desk,
+        "desks": entry.get("slot_data") or [],
+        "last_checked": entry.get("checked_at"),
+        "scraper_active": bool(settings.SCRAPER_API_KEY),
+    }
+
+
 def _build_status_text(slots_found: bool, available_slots: list) -> str:
     if slots_found:
         desks_str = " | ".join(
-            f"{s['desk_name']} ({s['product_label']}, first: {s['first_date']})"
+            f"{s['desk_name']} (first: {s['first_date']})"
             for s in available_slots
         )
         return f"SLOTS AVAILABLE: {desks_str}"
@@ -425,13 +491,15 @@ async def check_ind(authorization: Annotated[str | None, Header()] = None):
 
     supabase = get_supabase()
 
-    available_slots = _check_oap_slots()
+    all_desk_results = _check_oap_slots()
+    available_slots = [d for d in all_desk_results if d.get("slot_count", 0) > 0]
     slots_found = bool(available_slots)
     status_text = _build_status_text(slots_found, available_slots)
 
     supabase.table("ind_monitor_cache").insert({
         "slots_available": slots_found,
         "status_text": status_text,
+        "slot_data": all_desk_results,
     }).execute()
 
     subs = (

@@ -179,7 +179,8 @@ export default function DashboardPage() {
       getUsage(data.user.id).then(setUsage).catch(() => null)
       const prof = await getProfile(data.user.id).catch(() => null)
       setProfile(prof)
-      if (prof?.tier === 'paid') {
+      const profTrialActive = prof?.trial_ends_at && new Date(prof.trial_ends_at) > new Date()
+      if (prof?.tier === 'paid' || profTrialActive) {
         getRiskScore(data.user.id).then(setRiskScore).catch(() => null)
       }
       // Load storage usage
@@ -821,7 +822,12 @@ export default function DashboardPage() {
               />
             )}
             {user && profile && (
-              <IndMonitorWidget userId={user.id} userEmail={user.email ?? profile.email ?? ''} />
+              <IndMonitorWidget
+                userId={user.id}
+                userEmail={user.email ?? profile.email ?? ''}
+                destinationCity={profile.destination_city ?? undefined}
+                moveDate={profile.move_date ?? undefined}
+              />
             )}
             {profile && (
               <ResourcesWidget profile={profile} />

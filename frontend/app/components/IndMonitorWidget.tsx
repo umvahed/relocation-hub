@@ -1,12 +1,14 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { subscribeIndMonitor, unsubscribeIndMonitor, getIndMonitorStatus } from '@/lib/api'
+import { subscribeIndMonitor, unsubscribeIndMonitor, getIndMonitorStatus, getIndSlots, type IndSlotsResponse, type IndSlotDesk } from '@/lib/api'
 
 const IND_BOOKING_URL = 'https://oap.ind.nl/oap/en/#/doc'
 
 interface Props {
   readonly userId: string
   readonly userEmail: string
+  readonly destinationCity?: string
+  readonly moveDate?: string
 }
 
 const Spinner = ({ size }: { readonly size: string }) => (
@@ -23,7 +25,54 @@ function formatCheckedAgo(checkedAt: string): string {
   return `${Math.floor(diff / 60)}h ago`
 }
 
-export default function IndMonitorWidget({ userId, userEmail }: Props) {
+function formatSlotDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+/**
+ * Returns the target booking window for IND biometrics (TKV).
+ * TKV must be completed within ~90 days of arrival; aim for the first 6 weeks.
+ */
+function getAppointmentContext(moveDate: string): string {
+  const move = new Date(moveDate)
+  const windowStart = new Date(move)
+  windowStart.setDate(windowStart.getDate() + 7)
+  const windowEnd = new Date(move)
+  windowEnd.setDate(windowEnd.getDate() + 60)
+  const fmt = (d: Date) => d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+  const moveStr = move.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  return `For your ${moveStr} arrival, aim to book in ${fmt(windowStart)} – ${fmt(windowEnd)}`
+}
+
+function DeskRow({ desk, isNearest }: { desk: IndSlotDesk; isNearest: boolean }) {
+  const hasSlot = desk.slot_count > 0
+  const notChecked = !desk.checked && desk.slot_count === 0
+
+  return (
+    <div className={`flex items-center justify-between py-1.5 ${isNearest ? '' : ''}`}>
+      <div className="flex items-center gap-2 min-w-0">
+        <span
+          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+            hasSlot ? 'bg-green-500' : notChecked ? 'bg-gray-300 dark:bg-gray-600' : 'bg-gray-300 dark:bg-gray-600'
+          }`}
+        />
+        <span className={`text-xs ${isNearest ? 'font-semibold text-gray-800 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400'} truncate`}>
+          {desk.desk_name}
+          {isNearest && <span className="ml-1.5 text-[10px] font-normal text-indigo-400 dark:text-indigo-500">nearest</span>}
+        </span>
+      </div>
+      <span className={`text-xs flex-shrink-0 ml-2 tabular-nums ${hasSlot ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-gray-400 dark:text-gray-500'}`}>
+        {hasSlot && desk.first_date
+          ? `Next: ${formatSlotDate(desk.first_date)}`
+          : notChecked
+          ? 'not checked'
+          : 'No slots'}
+      </span>
+    </div>
+  )
+}
+
+export default function IndMonitorWidget({ userId, userEmail, destinationCity, moveDate }: Props) {
   const [subscribed, setSubscribed] = useState<boolean | null>(null)
   const [lastReminder, setLastReminder] = useState<string | null>(null)
   const [latestCheck, setLatestCheck] = useState<{
@@ -31,6 +80,7 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
     status_text: string
     checked_at: string
   } | null>(null)
+  const [slotsInfo, setSlotsInfo] = useState<IndSlotsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
   const [booked, setBooked] = useState(false)
@@ -39,15 +89,17 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
   useEffect(() => {
     const storedBooked = localStorage.getItem(`ind_booked_${userId}`) === 'true'
     setBooked(storedBooked)
-    getIndMonitorStatus(userId)
-      .then(s => {
-        setSubscribed(s.subscribed)
-        setLastReminder(s.subscription?.last_notified_at ?? null)
-        setLatestCheck(s.latest_check ?? null)
-      })
-      .catch(() => setError('Could not load status'))
-      .finally(() => setLoading(false))
-  }, [userId])
+
+    Promise.all([
+      getIndMonitorStatus(userId),
+      getIndSlots(destinationCity),
+    ]).then(([status, slots]) => {
+      setSubscribed(status.subscribed)
+      setLastReminder(status.subscription?.last_notified_at ?? null)
+      setLatestCheck(status.latest_check ?? null)
+      setSlotsInfo(slots)
+    }).catch(() => setError('Could not load status')).finally(() => setLoading(false))
+  }, [userId, destinationCity])
 
   const handleSubscribe = async () => {
     setToggling(true)
@@ -97,26 +149,26 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
     : null
 
   const checkedAgo = latestCheck?.checked_at ? formatCheckedAgo(latestCheck.checked_at) : null
-  const slotsAvailable = latestCheck?.slots_available ?? false
+  const nearestCode = slotsInfo?.nearest_desk?.code ?? null
 
-  let statusWrapperClass = 'bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700'
-  let dotClass = 'bg-gray-300 dark:bg-gray-600'
-  let labelClass = 'text-gray-500 dark:text-gray-400'
-  let labelText = 'No slots right now'
+  // Sorted: nearest desk first, then the rest
+  const sortedDesks = slotsInfo?.desks
+    ? [
+        ...slotsInfo.desks.filter(d => d.desk_code === nearestCode),
+        ...slotsInfo.desks.filter(d => d.desk_code !== nearestCode),
+      ]
+    : []
 
-  if (slotsAvailable) {
-    statusWrapperClass = 'bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800'
-    dotClass = 'bg-green-500'
-    labelClass = 'text-green-700 dark:text-green-400'
-    labelText = 'Slots detected — book now!'
-  }
+  const nearestDesk = sortedDesks[0]
+  const nearestHasSlot = (nearestDesk?.slot_count ?? 0) > 0
+  const anySlotFound = sortedDesks.some(d => d.slot_count > 0)
 
-  const bookBtnClass = slotsAvailable
+  const bookBtnClass = anySlotFound
     ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30'
     : 'border-indigo-100 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30'
-  const bookBtnTextClass = slotsAvailable ? 'text-green-700 dark:text-green-300' : 'text-indigo-700 dark:text-indigo-300'
-  const bookBtnLabel = slotsAvailable ? 'Book appointment now' : 'Check slots yourself'
-  const bookBtnIconClass = slotsAvailable ? 'text-green-400' : 'text-indigo-400'
+  const bookBtnTextClass = anySlotFound ? 'text-green-700 dark:text-green-300' : 'text-indigo-700 dark:text-indigo-300'
+  const bookBtnLabel = anySlotFound ? 'Book appointment now' : 'Check slots yourself'
+  const bookBtnIconClass = anySlotFound ? 'text-green-400' : 'text-indigo-400'
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5">
@@ -128,7 +180,9 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">IND Appointment Alerts</h3>
           </div>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-            Auto-monitors all IND desks every 4 hours
+            {slotsInfo?.nearest_desk
+              ? `Monitoring ${slotsInfo.nearest_desk.name} desk · checked every 4h`
+              : 'Auto-monitors all IND desks every 4 hours'}
           </p>
         </div>
         {!loading && !booked && !subscribed && (
@@ -147,7 +201,6 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
           <Spinner size="w-4 h-4 text-gray-300 dark:text-gray-600" />
         </div>
       ) : booked ? (
-        /* Appointment booked — closed state */
         <div className="space-y-3">
           <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
             <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -167,28 +220,40 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Slot availability status */}
-          {latestCheck ? (
-            <div className={`flex items-start gap-2.5 rounded-xl px-3.5 py-2.5 ${statusWrapperClass}`}>
-              <span className={`flex-shrink-0 w-2 h-2 rounded-full ${dotClass}`} style={{ marginTop: '5px' }} />
-              <div className="min-w-0">
-                <p className={`text-xs font-semibold ${labelClass}`}>{labelText}</p>
-                {slotsAvailable && (
-                  <p className="text-xs text-green-600 dark:text-green-500 mt-0.5 truncate">
-                    {latestCheck.status_text.replace('SLOTS AVAILABLE: ', '')}
-                  </p>
-                )}
-                {checkedAgo && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    Last checked {checkedAgo}
-                  </p>
-                )}
+
+          {/* Per-desk slot availability */}
+          {sortedDesks.length > 0 ? (
+            <div className="bg-gray-50 dark:bg-gray-700/40 rounded-xl border border-gray-100 dark:border-gray-700 px-3.5 py-2.5">
+              <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                {sortedDesks.map(desk => (
+                  <DeskRow key={desk.desk_code} desk={desk} isNearest={desk.desk_code === nearestCode} />
+                ))}
               </div>
+              {checkedAgo && (
+                <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700/50">
+                  {slotsInfo?.scraper_active ? `Last checked ${checkedAgo}` : 'Live checking not configured — subscribe for alerts'}
+                </p>
+              )}
+              {!checkedAgo && !slotsInfo?.scraper_active && (
+                <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-1">
+                  Live slot checking not yet configured — subscribe for alerts when available
+                </p>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700">
               <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 flex-shrink-0" />
               <p className="text-xs text-gray-400 dark:text-gray-500">Waiting for first check…</p>
+            </div>
+          )}
+
+          {/* Move date context */}
+          {moveDate && (
+            <div className="flex items-start gap-2 rounded-xl px-3.5 py-2.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+              <svg className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-blue-700 dark:text-blue-300">{getAppointmentContext(moveDate)}</p>
             </div>
           )}
 
@@ -217,7 +282,6 @@ export default function IndMonitorWidget({ userId, userEmail }: Props) {
                   {reminderAgo && <span className="text-indigo-400 dark:text-indigo-500"> Last sent {reminderAgo}.</span>}
                 </span>
               </div>
-              {/* Primary close-loop action */}
               <button
                 onClick={handleBooked}
                 disabled={toggling}

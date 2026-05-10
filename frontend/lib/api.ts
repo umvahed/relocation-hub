@@ -360,6 +360,29 @@ export async function downloadAllowanceStatement(user_id: string): Promise<void>
   URL.revokeObjectURL(url)
 }
 
+export interface IndSlotDesk {
+  desk_code: string
+  desk_name: string
+  first_date: string | null
+  slot_count: number
+  checked: boolean
+}
+
+export interface IndSlotsResponse {
+  nearest_desk: { code: string; name: string }
+  desks: IndSlotDesk[]
+  last_checked: string | null
+  scraper_active: boolean
+}
+
+export async function getIndSlots(city?: string): Promise<IndSlotsResponse> {
+  const url = city
+    ? `${API_URL}/api/ind-monitor/slots?city=${encodeURIComponent(city)}`
+    : `${API_URL}/api/ind-monitor/slots`
+  const res = await fetch(url)
+  return handleResponse(res)
+}
+
 export async function reportIndSlot(user_id: string) {
   const res = await fetch(`${API_URL}/api/ind-monitor/report-slot`, {
     method: 'POST',
