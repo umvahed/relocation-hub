@@ -8,7 +8,8 @@ export async function GET() {
     return Response.json({ error: 'Missing configuration' }, { status: 500 })
   }
 
-  const res = await fetch(`${apiUrl}/api/ind-monitor/debug`, {
+  const res = await fetch(`${apiUrl}/api/ind-monitor/send-appointment-reminders`, {
+    method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}` },
   })
 

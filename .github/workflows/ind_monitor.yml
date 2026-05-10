@@ -1,17 +1,15 @@
-name: IND Monitor
+name: IND Monitor — Weekly Reset
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # 08:00 CEST / 07:00 CET — GitHub Actions runs in UTC
+    - cron: '0 6 * * 1'  # Every Monday 08:00 CEST / 07:00 CET (GitHub Actions runs UTC)
   workflow_dispatch:      # Manual trigger for testing
 
 jobs:
-  check-slots:
+  weekly-reset:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Fetch IND OAP slots and notify Railway
+      - name: Trigger weekly reset on Railway
         env:
           RAILWAY_URL: ${{ secrets.RAILWAY_URL }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}

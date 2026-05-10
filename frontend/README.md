@@ -45,7 +45,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 |---|---|
 | `NavAuthButton.tsx` | Auth-aware nav CTA — "Get started" or "My Dashboard →" |
 | `RiskScoreWidget.tsx` | Relocation risk score (0–100, 4 dimensions) — paid only |
-| `IndMonitorWidget.tsx` | IND appointment slot monitor — subscribe, status, self-report |
+| `IndMonitorWidget.tsx` | IND appointment monitor — personal flag system, Monday alerts, booking + what-to-bring |
 | `AllowanceTrackerWidget.tsx` | Relocation allowance tracker — set budget, log expenses, PDF export |
 | `ResourcesWidget.tsx` | City-specific resource links (Pararius, ExpatGuide, Marktplaats, IKEA) |
 | `EditProfileModal.tsx` | Profile editing modal with optional checklist regeneration |

@@ -12,7 +12,7 @@ backend/    → Railway (relocation-hub-production.up.railway.app)
 - Auth: Supabase Google OAuth + email/password
 - AI: Anthropic Claude (checklist generation + document validation + risk score) via backend only
 - Storage: Supabase bucket `documents` (RLS enforced)
-- Cron: All crons run via cron-job.org (keepalive every 5 min, weekly-digest, send-reminders, ind-monitor every 4h). `vercel.json` is intentionally empty — Vercel Hobby only allows daily cron frequency, so keepalive runs via cron-job.org instead. When upgrading to Vercel Pro, move keepalive to vercel.json: `{ "crons": [{ "path": "/api/keepalive", "schedule": "*/5 * * * *" }] }`
+- Cron: Most crons via cron-job.org (keepalive every 5 min, weekly-digest, send-reminders, ind-appointment-reminders daily). IND weekly reset runs via GitHub Actions every Monday at 07:00 CET (`.github/workflows/ind_monitor.yml`). `vercel.json` is intentionally empty — Vercel Hobby only allows daily cron frequency, so keepalive runs via cron-job.org instead. When upgrading to Vercel Pro, move keepalive to vercel.json: `{ "crons": [{ "path": "/api/keepalive", "schedule": "*/5 * * * *" }] }`
 
 ## Env vars — where they live
 
@@ -30,7 +30,7 @@ backend/    → Railway (relocation-hub-production.up.railway.app)
 | `RESEND_FROM_EMAIL` | Railway |
 | `FRONTEND_URL` | Railway |
 | `ADMIN_SECRET` | Railway |
-| `SCRAPER_API_KEY` | Railway (optional — IND slot detection via residential proxy) |
+| `RAILWAY_URL` | GitHub Actions secret (IND weekly reset cron calls Railway directly) |
 
 Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEND_API_KEY` lives in BOTH Vercel (cron proxies) and Railway (email sending).
 
@@ -98,11 +98,15 @@ Not yet built: Stripe payments, B2B HR portal.
 | POST | `/api/reminders/send` | Send due-date reminder emails (cron) |
 | PATCH | `/api/reminders/task/{task_id}/due-date` | Set task due date |
 | POST | `/api/notifications/weekly-digest` | Send weekly digest to HR contacts (cron) |
-| GET | `/api/ind-monitor/status/{user_id}` | Subscription status + latest check result |
-| POST | `/api/ind-monitor/subscribe` | Subscribe user to slot alerts |
+| GET | `/api/ind-monitor/status/{user_id}` | Subscription status + `user_slots_available` flag |
+| POST | `/api/ind-monitor/subscribe` | Subscribe user; sets `user_slots_available=true` |
 | DELETE | `/api/ind-monitor/subscribe/{user_id}` | Unsubscribe user |
-| POST | `/api/ind-monitor/check` | Check OAP API + notify subscribers (cron, auth-protected) |
-| POST | `/api/ind-monitor/report-slot` | Community self-report: user found a slot, emails all other subscribers |
+| POST | `/api/ind-monitor/report-no-slots` | User checked OAP and found nothing — flips their personal flag to false |
+| POST | `/api/ind-monitor/weekly-reset` | Monday cron: resets all flags to true + emails subscribers (auth-protected, skips Nov 24–Jan 7) |
+| POST | `/api/ind-monitor/appointment` | Save booked appointment (date + desk); auto-unsubscribes from alerts |
+| GET | `/api/ind-monitor/appointment/{user_id}` | Fetch saved appointment |
+| DELETE | `/api/ind-monitor/appointment/{user_id}` | Remove appointment |
+| POST | `/api/ind-monitor/send-appointment-reminders` | Daily cron: send 7-day and 1-day pre-appointment reminders (auth-protected) |
 | GET | `/api/docpack/{user_id}` | Build + stream merged PDF (cover page + non-failed docs) |
 | POST | `/api/docpack/{user_id}/send-to-hr` | Build merged PDF, upload to Supabase, email 7-day signed URL to HR contact |
 | GET | `/api/allowance/{user_id}` | Get allowance summary: total, spent, balance, expenses list |
@@ -115,10 +119,12 @@ Not yet built: Stripe payments, B2B HR portal.
 ## Go-live checklist (quick reference — full version in PLAN.md)
 
 - Supabase: migrations 000–011 run, RLS on all tables, `documents` storage bucket with auth policies, Google OAuth redirect set to `/auth/callback`
-- Railway: all 8 core env vars set (SCRAPER_API_KEY optional), `GET /api/health` returns 200, CORS origin matches Vercel URL exactly
+- Railway: all 8 core env vars set, `GET /api/health` returns 200, CORS origin matches Vercel URL exactly
 - Vercel: 3 `NEXT_PUBLIC_*` env vars set, build passes
-- cron-job.org: 4 jobs active (keepalive 5min, reminders daily, digest weekly, IND monitor 4h)
-- Smoke test: OAuth login → onboarding → checklist → document upload → validation → risk score → IND subscribe → iCal → edit profile → delete account
+- cron-job.org: 4 jobs active (keepalive 5min, reminders daily, digest weekly, ind-appointment-reminders daily)
+- GitHub Actions secrets: `RAILWAY_URL` + `RESEND_API_KEY` set; `ind_monitor.yml` runs every Monday
+- Supabase: migration 013 run (`user_slots_available` column on `ind_monitor_subscriptions`, `ind_appointments` table)
+- Smoke test: OAuth login → onboarding → checklist → document upload → validation → risk score → IND subscribe → check "no slots" → iCal → edit profile → delete account
 
 ## Performance notes (full roadmap in PLAN.md)
 
@@ -143,7 +149,7 @@ Not yet built: Stripe payments, B2B HR portal.
 
 ### Phase 3 — Innovation ✅ COMPLETE
 1. ✅ Checklist regeneration + profile editing
-2. ✅ IND Appointment Slot Monitor (4h reminder cron + community self-report → instant alert to all subscribers)
+2. ✅ IND Appointment Monitor — personal per-user flag system (default: "slots available"; user clicks "no slots" to flip; Monday GitHub Actions cron resets all flags + emails subscribers; exception period Nov 24–Jan 7 skips reset; user saves booked appointment → countdown + what-to-bring view + 7d/1d reminder emails)
 3. ✅ 30% Ruling eligibility calculator
 4. ✅ Resource links (Pararius, ExpatGuide, Marktplaats, IKEA)
 5. ✅ Container shipping improvements (3 options, ship date, arrival estimate) + task search

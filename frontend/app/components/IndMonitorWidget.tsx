@@ -1,8 +1,31 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { subscribeIndMonitor, unsubscribeIndMonitor, getIndMonitorStatus, getIndSlots, type IndSlotsResponse, type IndSlotDesk } from '@/lib/api'
+import {
+  subscribeIndMonitor,
+  unsubscribeIndMonitor,
+  getIndMonitorStatus,
+  reportNoSlots,
+  saveIndAppointment,
+  getIndAppointment,
+  deleteIndAppointment,
+  type IndAppointment,
+} from '@/lib/api'
 
 const IND_BOOKING_URL = 'https://oap.ind.nl/oap/en/#/doc'
+
+const DESKS = [
+  { code: 'AM', name: 'Amsterdam' },
+  { code: 'DH', name: 'Den Haag' },
+  { code: 'ZW', name: 'Zwolle' },
+  { code: 'DB', name: "’s-Hertogenbosch" },
+]
+
+const DESK_ADDRESSES: Record<string, string> = {
+  AM: 'Entrance F, De Entree 71, 1101 BH Amsterdam',
+  DH: 'Rijnstraat 8, 2515 XP Den Haag',
+  ZW: 'Dokterspad 1, 8011 PP Zwolle',
+  DB: "Pettelaarpark 1, 5216 PP ’s-Hertogenbosch",
+}
 
 interface Props {
   readonly userId: string
@@ -18,21 +41,30 @@ const Spinner = ({ size }: { readonly size: string }) => (
   </svg>
 )
 
-function formatCheckedAgo(checkedAt: string): string {
-  const diff = Math.floor((Date.now() - new Date(checkedAt).getTime()) / 60000)
-  if (diff < 1) return 'just now'
-  if (diff < 60) return `${diff}m ago`
-  return `${Math.floor(diff / 60)}h ago`
+const ExternalLinkIcon = ({ cls }: { cls: string }) => (
+  <svg className={cls} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+  </svg>
+)
+
+function isExceptionPeriod(): boolean {
+  const now = new Date()
+  const month = now.getMonth() + 1
+  const day = now.getDate()
+  return (month === 11 && day >= 24) || month === 12 || (month === 1 && day <= 7)
 }
 
-function formatSlotDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+function daysUntil(dateStr: string): number {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(dateStr)
+  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-/**
- * Returns the target booking window for IND biometrics (TKV).
- * TKV must be completed within ~90 days of arrival; aim for the first 6 weeks.
- */
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 function getAppointmentContext(moveDate: string): string {
   const move = new Date(moveDate)
   const windowStart = new Date(move)
@@ -44,62 +76,149 @@ function getAppointmentContext(moveDate: string): string {
   return `For your ${moveStr} arrival, aim to book in ${fmt(windowStart)} – ${fmt(windowEnd)}`
 }
 
-function DeskRow({ desk, isNearest }: { desk: IndSlotDesk; isNearest: boolean }) {
-  const hasSlot = desk.slot_count > 0
-  const notChecked = !desk.checked && desk.slot_count === 0
+interface BookingSectionProps {
+  showForm: boolean
+  setShowForm: (v: boolean) => void
+  bookingDesk: string
+  setBookingDesk: (v: string) => void
+  bookingDate: string
+  setBookingDate: (v: string) => void
+  onSave: () => void
+  saving: boolean
+}
+
+function BookingSection({
+  showForm, setShowForm, bookingDesk, setBookingDesk, bookingDate, setBookingDate, onSave, saving,
+}: BookingSectionProps) {
+  if (!showForm) {
+    return (
+      <button
+        onClick={() => setShowForm(true)}
+        className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition text-xs font-semibold text-emerald-700 dark:text-emerald-400"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        I&apos;ve booked my appointment
+      </button>
+    )
+  }
 
   return (
-    <div className={`flex items-center justify-between py-1.5 ${isNearest ? '' : ''}`}>
-      <div className="flex items-center gap-2 min-w-0">
-        <span
-          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-            hasSlot ? 'bg-green-500' : notChecked ? 'bg-gray-300 dark:bg-gray-600' : 'bg-gray-300 dark:bg-gray-600'
-          }`}
+    <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3.5 py-3 space-y-2.5">
+      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Save your appointment details</p>
+      <div className="flex gap-2">
+        <select
+          value={bookingDesk}
+          onChange={e => setBookingDesk(e.target.value)}
+          className="flex-1 text-xs rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1.5"
+        >
+          {DESKS.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
+        </select>
+        <input
+          type="date"
+          value={bookingDate}
+          onChange={e => setBookingDate(e.target.value)}
+          className="flex-1 text-xs rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1.5"
         />
-        <span className={`text-xs ${isNearest ? 'font-semibold text-gray-800 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400'} truncate`}>
-          {desk.desk_name}
-          {isNearest && <span className="ml-1.5 text-[10px] font-normal text-indigo-400 dark:text-indigo-500">nearest</span>}
-        </span>
       </div>
-      <span className={`text-xs flex-shrink-0 ml-2 tabular-nums ${hasSlot ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-gray-400 dark:text-gray-500'}`}>
-        {hasSlot && desk.first_date
-          ? `Next: ${formatSlotDate(desk.first_date)}`
-          : notChecked
-          ? 'not checked'
-          : 'No slots'}
-      </span>
+      <div className="flex gap-2">
+        <button
+          onClick={onSave}
+          disabled={saving || !bookingDate}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition disabled:opacity-50"
+        >
+          {saving ? <Spinner size="w-3 h-3" /> : 'Save'}
+        </button>
+        <button
+          onClick={() => setShowForm(false)}
+          className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   )
 }
 
-export default function IndMonitorWidget({ userId, userEmail, destinationCity, moveDate }: Props) {
+function AppointmentView({
+  appointment, onDelete, toggling,
+}: { appointment: IndAppointment; onDelete: () => void; toggling: boolean }) {
+  const days = daysUntil(appointment.appointment_date)
+  const address = DESK_ADDRESSES[appointment.desk_code] ?? ''
+  const isPast = days < 0
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-3">
+        <div className="flex items-center gap-2 mb-2">
+          <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+            {isPast ? 'Biometrics appointment completed' : 'Biometrics appointment booked'}
+          </p>
+        </div>
+        <p className="text-sm font-semibold text-gray-900 dark:text-white">{appointment.desk_name}</p>
+        <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+          {formatDate(appointment.appointment_date)}
+          {!isPast && (
+            <span className="ml-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+              · in {days} day{days !== 1 ? 's' : ''}
+            </span>
+          )}
+          {isPast && <span className="ml-1.5 text-gray-400"> · done</span>}
+        </p>
+        {address && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">📍 {address}</p>}
+      </div>
+
+      {!isPast && (
+        <div className="rounded-xl bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700 px-3.5 py-3">
+          <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">What to bring</p>
+          <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 pl-1">
+            <li>· Valid passport or travel document</li>
+            <li>· V-number (on your IND permit letter)</li>
+            <li>· Appointment confirmation email from IND</li>
+            <li>· Arrive 10 minutes early</li>
+          </ul>
+        </div>
+      )}
+
+      <button
+        onClick={onDelete}
+        disabled={toggling}
+        className="w-full text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition disabled:opacity-50 py-1"
+      >
+        {toggling ? <Spinner size="w-3 h-3" /> : 'Remove appointment'}
+      </button>
+    </div>
+  )
+}
+
+export default function IndMonitorWidget({ userId, userEmail, destinationCity: _destinationCity, moveDate }: Props) {
   const [subscribed, setSubscribed] = useState<boolean | null>(null)
-  const [lastReminder, setLastReminder] = useState<string | null>(null)
-  const [latestCheck, setLatestCheck] = useState<{
-    slots_available: boolean
-    status_text: string
-    checked_at: string
-  } | null>(null)
-  const [slotsInfo, setSlotsInfo] = useState<IndSlotsResponse | null>(null)
+  const [slotsAvailable, setSlotsAvailable] = useState(true)
+  const [appointment, setAppointment] = useState<IndAppointment | null | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
-  const [booked, setBooked] = useState(false)
   const [error, setError] = useState('')
+  const [showBookingForm, setShowBookingForm] = useState(false)
+  const [bookingDesk, setBookingDesk] = useState('AM')
+  const [bookingDate, setBookingDate] = useState('')
+  const [savingBooking, setSavingBooking] = useState(false)
+
+  const inExceptionPeriod = isExceptionPeriod()
 
   useEffect(() => {
-    const storedBooked = localStorage.getItem(`ind_booked_${userId}`) === 'true'
-    setBooked(storedBooked)
-
     Promise.all([
       getIndMonitorStatus(userId),
-      getIndSlots(destinationCity),
-    ]).then(([status, slots]) => {
+      getIndAppointment(userId),
+    ]).then(([status, appt]) => {
       setSubscribed(status.subscribed)
-      setLastReminder(status.subscription?.last_notified_at ?? null)
-      setLatestCheck(status.latest_check ?? null)
-      setSlotsInfo(slots)
+      setSlotsAvailable(status.subscription?.user_slots_available ?? true)
+      setAppointment(appt)
     }).catch(() => setError('Could not load status')).finally(() => setLoading(false))
-  }, [userId, destinationCity])
+  }, [userId])
 
   const handleSubscribe = async () => {
     setToggling(true)
@@ -107,10 +226,9 @@ export default function IndMonitorWidget({ userId, userEmail, destinationCity, m
     try {
       await subscribeIndMonitor(userId, userEmail)
       setSubscribed(true)
-      setBooked(false)
-      localStorage.removeItem(`ind_booked_${userId}`)
-    } catch (e: any) {
-      setError(e.message || 'Failed to subscribe')
+      setSlotsAvailable(true)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to subscribe')
     } finally {
       setToggling(false)
     }
@@ -122,127 +240,89 @@ export default function IndMonitorWidget({ userId, userEmail, destinationCity, m
     try {
       await unsubscribeIndMonitor(userId)
       setSubscribed(false)
-    } catch (e: any) {
-      setError(e.message || 'Failed to unsubscribe')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to unsubscribe')
     } finally {
       setToggling(false)
     }
   }
 
-  const handleBooked = async () => {
+  const handleReportNoSlots = async () => {
     setToggling(true)
     setError('')
     try {
-      await unsubscribeIndMonitor(userId)
-      setSubscribed(false)
-      setBooked(true)
-      localStorage.setItem(`ind_booked_${userId}`, 'true')
-    } catch (e: any) {
-      setError(e.message || 'Failed to update')
+      await reportNoSlots(userId)
+      setSlotsAvailable(false)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to report')
     } finally {
       setToggling(false)
     }
   }
 
-  const reminderAgo = lastReminder
-    ? new Date(lastReminder).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-    : null
+  const handleSaveBooking = async () => {
+    if (!bookingDate) { setError('Please select a date'); return }
+    setSavingBooking(true)
+    setError('')
+    try {
+      const desk = DESKS.find(d => d.code === bookingDesk)!
+      await saveIndAppointment({ user_id: userId, desk_code: bookingDesk, desk_name: desk.name, appointment_date: bookingDate })
+      const appt = await getIndAppointment(userId)
+      setAppointment(appt)
+      setSubscribed(false)
+      setShowBookingForm(false)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to save appointment')
+    } finally {
+      setSavingBooking(false)
+    }
+  }
 
-  const checkedAgo = latestCheck?.checked_at ? formatCheckedAgo(latestCheck.checked_at) : null
-  const nearestCode = slotsInfo?.nearest_desk?.code ?? null
-
-  // Sorted: nearest desk first, then the rest
-  const sortedDesks = slotsInfo?.desks
-    ? [
-        ...slotsInfo.desks.filter(d => d.desk_code === nearestCode),
-        ...slotsInfo.desks.filter(d => d.desk_code !== nearestCode),
-      ]
-    : []
-
-  const nearestDesk = sortedDesks[0]
-  const nearestHasSlot = (nearestDesk?.slot_count ?? 0) > 0
-  const anySlotFound = sortedDesks.some(d => d.slot_count > 0)
-
-  const bookBtnClass = anySlotFound
-    ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30'
-    : 'border-indigo-100 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30'
-  const bookBtnTextClass = anySlotFound ? 'text-green-700 dark:text-green-300' : 'text-indigo-700 dark:text-indigo-300'
-  const bookBtnLabel = anySlotFound ? 'Book appointment now' : 'Check slots yourself'
-  const bookBtnIconClass = anySlotFound ? 'text-green-400' : 'text-indigo-400'
+  const handleDeleteAppointment = async () => {
+    setToggling(true)
+    setError('')
+    try {
+      await deleteIndAppointment(userId)
+      setAppointment(null)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to remove appointment')
+    } finally {
+      setToggling(false)
+    }
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 mb-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-base">🇳🇱</span>
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-base">🇳🇱</span>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">IND Appointment Alerts</h3>
-          </div>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-            {slotsInfo?.nearest_desk
-              ? `Monitoring ${slotsInfo.nearest_desk.name} desk · checked every 4h`
-              : 'Auto-monitors all IND desks every 4 hours'}
-          </p>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">IND Appointment Monitor</h3>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Weekly Monday alerts · TKV biometrics</p>
         </div>
-        {!loading && !booked && !subscribed && (
-          <button
-            onClick={handleSubscribe}
-            disabled={toggling}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-700"
-          >
-            {toggling ? <Spinner size="w-3 h-3" /> : 'Notify me'}
-          </button>
-        )}
       </div>
 
-      {loading ? (
+      {loading || appointment === undefined ? (
         <div className="h-10 flex items-center justify-center">
           <Spinner size="w-4 h-4 text-gray-300 dark:text-gray-600" />
         </div>
-      ) : booked ? (
+      ) : appointment ? (
+        /* ── State: Booked ── */
+        <AppointmentView appointment={appointment} onDelete={handleDeleteAppointment} toggling={toggling} />
+      ) : !subscribed ? (
+        /* ── State: Not subscribed ── */
         <div className="space-y-3">
-          <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
-            <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700">
+            <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
             <div>
-              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">IND appointment booked — alerts stopped</p>
-              <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">You won't receive any more slot emails. Good luck!</p>
+              <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Monday morning reminders</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Get a weekly email every Monday to check IND slot availability. Slots go within minutes.
+              </p>
             </div>
           </div>
-          <button
-            onClick={() => { setBooked(false); localStorage.removeItem(`ind_booked_${userId}`) }}
-            className="text-xs text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
-          >
-            Undo — I need to keep monitoring
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-
-          {/* Per-desk slot availability */}
-          {sortedDesks.length > 0 ? (
-            <div className="bg-gray-50 dark:bg-gray-700/40 rounded-xl border border-gray-100 dark:border-gray-700 px-3.5 py-2.5">
-              <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
-                {sortedDesks.map(desk => (
-                  <DeskRow key={desk.desk_code} desk={desk} isNearest={desk.desk_code === nearestCode} />
-                ))}
-              </div>
-              {checkedAgo && (
-                <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700/50">
-                  Last checked {checkedAgo}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700">
-              <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 flex-shrink-0" />
-              <p className="text-xs text-gray-400 dark:text-gray-500">Waiting for first check…</p>
-            </div>
-          )}
-
-          {/* Move date context */}
           {moveDate && (
             <div className="flex items-start gap-2 rounded-xl px-3.5 py-2.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
               <svg className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -251,59 +331,110 @@ export default function IndMonitorWidget({ userId, userEmail, destinationCity, m
               <p className="text-xs text-blue-700 dark:text-blue-300">{getAppointmentContext(moveDate)}</p>
             </div>
           )}
-
-          {/* Book / check button */}
+          <button
+            onClick={handleSubscribe}
+            disabled={toggling}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-700"
+          >
+            {toggling ? <Spinner size="w-3.5 h-3.5" /> : 'Get Monday reminders'}
+          </button>
+        </div>
+      ) : inExceptionPeriod ? (
+        /* ── State: Exception period (Nov 24 – Jan 7) ── */
+        <div className="space-y-3">
+          <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+            <span className="text-base flex-shrink-0">🎄</span>
+            <div>
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Holiday period — reduced IND availability</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                IND has limited availability late November through early January. Monday reminders resume in the new year.
+              </p>
+            </div>
+          </div>
           <a
             href={IND_BOOKING_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl border transition group ${bookBtnClass}`}
+            className="flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl border border-indigo-100 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition group"
           >
-            <span className={`text-sm font-medium ${bookBtnTextClass}`}>{bookBtnLabel}</span>
-            <svg className={`w-4 h-4 group-hover:translate-x-0.5 transition-transform ${bookBtnIconClass}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
+            <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Check slots anyway</span>
+            <ExternalLinkIcon cls="w-4 h-4 text-indigo-400 group-hover:translate-x-0.5 transition-transform" />
           </a>
-
-          {/* Subscription status + actions */}
-          {subscribed ? (
-            <div className="space-y-2">
-              <div className="flex items-start gap-2 text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl px-3.5 py-2.5">
-                <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>
-                  Alerts active — you&apos;ll get an email the moment slots appear, plus a reminder every 4 hours.
-                  {reminderAgo && <span className="text-indigo-400 dark:text-indigo-500"> Last sent {reminderAgo}.</span>}
-                </span>
-              </div>
-              <button
-                onClick={handleBooked}
-                disabled={toggling}
-                className="flex items-center justify-center gap-2 w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition disabled:opacity-60 text-xs font-semibold text-emerald-700 dark:text-emerald-400"
-              >
-                {toggling ? <Spinner size="w-3 h-3" /> : (
-                  <>
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    I&apos;ve booked my appointment — stop alerts
-                  </>
-                )}
-              </button>
-              <button
-                onClick={handleUnsubscribe}
-                disabled={toggling}
-                className="w-full text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition disabled:opacity-50 py-1"
-              >
-                Unsubscribe without booking
-              </button>
+          <BookingSection
+            showForm={showBookingForm} setShowForm={setShowBookingForm}
+            bookingDesk={bookingDesk} setBookingDesk={setBookingDesk}
+            bookingDate={bookingDate} setBookingDate={setBookingDate}
+            onSave={handleSaveBooking} saving={savingBooking}
+          />
+          <button onClick={handleUnsubscribe} disabled={toggling} className="w-full text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition py-1 disabled:opacity-50">
+            Unsubscribe
+          </button>
+        </div>
+      ) : slotsAvailable ? (
+        /* ── State: Subscribed + slots available (default) ── */
+        <div className="space-y-3">
+          <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+            <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 mt-1.5" />
+            <div>
+              <p className="text-xs font-semibold text-green-800 dark:text-green-300">Slots available within 2 weeks</p>
+              <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">
+                Check your nearest desk — Amsterdam, Den Haag, Zwolle or &apos;s-Hertogenbosch. Slots fill within minutes.
+              </p>
             </div>
-          ) : (
-            <p className="text-xs text-gray-400 dark:text-gray-500">
-              Subscribe for instant email alerts and reminders every 4 hours when slots appear.
-            </p>
-          )}
+          </div>
+          <a
+            href={IND_BOOKING_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 transition group"
+          >
+            <span className="text-sm font-medium text-green-700 dark:text-green-300">Book appointment now</span>
+            <ExternalLinkIcon cls="w-4 h-4 text-green-400 group-hover:translate-x-0.5 transition-transform" />
+          </a>
+          <BookingSection
+            showForm={showBookingForm} setShowForm={setShowBookingForm}
+            bookingDesk={bookingDesk} setBookingDesk={setBookingDesk}
+            bookingDate={bookingDate} setBookingDate={setBookingDate}
+            onSave={handleSaveBooking} saving={savingBooking}
+          />
+          <button
+            onClick={handleReportNoSlots}
+            disabled={toggling}
+            className="w-full text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition disabled:opacity-50 py-1"
+          >
+            {toggling ? <span className="flex justify-center"><Spinner size="w-3 h-3" /></span> : 'I checked — no slots within 2 weeks'}
+          </button>
+        </div>
+      ) : (
+        /* ── State: Subscribed + no slots ── */
+        <div className="space-y-3">
+          <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700">
+            <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0 mt-1.5" />
+            <div>
+              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">You checked — no slots right now</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                We&apos;ll reset this on Monday and remind you to check again.
+              </p>
+            </div>
+          </div>
+          <a
+            href={IND_BOOKING_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl border border-indigo-100 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition group"
+          >
+            <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Check again on IND website</span>
+            <ExternalLinkIcon cls="w-4 h-4 text-indigo-400 group-hover:translate-x-0.5 transition-transform" />
+          </a>
+          <BookingSection
+            showForm={showBookingForm} setShowForm={setShowBookingForm}
+            bookingDesk={bookingDesk} setBookingDesk={setBookingDesk}
+            bookingDate={bookingDate} setBookingDate={setBookingDate}
+            onSave={handleSaveBooking} saving={savingBooking}
+          />
+          <button onClick={handleUnsubscribe} disabled={toggling} className="w-full text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition py-1 disabled:opacity-50">
+            Unsubscribe
+          </button>
         </div>
       )}
 

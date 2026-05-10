@@ -241,8 +241,12 @@ export async function deleteDocument(document_id: string, user_id: string) {
 
 export interface IndMonitorStatus {
   subscribed: boolean
-  subscription: { active: boolean; last_notified_at: string | null; created_at: string } | null
-  latest_check: { slots_available: boolean; status_text: string; checked_at: string } | null
+  subscription: {
+    active: boolean
+    last_notified_at: string | null
+    created_at: string
+    user_slots_available: boolean
+  } | null
 }
 
 export async function getIndMonitorStatus(user_id: string): Promise<IndMonitorStatus> {
@@ -261,6 +265,52 @@ export async function subscribeIndMonitor(user_id: string, email: string) {
 
 export async function unsubscribeIndMonitor(user_id: string) {
   const res = await fetch(`${API_URL}/api/ind-monitor/subscribe/${user_id}`, {
+    method: 'DELETE',
+  })
+  return handleResponse(res)
+}
+
+export async function reportNoSlots(user_id: string) {
+  const res = await fetch(`${API_URL}/api/ind-monitor/report-no-slots`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id }),
+  })
+  return handleResponse(res)
+}
+
+export interface IndAppointment {
+  id: string
+  user_id: string
+  desk_code: string
+  desk_name: string
+  appointment_date: string
+  reminder_sent_7d: boolean
+  reminder_sent_1d: boolean
+  created_at: string
+}
+
+export async function saveIndAppointment(data: {
+  user_id: string
+  desk_code: string
+  desk_name: string
+  appointment_date: string
+}): Promise<{ saved: boolean }> {
+  const res = await fetch(`${API_URL}/api/ind-monitor/appointment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res)
+}
+
+export async function getIndAppointment(user_id: string): Promise<IndAppointment | null> {
+  const res = await fetch(`${API_URL}/api/ind-monitor/appointment/${user_id}`)
+  return handleResponse(res)
+}
+
+export async function deleteIndAppointment(user_id: string): Promise<{ deleted: boolean }> {
+  const res = await fetch(`${API_URL}/api/ind-monitor/appointment/${user_id}`, {
     method: 'DELETE',
   })
   return handleResponse(res)
@@ -360,33 +410,3 @@ export async function downloadAllowanceStatement(user_id: string): Promise<void>
   URL.revokeObjectURL(url)
 }
 
-export interface IndSlotDesk {
-  desk_code: string
-  desk_name: string
-  first_date: string | null
-  slot_count: number
-  checked: boolean
-}
-
-export interface IndSlotsResponse {
-  nearest_desk: { code: string; name: string }
-  desks: IndSlotDesk[]
-  last_checked: string | null
-}
-
-export async function getIndSlots(city?: string): Promise<IndSlotsResponse> {
-  const url = city
-    ? `${API_URL}/api/ind-monitor/slots?city=${encodeURIComponent(city)}`
-    : `${API_URL}/api/ind-monitor/slots`
-  const res = await fetch(url)
-  return handleResponse(res)
-}
-
-export async function reportIndSlot(user_id: string) {
-  const res = await fetch(`${API_URL}/api/ind-monitor/report-slot`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id }),
-  })
-  return handleResponse(res)
-}
