@@ -2,10 +2,13 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 import json
+import logging
 from datetime import datetime, timezone, timedelta
 from app.config import settings
 from app.routes.notifications import _send_email
 from supabase import create_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 _supabase = None
@@ -104,8 +107,8 @@ def _check_oap_slots() -> list[dict]:
     # Establish PROFILE session cookie — required by Apache backend
     try:
         session.get(f"{IND_OAP_BASE}/oap/en/", proxies=proxies, timeout=15)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("OAP session cookie request failed: %s", e)
 
     results = []
     for desk in DESKS:
@@ -116,6 +119,7 @@ def _check_oap_slots() -> list[dict]:
         try:
             r = session.get(url, proxies=proxies, timeout=20)
             if r.status_code != 200:
+                logger.warning("OAP %s returned HTTP %s", desk["code"], r.status_code)
                 results.append({
                     "desk_code": desk["code"],
                     "desk_name": desk["name"],
@@ -132,7 +136,8 @@ def _check_oap_slots() -> list[dict]:
                 "slot_count": len(slots),
                 "checked": True,
             })
-        except Exception:
+        except Exception as e:
+            logger.warning("OAP %s request failed: %s", desk["code"], e)
             results.append({
                 "desk_code": desk["code"],
                 "desk_name": desk["name"],
