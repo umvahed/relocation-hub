@@ -96,8 +96,8 @@ async def _fetch_desk_slots(desk: dict) -> dict:
     try:
         async with httpx.AsyncClient(timeout=90) as client:
             r = await client.get(fetch_url)
+        logger.info("OAP %s status=%s body_preview=%s", desk["code"], r.status_code, r.text[:300])
         if r.status_code != 200:
-            logger.warning("OAP %s HTTP %s", desk["code"], r.status_code)
             return {"desk_code": desk["code"], "desk_name": desk["name"],
                     "first_date": None, "slot_count": 0, "checked": False}
         slots = _parse_oap_response(r.text)
@@ -110,7 +110,7 @@ async def _fetch_desk_slots(desk: dict) -> dict:
             "checked": True,
         }
     except Exception as e:
-        logger.warning("OAP %s failed: %s", desk["code"], e)
+        logger.warning("OAP %s failed: %s | body=%s", desk["code"], e, r.text[:300] if "r" in dir() else "no response")
         return {"desk_code": desk["code"], "desk_name": desk["name"],
                 "first_date": None, "slot_count": 0, "checked": False}
 
