@@ -20,6 +20,23 @@ const DESKS = [
   { code: 'DB', name: "'s-Hertogenbosch" },
 ]
 
+const CITY_TO_DESK: Record<string, string> = {
+  amsterdam: 'AM', haarlem: 'AM', alkmaar: 'AM', almere: 'AM',
+  zaandam: 'AM', amstelveen: 'AM', hilversum: 'AM', lelystad: 'AM', utrecht: 'AM',
+  'den haag': 'DH', 'the hague': 'DH', "'s-gravenhage": 'DH',
+  rotterdam: 'DH', delft: 'DH', leiden: 'DH', zoetermeer: 'DH',
+  dordrecht: 'DH', gouda: 'DH', schiedam: 'DH',
+  zwolle: 'ZW', groningen: 'ZW', enschede: 'ZW', arnhem: 'ZW',
+  apeldoorn: 'ZW', deventer: 'ZW', leeuwarden: 'ZW', nijmegen: 'ZW', assen: 'ZW',
+  "'s-hertogenbosch": 'DB', 'den bosch': 'DB', eindhoven: 'DB',
+  tilburg: 'DB', breda: 'DB', maastricht: 'DB', venlo: 'DB', hertogenbosch: 'DB',
+}
+
+function cityToDesk(city: string): { code: string; name: string } {
+  const code = CITY_TO_DESK[city.toLowerCase().trim()] ?? 'DH'
+  return DESKS.find(d => d.code === code) ?? DESKS[1]
+}
+
 const DESK_ADDRESSES: Record<string, string> = {
   AM: 'Entrance F, De Entree 71, 1101 BH Amsterdam',
   DH: 'Rijnstraat 8, 2515 XP Den Haag',
@@ -172,7 +189,7 @@ function BookingForm({ bookingDesk, setBookingDesk, bookingDate, setBookingDate,
   )
 }
 
-export default function IndMonitorWidget({ userId, userEmail, destinationCity: _destinationCity, moveDate }: Props) {
+export default function IndMonitorWidget({ userId, userEmail, destinationCity, moveDate }: Props) {
   const [subscribed, setSubscribed] = useState<boolean | null>(null)
   const [slotsAvailable, setSlotsAvailable] = useState(true)
   const [appointment, setAppointment] = useState<IndAppointment | null | undefined>(undefined)
@@ -319,7 +336,10 @@ export default function IndMonitorWidget({ userId, userEmail, destinationCity: _
               <div>
                 <p className="text-xs font-semibold text-green-800 dark:text-green-300">Slots available within 2 weeks</p>
                 <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">
-                  Check all four desks — Amsterdam, Den Haag, Zwolle, &apos;s-Hertogenbosch. Slots fill within minutes.
+                  {destinationCity
+                    ? <>Nearest desk: <strong>{cityToDesk(destinationCity).name}</strong>. Slots fill within minutes.</>
+                    : <>Check all four desks — Amsterdam, Den Haag, Zwolle, &apos;s-Hertogenbosch. Slots fill within minutes.</>
+                  }
                 </p>
               </div>
             </div>
