@@ -829,15 +829,15 @@ export default function DashboardPage() {
                 moveDate={profile.move_date ?? undefined}
               />
             )}
-            {profile && (
-              <ResourcesWidget profile={profile} />
-            )}
             {user && profile?.has_relocation_allowance && (
               <AllowanceTrackerWidget
                 userId={user.id}
                 prefillExpense={logExpensePrefill}
                 onPrefillConsumed={() => setLogExpensePrefill(null)}
               />
+            )}
+            {profile && (
+              <ResourcesWidget profile={profile} />
             )}
           </aside>
 
