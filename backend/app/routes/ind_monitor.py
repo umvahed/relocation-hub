@@ -78,45 +78,10 @@ def _parse_oap_response(text: str) -> list:
     return json.loads(text).get("data") or []
 
 
-async def _fetch_desk_slots(desk: dict) -> dict:
-    """Queries OAP for TKV slots at one desk — plain GET with browser User-Agent."""
-    import httpx
-    oap_url = (
-        f"{IND_OAP_BASE}/oap/api/desks/{desk['code']}/slots/"
-        f"?productKey=TKV&persons=1"
-    )
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:97.0) Gecko/20100101 Firefox/97.0",
-        "Accept": "application/json, text/plain, */*",
-        "Referer": "https://oap.ind.nl/oap/en/",
-    }
-    try:
-        async with httpx.AsyncClient(timeout=30, verify=False) as client:
-            r = await client.get(oap_url, headers=headers)
-        logger.info("OAP %s status=%s body_preview=%s", desk["code"], r.status_code, r.text[:300])
-        if r.status_code != 200:
-            return {"desk_code": desk["code"], "desk_name": desk["name"],
-                    "first_date": None, "slot_count": 0, "checked": False}
-        slots = _parse_oap_response(r.text)
-        logger.info("OAP %s: %s slot(s)", desk["code"], len(slots))
-        return {
-            "desk_code": desk["code"],
-            "desk_name": desk["name"],
-            "first_date": slots[0].get("date") if slots else None,
-            "slot_count": len(slots),
-            "checked": True,
-        }
-    except Exception as e:
-        logger.warning("OAP %s failed: %s", desk["code"], e)
-        return {"desk_code": desk["code"], "desk_name": desk["name"],
-                "first_date": None, "slot_count": 0, "checked": False}
-
-
-async def _check_oap_slots() -> list[dict]:
-    """Queries all 4 desks in parallel. Returns [] if SCRAPER_API_KEY is not set."""
-    if not settings.ZENROWS_API_KEY:
-        return []
-    return list(await asyncio.gather(*[_fetch_desk_slots(desk) for desk in DESKS]))
+def _check_oap_slots() -> list[dict]:
+    # OAP blocks Railway/cloud datacenter IPs at Cloudflare level.
+    # Slot data is fetched by GitHub Actions and passed via slot_results in the request body.
+    return []
 
 
 def _send_slots_email(email: str, slots: list[dict]) -> bool:
@@ -456,11 +421,11 @@ def _prune_cache(supabase) -> None:
         supabase.table("ind_monitor_cache").delete().in_("id", ids).execute()
 
 
-async def _run_ind_check(prefetched: list[dict] | None = None) -> None:
+def _run_ind_check(prefetched: list[dict] | None = None) -> None:
     """Background task: fetch slots, store in cache, send notifications."""
     supabase = get_supabase()
 
-    all_desk_results = prefetched if prefetched is not None else await _check_oap_slots()
+    all_desk_results = prefetched if prefetched is not None else _check_oap_slots()
     available_slots = [d for d in all_desk_results if d.get("slot_count", 0) > 0]
     slots_found = bool(available_slots)
     status_text = _build_status_text(slots_found, available_slots)
