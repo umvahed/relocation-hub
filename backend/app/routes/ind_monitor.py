@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 import json
 import logging
+from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from app.config import settings
 from app.routes.notifications import _send_email
@@ -24,8 +25,7 @@ DESKS = [
 ]
 
 REMINDER_INTERVAL_HOURS = 4
-SCRAPER_PROXY_HOST = "proxy.scraperapi.com"
-SCRAPER_PROXY_PORT = 8010
+SCRAPER_API_ENDPOINT = "https://api.scraperapi.com/"
 
 # Maps lowercased city names to the nearest IND desk code.
 # Default (unknown city): DH (IND headquarters is in Den Haag).
@@ -65,16 +65,15 @@ def _city_to_desk(city: str) -> str:
     return CITY_TO_DESK.get(city.lower().strip(), "DH")
 
 
-def _get_proxies() -> Optional[dict]:
+def _scraper_url(target: str) -> Optional[str]:
     """
-    ScraperAPI proxy mode — routes traffic through Dutch residential IPs while
-    curl_cffi preserves Chrome TLS fingerprint end-to-end.
+    Wraps a target URL in ScraperAPI URL mode — a plain HTTPS GET to api.scraperapi.com.
+    Returns None if SCRAPER_API_KEY is not set.
     """
     key = settings.SCRAPER_API_KEY
     if not key:
         return None
-    proxy_url = f"http://scraperapi.country_code=nl:{key}@{SCRAPER_PROXY_HOST}:{SCRAPER_PROXY_PORT}"
-    return {"http": proxy_url, "https": proxy_url}
+    return f"{SCRAPER_API_ENDPOINT}?api_key={key}&url={quote(target, safe='')}&country_code=nl"
 
 
 def _parse_oap_response(text: str) -> list:
@@ -92,32 +91,22 @@ def _check_oap_slots() -> list[dict]:
     Queries OAP for TKV (biometrics) slots at all 4 desks.
     Returns one result per desk: {desk_code, desk_name, first_date|None, slot_count, checked}.
     checked=False means the API call failed for that desk.
-    Returns [] if ScraperAPI is not configured or curl_cffi is not installed.
+    Returns [] if ScraperAPI is not configured.
     """
-    try:
-        from curl_cffi import requests as cf_requests
-    except ImportError:
+    if not settings.SCRAPER_API_KEY:
         return []
 
-    proxies = _get_proxies()
-    if not proxies:
-        return []
-
-    session = cf_requests.Session(impersonate="chrome120")
-    # Establish PROFILE session cookie — required by Apache backend
-    try:
-        session.get(f"{IND_OAP_BASE}/oap/en/", proxies=proxies, timeout=15)
-    except Exception as e:
-        logger.warning("OAP session cookie request failed: %s", e)
+    import requests as req_lib
 
     results = []
     for desk in DESKS:
-        url = (
+        oap_url = (
             f"{IND_OAP_BASE}/oap/api/desks/{desk['code']}/slots/"
             f"?productKey=TKV&persons=1"
         )
+        fetch_url = _scraper_url(oap_url)
         try:
-            r = session.get(url, proxies=proxies, timeout=20)
+            r = req_lib.get(fetch_url, timeout=30)
             if r.status_code != 200:
                 logger.warning("OAP %s returned HTTP %s", desk["code"], r.status_code)
                 results.append({
@@ -129,6 +118,7 @@ def _check_oap_slots() -> list[dict]:
                 })
                 continue
             slots = _parse_oap_response(r.text)
+            logger.info("OAP %s: %s slot(s)", desk["code"], len(slots))
             results.append({
                 "desk_code": desk["code"],
                 "desk_name": desk["name"],
