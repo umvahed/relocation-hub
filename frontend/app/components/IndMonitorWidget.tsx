@@ -375,7 +375,7 @@ export default function IndMonitorWidget({ userId, userEmail, destinationCity: _
                 disabled={toggling}
                 className="w-full flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-700"
               >
-                {toggling ? <Spinner size="w-3 h-3" /> : 'Get Monday reminders'}
+                {toggling ? <Spinner size="w-3 h-3" /> : 'Remind me'}
               </button>
               {!showBookingForm && (
                 <button
