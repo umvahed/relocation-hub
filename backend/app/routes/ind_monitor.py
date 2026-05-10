@@ -81,7 +81,7 @@ def _parse_oap_response(text: str) -> list:
 async def _fetch_desk_slots(desk: dict) -> dict:
     """Queries OAP for TKV slots at one desk via ScraperAPI render mode (headless browser)."""
     import httpx
-    key = settings.SCRAPER_API_KEY
+    key = settings.ZENROWS_API_KEY
     oap_url = (
         f"{IND_OAP_BASE}/oap/api/desks/{desk['code']}/slots/"
         f"?productKey=TKV&persons=1"
@@ -117,7 +117,7 @@ async def _fetch_desk_slots(desk: dict) -> dict:
 
 async def _check_oap_slots() -> list[dict]:
     """Queries all 4 desks in parallel. Returns [] if SCRAPER_API_KEY is not set."""
-    if not settings.SCRAPER_API_KEY:
+    if not settings.ZENROWS_API_KEY:
         return []
     return list(await asyncio.gather(*[_fetch_desk_slots(desk) for desk in DESKS]))
 

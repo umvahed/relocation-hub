@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     DAILY_RISK_SCORE_LIMIT: int = 3
     ADMIN_SECRET: str = ""
     MAX_VALIDATION_FILE_SIZE: int = 20 * 1024 * 1024  # 20MB
-    SCRAPER_API_KEY: Optional[str] = None  # zenrows.com API key — OAP slot detection via antibot + residential proxy
+    ZENROWS_API_KEY: Optional[str] = None  # zenrows.com API key — OAP slot detection via antibot + residential proxy
 
     class Config:
         env_file = ".env"
