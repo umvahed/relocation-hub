@@ -231,12 +231,7 @@ export default function IndMonitorWidget({ userId, userEmail, destinationCity, m
               </div>
               {checkedAgo && (
                 <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700/50">
-                  {slotsInfo?.scraper_active ? `Last checked ${checkedAgo}` : 'Live checking not configured — subscribe for alerts'}
-                </p>
-              )}
-              {!checkedAgo && !slotsInfo?.scraper_active && (
-                <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-1">
-                  Live slot checking not yet configured — subscribe for alerts when available
+                  Last checked {checkedAgo}
                 </p>
               )}
             </div>

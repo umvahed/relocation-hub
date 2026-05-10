@@ -372,7 +372,6 @@ export interface IndSlotsResponse {
   nearest_desk: { code: string; name: string }
   desks: IndSlotDesk[]
   last_checked: string | null
-  scraper_active: boolean
 }
 
 export async function getIndSlots(city?: string): Promise<IndSlotsResponse> {

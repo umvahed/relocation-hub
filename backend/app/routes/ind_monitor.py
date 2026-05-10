@@ -86,16 +86,21 @@ def _parse_oap_response(text: str) -> list:
     return json.loads(text).get("data") or []
 
 
+OAP_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9,nl;q=0.8",
+    "Referer": "https://oap.ind.nl/oap/en/",
+    "Origin": "https://oap.ind.nl",
+}
+
+
 def _check_oap_slots() -> list[dict]:
     """
     Queries OAP for TKV (biometrics) slots at all 4 desks.
+    Tries direct request first; falls back to ScraperAPI URL mode on 403/429 if key is set.
     Returns one result per desk: {desk_code, desk_name, first_date|None, slot_count, checked}.
-    checked=False means the API call failed for that desk.
-    Returns [] if ScraperAPI is not configured.
     """
-    if not settings.SCRAPER_API_KEY:
-        return []
-
     import requests as req_lib
 
     results = []
@@ -104,21 +109,27 @@ def _check_oap_slots() -> list[dict]:
             f"{IND_OAP_BASE}/oap/api/desks/{desk['code']}/slots/"
             f"?productKey=TKV&persons=1"
         )
-        fetch_url = _scraper_url(oap_url)
+        fetch_url = oap_url
+        used_scraper = False
+
         try:
-            r = req_lib.get(fetch_url, timeout=30)
+            r = req_lib.get(fetch_url, headers=OAP_HEADERS, timeout=15)
+
+            # If OAP blocks us, retry once via ScraperAPI URL mode
+            if r.status_code in (403, 429) and settings.SCRAPER_API_KEY:
+                logger.info("OAP %s blocked (%s), retrying via ScraperAPI", desk["code"], r.status_code)
+                scraper = _scraper_url(oap_url)
+                r = req_lib.get(scraper, timeout=30)
+                used_scraper = True
+
             if r.status_code != 200:
-                logger.warning("OAP %s returned HTTP %s", desk["code"], r.status_code)
-                results.append({
-                    "desk_code": desk["code"],
-                    "desk_name": desk["name"],
-                    "first_date": None,
-                    "slot_count": 0,
-                    "checked": False,
-                })
+                logger.warning("OAP %s returned HTTP %s (scraper=%s)", desk["code"], r.status_code, used_scraper)
+                results.append({"desk_code": desk["code"], "desk_name": desk["name"],
+                                 "first_date": None, "slot_count": 0, "checked": False})
                 continue
+
             slots = _parse_oap_response(r.text)
-            logger.info("OAP %s: %s slot(s)", desk["code"], len(slots))
+            logger.info("OAP %s: %s slot(s) (scraper=%s)", desk["code"], len(slots), used_scraper)
             results.append({
                 "desk_code": desk["code"],
                 "desk_name": desk["name"],
@@ -128,13 +139,8 @@ def _check_oap_slots() -> list[dict]:
             })
         except Exception as e:
             logger.warning("OAP %s request failed: %s", desk["code"], e)
-            results.append({
-                "desk_code": desk["code"],
-                "desk_name": desk["name"],
-                "first_date": None,
-                "slot_count": 0,
-                "checked": False,
-            })
+            results.append({"desk_code": desk["code"], "desk_name": desk["name"],
+                             "first_date": None, "slot_count": 0, "checked": False})
 
     return results
 
@@ -412,7 +418,6 @@ async def get_slots(city: Optional[str] = None):
             "nearest_desk": nearest_desk,
             "desks": [],
             "last_checked": None,
-            "scraper_active": bool(settings.SCRAPER_API_KEY),
         }
 
     entry = latest.data[0]
@@ -420,7 +425,6 @@ async def get_slots(city: Optional[str] = None):
         "nearest_desk": nearest_desk,
         "desks": entry.get("slot_data") or [],
         "last_checked": entry.get("checked_at"),
-        "scraper_active": bool(settings.SCRAPER_API_KEY),
     }
 
 
@@ -431,12 +435,7 @@ def _build_status_text(slots_found: bool, available_slots: list) -> str:
             for s in available_slots
         )
         return f"SLOTS AVAILABLE: {desks_str}"
-    proxy_active = bool(settings.SCRAPER_API_KEY)
-    return (
-        "No slots available (checked all desks)"
-        if proxy_active
-        else "No slots checked — SCRAPER_API_KEY not set (reminder mode)"
-    )
+    return "No slots available (checked all desks)"
 
 
 def _fetch_notify_prefs(supabase, user_ids: list) -> dict:
