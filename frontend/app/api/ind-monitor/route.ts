@@ -32,17 +32,17 @@ export async function GET() {
     return Response.json({ error: 'Missing configuration' }, { status: 500 })
   }
 
-  // Query OAP from Vercel's network (Cloudflare edge — not blocked by OAP)
+  // Query OAP from Vercel edge (Cloudflare network)
   const slotResults = await Promise.all(
     DESKS.map(async (desk) => {
       const url = `${OAP_BASE}/oap/api/desks/${desk.code}/slots/?productKey=TKV&persons=1`
       try {
         const r = await fetch(url, { headers: BROWSER_HEADERS })
-        if (!r.ok) return { desk_code: desk.code, desk_name: desk.name, first_date: null, slot_count: 0, checked: false }
+        if (!r.ok) return { desk_code: desk.code, desk_name: desk.name, first_date: null, slot_count: 0, checked: false, _debug_status: r.status }
         const slots = parseOap(await r.text())
-        return { desk_code: desk.code, desk_name: desk.name, first_date: slots[0]?.date ?? null, slot_count: slots.length, checked: true }
-      } catch {
-        return { desk_code: desk.code, desk_name: desk.name, first_date: null, slot_count: 0, checked: false }
+        return { desk_code: desk.code, desk_name: desk.name, first_date: slots[0]?.date ?? null, slot_count: slots.length, checked: true, _debug_status: 200 }
+      } catch (e: any) {
+        return { desk_code: desk.code, desk_name: desk.name, first_date: null, slot_count: 0, checked: false, _debug_error: e?.message ?? 'unknown' }
       }
     })
   )
@@ -55,5 +55,5 @@ export async function GET() {
   })
 
   const data = await res.json()
-  return Response.json(data, { status: res.status })
+  return Response.json({ ...data, _debug_slots: slotResults }, { status: res.status })
 }
