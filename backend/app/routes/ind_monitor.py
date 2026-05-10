@@ -1,5 +1,6 @@
 from typing import Annotated, Optional
-from fastapi import APIRouter, HTTPException, Header
+import asyncio
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Header
 from pydantic import BaseModel
 import json
 import logging
@@ -86,63 +87,48 @@ def _parse_oap_response(text: str) -> list:
     return json.loads(text).get("data") or []
 
 
-OAP_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.9,nl;q=0.8",
-    "Referer": "https://oap.ind.nl/oap/en/",
-    "Origin": "https://oap.ind.nl",
-}
+async def _fetch_desk_slots(desk: dict) -> dict:
+    """Queries OAP for TKV slots at one desk via ScraperAPI render mode (headless browser)."""
+    import httpx
+    key = settings.SCRAPER_API_KEY
+    oap_url = (
+        f"{IND_OAP_BASE}/oap/api/desks/{desk['code']}/slots/"
+        f"?productKey=TKV&persons=1"
+    )
+    # render=true: headless browser handles Cloudflare Bot Management
+    # premium=true: residential IP pool
+    fetch_url = (
+        f"https://api.scraperapi.com/?api_key={key}"
+        f"&url={quote(oap_url, safe='')}&render=true&premium=true"
+    ) if key else oap_url
+
+    try:
+        async with httpx.AsyncClient(timeout=90) as client:
+            r = await client.get(fetch_url)
+        if r.status_code != 200:
+            logger.warning("OAP %s HTTP %s", desk["code"], r.status_code)
+            return {"desk_code": desk["code"], "desk_name": desk["name"],
+                    "first_date": None, "slot_count": 0, "checked": False}
+        slots = _parse_oap_response(r.text)
+        logger.info("OAP %s: %s slot(s)", desk["code"], len(slots))
+        return {
+            "desk_code": desk["code"],
+            "desk_name": desk["name"],
+            "first_date": slots[0].get("date") if slots else None,
+            "slot_count": len(slots),
+            "checked": True,
+        }
+    except Exception as e:
+        logger.warning("OAP %s failed: %s", desk["code"], e)
+        return {"desk_code": desk["code"], "desk_name": desk["name"],
+                "first_date": None, "slot_count": 0, "checked": False}
 
 
-def _check_oap_slots() -> list[dict]:
-    """
-    Queries OAP for TKV (biometrics) slots at all 4 desks.
-    Tries direct request first; falls back to ScraperAPI URL mode on 403/429 if key is set.
-    Returns one result per desk: {desk_code, desk_name, first_date|None, slot_count, checked}.
-    """
-    import requests as req_lib
-
-    results = []
-    for desk in DESKS:
-        oap_url = (
-            f"{IND_OAP_BASE}/oap/api/desks/{desk['code']}/slots/"
-            f"?productKey=TKV&persons=1"
-        )
-        fetch_url = oap_url
-        used_scraper = False
-
-        try:
-            r = req_lib.get(fetch_url, headers=OAP_HEADERS, timeout=15)
-
-            # If OAP blocks us, retry once via ScraperAPI URL mode
-            if r.status_code in (403, 429) and settings.SCRAPER_API_KEY:
-                logger.info("OAP %s blocked (%s), retrying via ScraperAPI", desk["code"], r.status_code)
-                scraper = _scraper_url(oap_url)
-                r = req_lib.get(scraper, timeout=30)
-                used_scraper = True
-
-            if r.status_code != 200:
-                logger.warning("OAP %s returned HTTP %s (scraper=%s)", desk["code"], r.status_code, used_scraper)
-                results.append({"desk_code": desk["code"], "desk_name": desk["name"],
-                                 "first_date": None, "slot_count": 0, "checked": False})
-                continue
-
-            slots = _parse_oap_response(r.text)
-            logger.info("OAP %s: %s slot(s) (scraper=%s)", desk["code"], len(slots), used_scraper)
-            results.append({
-                "desk_code": desk["code"],
-                "desk_name": desk["name"],
-                "first_date": slots[0].get("date") if slots else None,
-                "slot_count": len(slots),
-                "checked": True,
-            })
-        except Exception as e:
-            logger.warning("OAP %s request failed: %s", desk["code"], e)
-            results.append({"desk_code": desk["code"], "desk_name": desk["name"],
-                             "first_date": None, "slot_count": 0, "checked": False})
-
-    return results
+async def _check_oap_slots() -> list[dict]:
+    """Queries all 4 desks in parallel. Returns [] if SCRAPER_API_KEY is not set."""
+    if not settings.SCRAPER_API_KEY:
+        return []
+    return list(await asyncio.gather(*[_fetch_desk_slots(desk) for desk in DESKS]))
 
 
 def _send_slots_email(email: str, slots: list[dict]) -> bool:
@@ -482,19 +468,11 @@ def _prune_cache(supabase) -> None:
         supabase.table("ind_monitor_cache").delete().in_("id", ids).execute()
 
 
-@router.post("/ind-monitor/check")
-async def check_ind(
-    body: CheckRequest = None,
-    authorization: Annotated[str | None, Header()] = None,
-):
-    if authorization != f"Bearer {settings.RESEND_API_KEY}":
-        raise HTTPException(status_code=401, detail="Unauthorised")
-
+async def _run_ind_check(prefetched: list[dict] | None = None) -> None:
+    """Background task: fetch slots, store in cache, send notifications."""
     supabase = get_supabase()
 
-    # Use pre-fetched results from Vercel edge if provided, otherwise query directly
-    all_desk_results = (body.slot_results if body and body.slot_results is not None
-                        else _check_oap_slots())
+    all_desk_results = prefetched if prefetched is not None else await _check_oap_slots()
     available_slots = [d for d in all_desk_results if d.get("slot_count", 0) > 0]
     slots_found = bool(available_slots)
     status_text = _build_status_text(slots_found, available_slots)
@@ -524,10 +502,18 @@ async def check_ind(
             notified += 1
 
     _prune_cache(supabase)
+    logger.info("IND check done — slots_found=%s notified=%s", slots_found, notified)
 
-    return {
-        "slots_found": slots_found,
-        "available": available_slots,
-        "notified": notified,
-        "status": status_text,
-    }
+
+@router.post("/ind-monitor/check")
+async def check_ind(
+    background_tasks: BackgroundTasks,
+    body: CheckRequest = None,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    if authorization != f"Bearer {settings.RESEND_API_KEY}":
+        raise HTTPException(status_code=401, detail="Unauthorised")
+
+    prefetched = body.slot_results if body and body.slot_results is not None else None
+    background_tasks.add_task(_run_ind_check, prefetched)
+    return {"triggered": True}
