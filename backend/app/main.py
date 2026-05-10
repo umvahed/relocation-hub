@@ -1,5 +1,8 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+logging.basicConfig(level=logging.INFO)
 from app.config import settings
 from app.routes.health import router as health_router
 from app.routes.auth import router as auth_router
