@@ -292,7 +292,17 @@ export default function IndMonitorWidget({ userId, userEmail, destinationCity: _
       ) : (
         <div className="space-y-3">
 
-          {/* ── Availability status — always visible ── */}
+          {/* ── Move date context — above status ── */}
+          {moveDate && (
+            <div className="flex items-start gap-2 rounded-xl px-3.5 py-2.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+              <svg className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-blue-700 dark:text-blue-300">{getAppointmentContext(moveDate)}</p>
+            </div>
+          )}
+
+          {/* ── Availability status ── */}
           {inExceptionPeriod ? (
             <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
               <span className="text-base flex-shrink-0">🎄</span>
@@ -318,20 +328,7 @@ export default function IndMonitorWidget({ userId, userEmail, destinationCity: _
               <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0 mt-1.5" />
               <div>
                 <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">You checked — no slots right now</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  We&apos;ll reset this on Monday and remind you to check again.
-                </p>
               </div>
-            </div>
-          )}
-
-          {/* ── Move date context ── */}
-          {moveDate && (
-            <div className="flex items-start gap-2 rounded-xl px-3.5 py-2.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
-              <svg className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-xs text-blue-700 dark:text-blue-300">{getAppointmentContext(moveDate)}</p>
             </div>
           )}
 
