@@ -32,12 +32,26 @@ export async function GET() {
     return Response.json({ error: 'Missing configuration' }, { status: 500 })
   }
 
+  // Establish OAP session — Apache backend requires a PROFILE cookie before the slots API responds
+  let sessionCookie = ''
+  try {
+    const sessionRes = await fetch(`${OAP_BASE}/oap/en/`, { headers: BROWSER_HEADERS })
+    const raw = sessionRes.headers.get('set-cookie') ?? ''
+    // Extract the first name=value token from each cookie directive
+    sessionCookie = raw.split(/,(?=[^ ][^=]+=)/).map(c => c.split(';')[0].trim()).join('; ')
+  } catch {
+    // Continue without cookie — will likely get 403, exposed via _debug_status
+  }
+
+  const apiHeaders: Record<string, string> = { ...BROWSER_HEADERS }
+  if (sessionCookie) apiHeaders['Cookie'] = sessionCookie
+
   // Query OAP from Vercel edge (Cloudflare network)
   const slotResults = await Promise.all(
     DESKS.map(async (desk) => {
       const url = `${OAP_BASE}/oap/api/desks/${desk.code}/slots/?productKey=TKV&persons=1`
       try {
-        const r = await fetch(url, { headers: BROWSER_HEADERS })
+        const r = await fetch(url, { headers: apiHeaders })
         if (!r.ok) return { desk_code: desk.code, desk_name: desk.name, first_date: null, slot_count: 0, checked: false, _debug_status: r.status }
         const slots = parseOap(await r.text())
         return { desk_code: desk.code, desk_name: desk.name, first_date: slots[0]?.date ?? null, slot_count: slots.length, checked: true, _debug_status: 200 }
