@@ -26,7 +26,7 @@ DESKS = [
 ]
 
 REMINDER_INTERVAL_HOURS = 4
-SCRAPER_API_ENDPOINT = "https://api.scraperapi.com/"
+ZENROWS_ENDPOINT = "https://api.zenrows.com/v1/"
 
 # Maps lowercased city names to the nearest IND desk code.
 # Default (unknown city): DH (IND headquarters is in Den Haag).
@@ -66,15 +66,6 @@ def _city_to_desk(city: str) -> str:
     return CITY_TO_DESK.get(city.lower().strip(), "DH")
 
 
-def _scraper_url(target: str) -> Optional[str]:
-    """
-    Wraps a target URL in ScraperAPI URL mode — a plain HTTPS GET to api.scraperapi.com.
-    Returns None if SCRAPER_API_KEY is not set.
-    """
-    key = settings.SCRAPER_API_KEY
-    if not key:
-        return None
-    return f"{SCRAPER_API_ENDPOINT}?api_key={key}&url={quote(target, safe='')}&country_code=nl"
 
 
 def _parse_oap_response(text: str) -> list:
@@ -95,11 +86,11 @@ async def _fetch_desk_slots(desk: dict) -> dict:
         f"{IND_OAP_BASE}/oap/api/desks/{desk['code']}/slots/"
         f"?productKey=TKV&persons=1"
     )
-    # render=true: headless browser handles Cloudflare Bot Management
-    # premium=true: residential IP pool
+    # antibot=true: ZenRows Cloudflare Bot Management bypass
+    # premium_proxy=true: residential IP pool
     fetch_url = (
-        f"https://api.scraperapi.com/?api_key={key}"
-        f"&url={quote(oap_url, safe='')}&render=true&premium=true"
+        f"{ZENROWS_ENDPOINT}?apikey={key}"
+        f"&url={quote(oap_url, safe='')}&premium_proxy=true&antibot=true"
     ) if key else oap_url
 
     try:
