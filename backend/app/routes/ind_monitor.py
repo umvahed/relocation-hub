@@ -1,10 +1,8 @@
 from typing import Annotated, Optional
-import asyncio
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Header
 from pydantic import BaseModel
 import json
 import logging
-from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from app.config import settings
 from app.routes.notifications import _send_email
@@ -26,7 +24,6 @@ DESKS = [
 ]
 
 REMINDER_INTERVAL_HOURS = 4
-ZENROWS_ENDPOINT = "https://api.zenrows.com/v1/"
 
 # Maps lowercased city names to the nearest IND desk code.
 # Default (unknown city): DH (IND headquarters is in Den Haag).
