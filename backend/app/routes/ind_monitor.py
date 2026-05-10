@@ -252,6 +252,10 @@ def _send_reminder_email(email: str) -> bool:
     return _send_email(to=email, subject=subject, html=html)
 
 
+class CheckRequest(BaseModel):
+    slot_results: Optional[list[dict]] = None
+
+
 class ReportSlotRequest(BaseModel):
     user_id: str
 
@@ -479,13 +483,18 @@ def _prune_cache(supabase) -> None:
 
 
 @router.post("/ind-monitor/check")
-async def check_ind(authorization: Annotated[str | None, Header()] = None):
+async def check_ind(
+    body: CheckRequest = None,
+    authorization: Annotated[str | None, Header()] = None,
+):
     if authorization != f"Bearer {settings.RESEND_API_KEY}":
         raise HTTPException(status_code=401, detail="Unauthorised")
 
     supabase = get_supabase()
 
-    all_desk_results = _check_oap_slots()
+    # Use pre-fetched results from Vercel edge if provided, otherwise query directly
+    all_desk_results = (body.slot_results if body and body.slot_results is not None
+                        else _check_oap_slots())
     available_slots = [d for d in all_desk_results if d.get("slot_count", 0) > 0]
     slots_found = bool(available_slots)
     status_text = _build_status_text(slots_found, available_slots)
