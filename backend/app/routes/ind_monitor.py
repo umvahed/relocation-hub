@@ -90,7 +90,7 @@ async def _fetch_desk_slots(desk: dict) -> dict:
     # premium_proxy=true: residential IP pool
     fetch_url = (
         f"{ZENROWS_ENDPOINT}?apikey={key}"
-        f"&url={quote(oap_url, safe='')}&js_render=true&premium_proxy=true&antibot=true"
+        f"&url={quote(oap_url, safe='')}&js_render=true&premium_proxy=true&antibot=true&proxy_country=nl"
     ) if key else oap_url
 
     try:
