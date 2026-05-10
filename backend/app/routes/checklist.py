@@ -126,6 +126,8 @@ class GenerateChecklistRequest(BaseModel):
     container_ship_date: str | None = None
     has_partner: bool = False
     partner_origin_country: str | None = None
+    has_children: bool = False
+    number_of_children: int = 0
     additional_context: str | None = None  # free-text from onboarding; relocation-relevant parts injected into prompt
 
 def _check_and_increment_usage(supabase, user_id: str, call_type: str = "checklist"):
@@ -156,7 +158,7 @@ def _check_and_increment_usage(supabase, user_id: str, call_type: str = "checkli
         supabase.table("api_usage").insert({"user_id": user_id, "date": today, "call_count": 1, "call_type": call_type}).execute()
 
 
-async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country: str, move_date, employment_type: str, has_pets: bool, shipping_type: str, has_relocation_allowance: bool, container_ship_date: str | None = None, has_partner: bool = False, partner_origin_country: str | None = None, additional_context: str | None = None) -> dict:
+async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country: str, move_date, employment_type: str, has_pets: bool, shipping_type: str, has_relocation_allowance: bool, container_ship_date: str | None = None, has_partner: bool = False, partner_origin_country: str | None = None, has_children: bool = False, number_of_children: int = 0, additional_context: str | None = None) -> dict:
     conditional_notes = []
 
     if has_pets:
@@ -187,6 +189,25 @@ async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country
         conditional_notes.append("- The user is moving as a student — include tasks for university/institution enrollment confirmation, student residence permit (applied for by the institution on their behalf), arranging student accommodation, and opening a student bank account. Do NOT include employment-related tasks like 30% ruling, payroll, or employer onboarding.")
     elif employment_type == "family":
         conditional_notes.append("- The user is moving for family reunification — include tasks for the family reunification residence permit (applied by the Dutch resident sponsor), obtaining an MVV if required, and registering at gemeente after arrival. Do NOT include employment or student-specific tasks.")
+
+    child_count = max(number_of_children, 1) if has_children else 0
+    if has_children:
+        plural = child_count > 1
+        conditional_notes.append(
+            f"- The user IS relocating with {child_count} child{'ren' if plural else ''}. "
+            f"Generate the following child-specific tasks:\n"
+            f"  * {'Each child requires an' if plural else 'Child requires an'} apostilled birth certificate — "
+            f"for South African users this is a separate Home Affairs apostille per child (same 4–8 week process as the main applicant); category: visa\n"
+            f"  * Research and choose a Dutch school for {'each child' if plural else 'the child'}: "
+            f"options are Dutch-only basisschool, tweetalige (bilingual Dutch/English) basisschool, or international school. "
+            f"Most expats enrol in a tweetalige or international school initially while children learn Dutch. "
+            f"Waiting lists can be 3–12 months — research schools before arrival and submit applications immediately on arriving; category: admin\n"
+            f"  * Submit school enrolment application{'s' if plural else ''} (basisschool registration requires proof of address, birth certificate, and vaccination record — BSN needed); category: admin\n"
+            f"  * Register {'children' if plural else 'child'} with a GP (huisarts) and the Jeugdgezondheidszorg (JGZ) for routine health checks and vaccinations; category: healthcare\n"
+            f"  * If childcare is needed (kinderopvang/BSO after-school care), register on waiting lists immediately on arrival — typically 3–12 months wait in major Dutch cities; category: admin"
+        )
+    else:
+        conditional_notes.append("- The user is NOT relocating with children — do NOT include any child-specific tasks (school enrolment, children's birth certificates, JGZ, kinderopvang).")
 
     if has_partner:
         partner_note = "- The user's partner IS relocating with them"
@@ -282,7 +303,6 @@ PHASE D — SETTLING IN (weeks 2-8+):
 - Begin permanent housing search (Funda, Pararius — income must be 3-4x monthly rent; 2 months deposit typical) — category: housing
 - Contents insurance (inboedelverzekering) — category: admin
 - Exchange foreign driving licence for Dutch licence via RDW — must be done within 185 days of gemeente registration; rules vary by country of origin (some get direct exchange, others need theory or practical exam) — category: admin
-- Register children at school (basisschool) if applicable — category: admin
 
 Return ONLY a JSON array. No other text. Each task must have:
 - title: string (concise, action-oriented, starts with a verb)
@@ -309,7 +329,21 @@ Generate 20-25 tasks. Return ONLY valid JSON array."""
     valid_categories = {"critical", "visa", "admin", "employment", "housing", "banking", "healthcare", "transport", "shipping", "pets"}
 
     if is_south_africa:
-        hardcoded = SA_VFS_PREREQUISITES + SA_DOCUMENT_TASKS
+        hardcoded = list(SA_VFS_PREREQUISITES + SA_DOCUMENT_TASKS)
+        if has_children and child_count > 0:
+            child_label = f"{child_count} children" if child_count > 1 else "your child"
+            hardcoded.append({
+                "title": f"Obtain apostilled birth certificate{'s' if child_count > 1 else ''} for {child_label}",
+                "description": (
+                    f"Each child relocating with you requires a separate apostilled birth certificate from the "
+                    f"Department of Home Affairs — the process is identical to your own: submit the original (or "
+                    f"certified copy) for apostilling and allow 4–8 weeks. Required by the IND and for Dutch school "
+                    f"enrolment. Start immediately alongside your own documents."
+                ),
+                "category": "critical",
+                "priority": 90,
+                "external_link": "https://www.dha.gov.za/index.php/civic-services/apostille-authentication",
+            })
     else:
         hardcoded = GENERAL_CRITICAL_TASKS
 
@@ -375,6 +409,7 @@ async def generate_checklist(request: GenerateChecklistRequest):
             request.employment_type, request.has_pets, request.shipping_type,
             request.has_relocation_allowance, request.container_ship_date,
             request.has_partner, request.partner_origin_country,
+            request.has_children, request.number_of_children,
             request.additional_context,
         )
     except Exception as e:
@@ -419,6 +454,8 @@ async def regenerate_checklist(request: RegenerateRequest):
             p.get("container_ship_date"),
             p.get("has_partner", False),
             p.get("partner_origin_country"),
+            p.get("has_children", False),
+            p.get("number_of_children", 0),
         )
 
         # Restore completed status and manually-set due dates for title-matched tasks

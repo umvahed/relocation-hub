@@ -111,6 +111,8 @@ export default function OnboardingPage() {
         container_ship_date: form.container_ship_date || undefined,
         has_partner: form.has_partner,
         partner_origin_country: form.has_partner ? form.partner_origin_country || undefined : undefined,
+        has_children: form.has_children,
+        number_of_children: form.has_children ? form.number_of_children : undefined,
         additional_context: form.additional_context.trim() || undefined,
       })
 
