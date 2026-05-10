@@ -801,7 +801,7 @@ export default function DashboardPage() {
         <div className="flex flex-col lg:flex-row gap-6 items-start">
 
           {/* Sidebar */}
-          <aside className="w-full lg:w-80 xl:w-96 flex-shrink-0 space-y-4 lg:sticky lg:top-[57px] lg:max-h-[calc(100vh-73px)] lg:overflow-y-auto lg:pb-4">
+          <aside className="w-full lg:w-80 xl:w-96 flex-shrink-0 space-y-4">
             {showRiskNudge && isPaid && (
               <div className="flex items-start gap-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl px-4 py-3">
                 <span className="text-base flex-shrink-0">📊</span>

@@ -409,11 +409,11 @@ export default function IndMonitorWidget({ userId, userEmail, destinationCity: _
                 <button
                   onClick={handleReportNoSlots}
                   disabled={toggling}
-                  className="w-full text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition disabled:opacity-50 py-1"
+                  className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50 text-xs font-medium text-gray-500 dark:text-gray-400"
                 >
                   {toggling
-                    ? <span className="flex justify-center"><Spinner size="w-3 h-3" /></span>
-                    : 'I checked — no slots within 2 weeks'
+                    ? <Spinner size="w-3 h-3" />
+                    : 'I checked — no slots available'
                   }
                 </button>
               )}
