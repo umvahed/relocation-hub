@@ -892,6 +892,67 @@ export default function DashboardPage() {
 
           {/* Sidebar */}
           <aside className="w-full lg:w-80 xl:w-96 flex-shrink-0 space-y-4">
+
+            {/* Priority Actions */}
+            {tasks.length > 0 && (() => {
+              const today = new Date(); today.setHours(0, 0, 0, 0)
+              const in7 = new Date(today); in7.setDate(in7.getDate() + 7)
+              const overdue = tasks.filter(t => t.status !== 'completed' && t.due_date && new Date(t.due_date) < today)
+              const dueSoon = tasks.filter(t => t.status !== 'completed' && t.due_date && new Date(t.due_date) >= today && new Date(t.due_date) <= in7)
+              const nextCritical = tasks.find(t => t.category === 'critical' && t.status !== 'completed')
+              const combined = [...overdue, ...dueSoon.filter(t => !overdue.find(o => o.id === t.id))]
+              if (nextCritical && !combined.find(t => t.id === nextCritical.id)) combined.push(nextCritical)
+              const shown = combined.slice(0, 3)
+              if (shown.length === 0) return null
+              return (
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse flex-shrink-0" />
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Priority actions</p>
+                  </div>
+                  <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                    {shown.map(task => {
+                      const isOverdue = task.due_date && new Date(task.due_date) < today
+                      const isCritical = task.category === 'critical' && !task.due_date
+                      const meta = SECTION_META[task.category]
+                      const label = task.title.startsWith('[Partner]') ? task.title.slice(10) : task.title
+                      const dateStr = task.due_date
+                        ? new Date(task.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                        : null
+                      return (
+                        <button
+                          key={task.id}
+                          onClick={() => {
+                            setExpandedId(task.id)
+                            setTimeout(() => document.getElementById(`task-${task.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition text-left group"
+                        >
+                          <div className={`w-0.5 h-8 rounded-full flex-shrink-0 ${
+                            isOverdue ? 'bg-red-400' : isCritical ? 'bg-rose-400' : 'bg-amber-400'
+                          }`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-800 dark:text-gray-100 truncate">{label}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {isOverdue && <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Overdue</span>}
+                              {!isOverdue && isCritical && <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Critical</span>}
+                              {!isOverdue && dateStr && <span className="text-[10px] text-gray-400 dark:text-gray-500">Due {dateStr}</span>}
+                              <span className={`ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded ${meta?.color} ${meta?.text} flex-shrink-0`}>
+                                {(meta?.label ?? task.category).split(/\s+/)[0]}
+                              </span>
+                            </div>
+                          </div>
+                          <svg className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 group-hover:text-indigo-400 transition flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+
             {showRiskNudge && isPaid && (
               <div className="flex items-start gap-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl px-4 py-3">
                 <span className="text-base flex-shrink-0">📊</span>
@@ -933,53 +994,6 @@ export default function DashboardPage() {
 
           {/* Main content */}
           <main className="flex-1 min-w-0 space-y-6">
-
-            {/* Focus Strip */}
-            {tasks.length > 0 && (() => {
-              const today = new Date(); today.setHours(0, 0, 0, 0)
-              const in7 = new Date(today); in7.setDate(in7.getDate() + 7)
-              const overdue = tasks.filter(t => t.status !== 'completed' && t.due_date && new Date(t.due_date) < today)
-              const dueSoon = tasks.filter(t => t.status !== 'completed' && t.due_date && new Date(t.due_date) >= today && new Date(t.due_date) <= in7)
-              const focusItems = [...overdue, ...dueSoon.filter(t => !overdue.find(o => o.id === t.id))]
-              const nextCritical = tasks.find(t => t.category === 'critical' && t.status !== 'completed')
-              if (nextCritical && !focusItems.find(t => t.id === nextCritical.id)) focusItems.push(nextCritical)
-              if (focusItems.length === 0) return null
-              return (
-                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 px-4 py-3.5">
-                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2.5">Focus this week</p>
-                  <div className="flex flex-wrap gap-2">
-                    {focusItems.map(task => {
-                      const isOverdue = task.due_date && new Date(task.due_date) < today
-                      const isCritical = task.category === 'critical' && !task.due_date
-                      const label = task.title.startsWith('[Partner]') ? task.title.slice(10) : task.title
-                      const dateStr = task.due_date
-                        ? new Date(task.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-                        : null
-                      return (
-                        <button
-                          key={task.id}
-                          onClick={() => {
-                            setExpandedId(task.id)
-                            setTimeout(() => document.getElementById(`task-${task.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
-                          }}
-                          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition ${
-                            isOverdue
-                              ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
-                              : isCritical
-                                ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400'
-                                : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
-                          }`}>
-                          {isOverdue && <span>⚠</span>}
-                          <span className="max-w-[180px] truncate">{label}</span>
-                          {dateStr && <span className="opacity-60">· {dateStr}</span>}
-                          {isCritical && <span className="opacity-60">· critical</span>}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })()}
 
             {/* Progress */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">

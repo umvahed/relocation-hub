@@ -52,6 +52,11 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEN
 - Regeneration preserves state: `source='custom'` tasks are never deleted; completed status + manually-set due dates are restored by title-matching after regeneration
 - Legal due dates auto-applied at generation and on demand: `LEGAL_OFFSETS` maps keywords (gemeente, digid, health insurance, rdw) to days-after-move_date; only applied to tasks with `due_date IS NULL`
 - Document pack is a merged PDF (not ZIP) — cover page + all non-failed documents merged via pypdf. `GET /api/docpack/{user_id}` streams `application/pdf`
+- Migration 014 added 7 profile columns: `employer_arranges_permit` (`employer` | `self` | `eu_citizen` | `unsure`), `employer_is_sponsor` (bool), `has_driving_licence` (bool), `driving_licence_country` (text), `children_school_stage` (`preschool` | `primary` | `secondary` | `both` | `not_sure`), `expects_30_ruling` (bool), `already_in_netherlands` (bool)
+- EU citizen path: when `employer_arranges_permit = 'eu_citizen'`, skip all IND/visa hardcoded tasks — only hardcoded task is a passport/ID validity check
+- Checklist generation uses all 7 new fields; regenerate returns `{ tasks, diff: { added: N, removed: N } }` — dashboard shows a dismissible diff banner
+- Profile enrichment: `POST /api/documents/{id}/enrich-profile` — paid only, no rate limit, extracts `salary_monthly_eur`, `job_title`, `permit_track`, `employer_name` from employment contracts via Claude; dashboard shows a dismissible offer banner when triggered
+- Dashboard Priority Actions widget (top of sidebar): shows up to 3 items — overdue tasks, due-within-7-days tasks, next critical task — each with a colored left border and scroll-to-task arrow
 
 ## Task categories (fixed order)
 
@@ -65,7 +70,7 @@ RDW driving licence exchange lives in `admin` (post-arrival), not `transport`.
 
 ## Current state
 
-Working end-to-end: Google OAuth / email auth → onboarding (5 steps, destination city, children, container ship date, partner, additional context) → AI checklist (partner-aware, `[Partner]` prefixed tasks) → dashboard → task search → custom task add/delete → document upload → AI validation → risk score → iCal feed → task reminders (partner email) → HR contact notifications (partner email for `[Partner]` tasks) → profile editing (partner section) → checklist regeneration → IND appointment slot monitor → 30% ruling calculator (public, net monthly estimate) → resource links (Pararius, ExpatGuide, Marktplaats, IKEA) → container arrival estimate → document pack (merged PDF download + send to HR, failed docs excluded) → relocation allowance tracker (set total, log expenses, balance, PDF statement, HR email on each expense).
+Working end-to-end: Google OAuth / email auth → onboarding (6 steps: basics, employment, logistics+school-stage, permit+situation, move-date, HR-contact) → AI checklist (EU citizen path, partner-aware, school-stage-specific tasks, 30%-ruling task, RDW driving-licence note, `[Partner]` prefixed tasks) → dashboard (Priority Actions sidebar widget, progress, tasks) → task search → custom task add/delete → document upload → AI validation → employment-doc profile enrichment → risk score → iCal feed → task reminders (partner email) → HR contact notifications → profile editing → checklist regeneration (diff banner) → IND appointment slot monitor → 30% ruling calculator → resource links → container arrival estimate → document pack (merged PDF) → relocation allowance tracker → shareable HR progress link.
 
 Not yet built: Stripe payments, B2B HR portal.
 
@@ -92,6 +97,7 @@ Not yet built: Stripe payments, B2B HR portal.
 | DELETE | `/api/documents/{document_id}` | Delete document |
 | POST | `/api/documents/{document_id}/validate` | AI document validation |
 | GET | `/api/documents/{document_id}/validation` | Get latest validation result |
+| POST | `/api/documents/{document_id}/enrich-profile` | Extract salary, job title, permit track, employer from employment contract (paid; no rate limit) |
 | POST | `/api/risk-score/compute` | Compute + upsert risk score |
 | GET | `/api/risk-score/{user_id}` | Get cached risk score |
 | GET | `/api/calendar/{user_id}/feed.ics` | iCal feed |
@@ -124,6 +130,7 @@ Not yet built: Stripe payments, B2B HR portal.
 - cron-job.org: 4 jobs active (keepalive 5min, reminders daily, digest weekly, ind-appointment-reminders daily)
 - GitHub Actions secrets: `RAILWAY_URL` + `RESEND_API_KEY` set; `ind_monitor.yml` runs every Monday
 - Supabase: migration 013 run (`user_slots_available` column on `ind_monitor_subscriptions`, `ind_appointments` table)
+- Supabase: migration 014 run (7 new `profiles` columns — see Key constraints above)
 - Smoke test: OAuth login → onboarding → checklist → document upload → validation → risk score → IND subscribe → check "no slots" → iCal → edit profile → delete account
 
 ## Performance notes (full roadmap in PLAN.md)
@@ -160,6 +167,10 @@ Not yet built: Stripe payments, B2B HR portal.
 10. ✅ Shareable progress link (`/share/[token]`) — public read-only page for HR; print-friendly one-pager with overall %, per-category bars, risk score, doc count
 11. ✅ Risk score — top blocker surfaced in collapsed widget header; action list shown before dimension breakdown
 12. ✅ Copy reminder button on tasks with due dates — preformatted WhatsApp-ready message to clipboard
+13. ✅ Expanded onboarding (6 steps) — permit arrangement, IND sponsor, already-in-NL, driving licence, school stage, 30% ruling expectation; EU citizen path skips IND tasks
+14. ✅ Checklist improvements — school-stage-specific tasks, RDW direct-exchange countries, 30%-ruling 4-month deadline task, employer_is_sponsor urgent blocker
+15. ✅ Profile enrichment from documents — employment contract → salary/job title/permit track extracted by Claude; dismissible offer banner on dashboard
+16. ✅ Dashboard Priority Actions widget — top-of-sidebar card showing overdue + due-soon + next critical tasks with scroll-to-task; regen diff + IND urgency + pre-departure milestone banners
 
 ### Phase 4 — Monetisation ← NEXT
 - Stripe one-time payment €19.99 (individual; relocation is bounded, not ongoing — no monthly anxiety)
