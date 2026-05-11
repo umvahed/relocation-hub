@@ -216,13 +216,6 @@ export default function DashboardPage() {
         }
         return updated
       })
-      if (newStatus === 'completed' && profile?.has_relocation_allowance) {
-        const displayTitle = task.title.startsWith('[Partner] ') ? task.title.slice(10) : task.title
-        setLogExpensePrefill({ description: displayTitle, taskId: task.id })
-        setTimeout(() => {
-          document.getElementById('allowance-tracker')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }, 200)
-      }
     } finally {
       setToggling(prev => { const n = new Set(prev); n.delete(task.id); return n })
     }
