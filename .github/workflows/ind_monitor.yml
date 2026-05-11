@@ -9,6 +9,8 @@ jobs:
   weekly-reset:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Trigger weekly reset on Railway
         env:
           RAILWAY_URL: ${{ secrets.RAILWAY_URL }}
