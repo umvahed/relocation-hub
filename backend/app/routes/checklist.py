@@ -128,7 +128,15 @@ class GenerateChecklistRequest(BaseModel):
     partner_origin_country: str | None = None
     has_children: bool = False
     number_of_children: int = 0
-    additional_context: str | None = None  # free-text from onboarding; relocation-relevant parts injected into prompt
+    additional_context: str | None = None
+    # Expanded onboarding fields (migration 014)
+    employer_arranges_permit: str | None = None   # 'employer' | 'self' | 'eu_citizen' | 'unsure'
+    employer_is_sponsor: bool | None = None
+    has_driving_licence: bool | None = None
+    driving_licence_country: str | None = None
+    children_school_stage: str | None = None
+    expects_30_ruling: bool | None = None
+    already_in_netherlands: bool | None = None
 
 def _check_and_increment_usage(supabase, user_id: str, call_type: str = "checklist"):
     today = date.today().isoformat()
@@ -158,7 +166,7 @@ def _check_and_increment_usage(supabase, user_id: str, call_type: str = "checkli
         supabase.table("api_usage").insert({"user_id": user_id, "date": today, "call_count": 1, "call_type": call_type}).execute()
 
 
-async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country: str, move_date, employment_type: str, has_pets: bool, shipping_type: str, has_relocation_allowance: bool, container_ship_date: str | None = None, has_partner: bool = False, partner_origin_country: str | None = None, has_children: bool = False, number_of_children: int = 0, additional_context: str | None = None) -> dict:
+async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country: str, move_date, employment_type: str, has_pets: bool, shipping_type: str, has_relocation_allowance: bool, container_ship_date: str | None = None, has_partner: bool = False, partner_origin_country: str | None = None, has_children: bool = False, number_of_children: int = 0, additional_context: str | None = None, employer_arranges_permit: str | None = None, employer_is_sponsor: bool | None = None, has_driving_licence: bool | None = None, driving_licence_country: str | None = None, children_school_stage: str | None = None, expects_30_ruling: bool | None = None, already_in_netherlands: bool | None = None) -> dict:
     conditional_notes = []
 
     if has_pets:
@@ -222,6 +230,127 @@ async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country
         conditional_notes.append(partner_note)
     else:
         conditional_notes.append("- The user is relocating alone — do NOT generate any '[Partner]' prefixed tasks.")
+
+    # ── Permit arrangement ────────────────────────────────────────────────────
+    is_eu_citizen = employer_arranges_permit == 'eu_citizen'
+    if is_eu_citizen:
+        conditional_notes.append(
+            "- CRITICAL: The user is an EU/EEA citizen — NO residence permit, MVV, or IND application is needed. "
+            "Completely skip all visa/permit application tasks. They have freedom of movement and register directly at gemeente on arrival. "
+            "Focus checklist on admin, housing, banking, healthcare, and employment onboarding only."
+        )
+    elif employer_arranges_permit == 'self':
+        conditional_notes.append(
+            "- The user is arranging their OWN permit (self-employed/DAFT). "
+            "Include tasks for: KVK registration, BTW (VAT) number, self-employment permit application with IND, business plan (if applicable). "
+            "Do NOT say 'your employer applies on your behalf' — the user applies directly."
+        )
+    elif employer_arranges_permit == 'employer':
+        conditional_notes.append(
+            "- The user's employer IS handling the permit (standard TEV procedure). "
+            "The employer submits to IND; user waits for the approval letter. Reinforce that the user should chase HR for updates but not apply directly."
+        )
+
+    if employer_is_sponsor is False and not is_eu_citizen and employer_arranges_permit not in ('self',):
+        conditional_notes.append(
+            "- URGENT: The user's employer is NOT currently a registered IND recognised sponsor (erkend referent). "
+            "Add a HIGH PRIORITY task: the employer must register as a recognised sponsor BEFORE submitting the permit application — this takes 4–8 weeks and is the biggest current blocker. "
+            "User should contact HR immediately to confirm registration is in progress."
+        )
+    elif employer_is_sponsor is None and not is_eu_citizen and employer_arranges_permit not in ('self', 'unsure', None):
+        conditional_notes.append(
+            "- The user is unsure whether their employer is a registered IND sponsor. "
+            "Add a task to verify this with HR immediately — if not registered, it adds 4–8 weeks."
+        )
+
+    # ── Current location ─────────────────────────────────────────────────────
+    if already_in_netherlands:
+        conditional_notes.append(
+            "- The user is ALREADY living in the Netherlands. Adjust accordingly: "
+            "gemeente registration and BSN are URGENT NOW (within 5 days of establishing a Dutch address — frame as overdue if not done). "
+            "Skip flight booking and pre-departure logistics. Immediately prioritise: gemeente → BSN → DigiD → health insurance → bank account."
+        )
+
+    # ── 30% ruling ───────────────────────────────────────────────────────────
+    if expects_30_ruling is True:
+        conditional_notes.append(
+            "- The user EXPECTS TO QUALIFY for the 30% ruling. Add a SPECIFIC URGENT task: "
+            "submit the 30% ruling application with your employer within 4 months of your FIRST Dutch workday "
+            "(not arrival date, not registration date — first day of work). "
+            "Missing this window permanently forfeits eligibility. "
+            "The employer submits to the Belastingdienst — confirm with HR this is in their process. External link: /tools/30-ruling"
+        )
+    elif expects_30_ruling is False:
+        conditional_notes.append("- The user does NOT expect to qualify for the 30% ruling — omit 30% ruling tasks.")
+
+    # ── Driving licence ───────────────────────────────────────────────────────
+    if has_driving_licence is False:
+        conditional_notes.append("- The user does NOT have a driving licence — omit all RDW driving licence exchange tasks.")
+    elif has_driving_licence is True and driving_licence_country:
+        direct_exchange_countries = {
+            "united kingdom", "uk", "australia", "new zealand", "japan", "south korea",
+            "singapore", "taiwan", "canada", "israel", "switzerland", "suriname",
+            "aruba", "curaçao", "bonaire",
+        }
+        is_eu = origin_country.strip().lower() not in (
+            "south africa", "za", "united states", "usa", "india", "brazil",
+            "nigeria", "kenya", "ghana", "zimbabwe", "pakistan", "philippines",
+        )
+        country_lower = driving_licence_country.strip().lower()
+        if country_lower in direct_exchange_countries or is_eu:
+            conditional_notes.append(
+                f"- The user has a driving licence from {driving_licence_country}. "
+                "This country qualifies for DIRECT exchange at RDW — no theory or practical test required. "
+                "Task: exchange at an RDW office within 185 days of gemeente registration. "
+                "Bring original licence, gemeente registration confirmation, and BSN."
+            )
+        else:
+            conditional_notes.append(
+                f"- The user has a driving licence from {driving_licence_country}. "
+                "This country does NOT have a full direct-exchange agreement with the Netherlands. "
+                "The user will likely need to pass the CBR theory exam; the practical exam requirement depends on the country — check RDW.nl. "
+                "Recommend starting Dutch driving theory study early. Deadline: 185 days after gemeente registration."
+            )
+    elif has_driving_licence is True:
+        conditional_notes.append(
+            "- The user has a driving licence (country of issue not specified). "
+            "Include an RDW exchange task noting they should check RDW.nl for their country's specific requirements. "
+            "Deadline: 185 days after gemeente registration."
+        )
+
+    # ── Children school stage ─────────────────────────────────────────────────
+    if has_children and children_school_stage:
+        stage_notes = {
+            'preschool': (
+                "Children are pre-school age (under 4). Prioritise finding kinderopvang (childcare) — "
+                "waiting lists in major cities are 6–18 months, apply immediately on arrival. "
+                "Also research peuterspeelzaal (playgroup). Skip basisschool enrolment for now."
+            ),
+            'primary': (
+                "Children are primary school age (4–12, basisschool). Generate school-specific tasks: "
+                "research Dutch basisschool vs tweetalige (bilingual Dutch/English) basisschool vs international school; "
+                "waiting lists can be 3–12 months for popular schools; apply as soon as BSN is available; "
+                "school requires proof of address, BSN, birth certificate, and vaccination record (rijksvaccinatieprogramma)."
+            ),
+            'secondary': (
+                "Children are secondary school age (12–18). Research middelbare scholen: ISN (The Hague), British School, "
+                "European School, and Dutch VO schools (HAVO/VWO/VMBO). "
+                "Placement depends on home-country school report — get a certified translation. "
+                "The Toelatingscommissie assesses foreign students. Apply well before start date."
+            ),
+            'both': (
+                "User has BOTH primary and secondary school-age children. Generate tasks for both age groups: "
+                "basisschool/tweetalige options for primary children AND middelbare school/international school for secondary children. "
+                "Each type has different waiting lists, requirements, and timelines."
+            ),
+            'not_sure': (
+                "Children's school stage is unconfirmed. Generate general school search tasks covering both primary and secondary options, "
+                "with a note for the user to research the appropriate school type for each child's age."
+            ),
+        }
+        note = stage_notes.get(children_school_stage)
+        if note:
+            conditional_notes.append(f"- SCHOOL STAGE: {note}")
 
     conditional_block = "\n".join(conditional_notes)
     is_south_africa = origin_country.strip().lower() in ("south africa", "za")
@@ -328,7 +457,19 @@ Generate 20-25 tasks. Return ONLY valid JSON array."""
     tasks = json.loads(tasks_json)
     valid_categories = {"critical", "visa", "admin", "employment", "housing", "banking", "healthcare", "transport", "shipping", "pets"}
 
-    if is_south_africa:
+    if is_eu_citizen:
+        hardcoded = [{
+            "title": "Verify passport or EU ID card validity for your stay",
+            "description": (
+                "As an EU/EEA citizen you have freedom of movement in the Netherlands — no residence permit or MVV is required. "
+                "Ensure your passport or national ID card is valid for your entire planned stay. "
+                "Recommended: at least 12 months of validity remaining. Keep your ID document accessible during your first weeks in NL as the gemeente will request it at registration."
+            ),
+            "category": "critical",
+            "priority": 100,
+            "external_link": None,
+        }]
+    elif is_south_africa:
         hardcoded = list(SA_VFS_PREREQUISITES + SA_DOCUMENT_TASKS)
         if has_children and child_count > 0:
             child_label = f"{child_count} children" if child_count > 1 else "your child"
@@ -344,7 +485,7 @@ Generate 20-25 tasks. Return ONLY valid JSON array."""
                 "priority": 90,
                 "external_link": "https://www.dha.gov.za/index.php/civic-services/apostille-authentication",
             })
-    else:
+    elif not is_eu_citizen:
         hardcoded = GENERAL_CRITICAL_TASKS
 
     tasks_to_insert = [{**doc, "user_id": user_id, "status": "pending", "source": "hardcoded"} for doc in hardcoded]
@@ -411,6 +552,10 @@ async def generate_checklist(request: GenerateChecklistRequest):
             request.has_partner, request.partner_origin_country,
             request.has_children, request.number_of_children,
             request.additional_context,
+            request.employer_arranges_permit, request.employer_is_sponsor,
+            request.has_driving_licence, request.driving_licence_country,
+            request.children_school_stage, request.expects_30_ruling,
+            request.already_in_netherlands,
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -431,9 +576,11 @@ async def regenerate_checklist(request: RegenerateRequest):
         # Snapshot state of existing tasks before wiping them
         existing_res = supabase.table("tasks").select("title, status, due_date, source").eq("user_id", request.user_id).execute()
         state_snapshot: dict[str, dict] = {}
+        old_title_set: set[str] = set()
         for t in (existing_res.data or []):
+            key = t["title"].lower().strip()
             if t.get("source") != "custom":
-                key = t["title"].lower().strip()
+                old_title_set.add(key)
                 state_snapshot[key] = {
                     "status": t.get("status", "pending"),
                     "due_date": t.get("due_date"),
@@ -456,6 +603,14 @@ async def regenerate_checklist(request: RegenerateRequest):
             p.get("partner_origin_country"),
             p.get("has_children", False),
             p.get("number_of_children", 0),
+            None,  # additional_context not re-injected on regen
+            p.get("employer_arranges_permit"),
+            p.get("employer_is_sponsor"),
+            p.get("has_driving_licence"),
+            p.get("driving_licence_country"),
+            p.get("children_school_stage"),
+            p.get("expects_30_ruling"),
+            p.get("already_in_netherlands"),
         )
 
         # Restore completed status and manually-set due dates for title-matched tasks
@@ -473,9 +628,16 @@ async def regenerate_checklist(request: RegenerateRequest):
             if updates:
                 supabase.table("tasks").update(updates).eq("id", task["id"]).execute()
 
+        # Compute diff for frontend notification
+        new_title_set = {t["title"].lower().strip() for t in (result.get("tasks") or []) if t.get("source") != "custom"}
+        diff = {
+            "added": len(new_title_set - old_title_set),
+            "removed": len(old_title_set - new_title_set),
+        }
+
         # Return full refreshed task list (including custom tasks that were kept)
         final = supabase.table("tasks").select("*").eq("user_id", request.user_id).order("priority", desc=True).execute()
-        return {"message": "Checklist regenerated", "task_count": len(final.data), "tasks": final.data}
+        return {"message": "Checklist regenerated", "task_count": len(final.data), "tasks": final.data, "diff": diff}
 
     except HTTPException:
         raise

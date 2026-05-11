@@ -39,6 +39,13 @@ export async function generateChecklist(data: {
   has_children?: boolean
   number_of_children?: number
   additional_context?: string
+  employer_arranges_permit?: string
+  employer_is_sponsor?: boolean | null
+  has_driving_licence?: boolean | null
+  driving_licence_country?: string
+  children_school_stage?: string
+  expects_30_ruling?: boolean | null
+  already_in_netherlands?: boolean | null
 }) {
   const res = await fetch(`${API_URL}/api/checklist/generate`, {
     method: 'POST',
@@ -191,6 +198,13 @@ export async function updateProfile(user_id: string, data: Partial<{
   partner_full_name: string
   partner_email: string
   partner_origin_country: string
+  employer_arranges_permit: string
+  employer_is_sponsor: boolean | null
+  has_driving_licence: boolean | null
+  driving_licence_country: string
+  children_school_stage: string
+  expects_30_ruling: boolean | null
+  already_in_netherlands: boolean | null
 }>) {
   const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`, {
     method: 'PATCH',
@@ -412,3 +426,23 @@ export async function downloadAllowanceStatement(user_id: string): Promise<void>
   URL.revokeObjectURL(url)
 }
 
+// ── Profile enrichment from document ────────────────────────────────────────
+
+export interface ProfileHints {
+  salary_monthly_eur: number | null
+  job_title: string | null
+  permit_track: 'highly_skilled_migrant' | 'ict_transfer' | 'daft' | 'unknown'
+  employer_name: string | null
+}
+
+export async function enrichProfileFromDocument(
+  document_id: string,
+  user_id: string
+): Promise<{ profile_hints: ProfileHints | null }> {
+  const res = await fetch(`${API_URL}/api/documents/${document_id}/enrich-profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id }),
+  })
+  return handleResponse(res)
+}

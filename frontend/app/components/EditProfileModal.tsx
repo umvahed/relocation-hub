@@ -12,7 +12,7 @@ interface Props {
   userId: string
   profile: any
   onSave: (updatedProfile: any, dateUpdates?: { id: string; due_date: string }[]) => void
-  onRegenerate: (newTasks: any[]) => void
+  onRegenerate: (newTasks: any[], diff?: { added: number; removed: number }) => void
   onClose: () => void
 }
 
@@ -91,7 +91,7 @@ export default function EditProfileModal({ userId, profile, onSave, onRegenerate
         partner_origin_country: form.has_partner ? form.partner_origin_country || undefined : undefined,
       })
       const result = await regenerateChecklist(userId)
-      onRegenerate(result.tasks || [])
+      onRegenerate(result.tasks || [], result.diff)
       onClose()
     } catch (e: any) {
       setError(e.message || 'Regeneration failed')

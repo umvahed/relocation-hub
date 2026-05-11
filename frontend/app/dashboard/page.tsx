@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, updateProfile, getDocumentValidation, validateDocument, createCustomTask, deleteTask, type RiskScore, type ValidationResult } from '@/lib/api'
+import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, updateProfile, getDocumentValidation, validateDocument, createCustomTask, deleteTask, getIndAppointment, enrichProfileFromDocument, type RiskScore, type ValidationResult, type ProfileHints } from '@/lib/api'
 import RiskScoreWidget from '@/app/components/RiskScoreWidget'
 import IndMonitorWidget from '@/app/components/IndMonitorWidget'
 import ResourcesWidget from '@/app/components/ResourcesWidget'
@@ -166,6 +166,12 @@ export default function DashboardPage() {
   const [copiedTaskId, setCopiedTaskId] = useState<string | null>(null)
   const [showShareLink, setShowShareLink] = useState(false)
   const [copiedShareLink, setCopiedShareLink] = useState(false)
+  const [regenDiff, setRegenDiff] = useState<{ added: number; removed: number } | null>(null)
+  const [dismissedINDUrgency, setDismissedINDUrgency] = useState(false)
+  const [preDepartureMilestone, setPreDepartureMilestone] = useState(false)
+  const [dismissedPreDeparture, setDismissedPreDeparture] = useState(false)
+  const [enrichmentHint, setEnrichmentHint] = useState<{ hints: ProfileHints; docName: string } | null>(null)
+  const [indAppointment, setIndAppointment] = useState<any>(undefined)
   const settingsRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -179,6 +185,7 @@ export default function DashboardPage() {
       getUsage(data.user.id).then(setUsage).catch(() => null)
       const prof = await getProfile(data.user.id).catch(() => null)
       setProfile(prof)
+      getIndAppointment(data.user.id).then(setIndAppointment).catch(() => setIndAppointment(null))
       const profTrialActive = prof?.trial_ends_at && new Date(prof.trial_ends_at) > new Date()
       if (prof?.tier === 'paid' || profTrialActive) {
         getRiskScore(data.user.id).then(setRiskScore).catch(() => null)
@@ -200,6 +207,12 @@ export default function DashboardPage() {
         if (isPaid && newStatus === 'completed' && task.category === 'critical') {
           const allCriticalDone = updated.filter(t => t.category === 'critical').every(t => t.status === 'completed')
           if (allCriticalDone) setShowRiskNudge(true)
+        }
+        if (newStatus === 'completed') {
+          const preCats = updated.filter(t => PRE_DEPARTURE_CATS.has(t.category))
+          if (preCats.length > 0 && preCats.every(t => t.status === 'completed')) {
+            setPreDepartureMilestone(true)
+          }
         }
         return updated
       })
@@ -294,6 +307,11 @@ export default function DashboardPage() {
       if (docId && task?.category === 'critical' && isPaid && profile?.ai_validation_consent && VALIDATABLE_MIME_TYPES.has(processed.type)) {
         validateDocument(docId, user.id)
           .then(result => setTaskValidations(prev => ({ ...prev, [docId]: result })))
+          .catch(() => null)
+      }
+      if (docId && task?.category === 'employment' && isPaid) {
+        enrichProfileFromDocument(docId, user.id)
+          .then(result => { if (result.profile_hints) setEnrichmentHint({ hints: result.profile_hints, docName: file.name }) })
           .catch(() => null)
       }
     }
@@ -450,10 +468,11 @@ export default function DashboardPage() {
               }))
             }
           }}
-          onRegenerate={(newTasks) => {
+          onRegenerate={(newTasks, diff) => {
             setTasks(newTasks)
             setTaskDocs({})
             setExpandedId(null)
+            if (diff) setRegenDiff(diff)
           }}
           onClose={() => setShowEditProfile(false)}
         />
@@ -796,6 +815,77 @@ export default function DashboardPage() {
           {profile?.container_ship_date && (profile?.shipping_type === 'container' || profile?.shipping_type === 'both') && (
             <ContainerArrivalBanner shipDate={profile.container_ship_date} originCountry={profile.origin_country ?? ''} />
           )}
+
+          {/* IND urgency — move within 60 days, no appointment booked */}
+          {profile?.move_date && (() => {
+            const today = new Date(); today.setHours(0, 0, 0, 0)
+            const move = new Date(profile.move_date); move.setHours(0, 0, 0, 0)
+            const daysToMove = Math.round((move.getTime() - today.getTime()) / 86400000)
+            if (daysToMove <= 0 || daysToMove > 60 || indAppointment !== null || indAppointment === undefined || dismissedINDUrgency) return null
+            return (
+              <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl px-4 py-3.5">
+                <span className="text-xl flex-shrink-0">📅</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">IND appointment not booked — {daysToMove} day{daysToMove !== 1 ? 's' : ''} to go</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Biometrics slots fill fast. Check the IND monitor below to get notified when slots open.</p>
+                </div>
+                <button onClick={() => setDismissedINDUrgency(true)} className="text-amber-400 hover:text-amber-600 dark:hover:text-amber-300 flex-shrink-0 text-xl leading-none">×</button>
+              </div>
+            )
+          })()}
+
+          {/* Pre-departure milestone */}
+          {preDepartureMilestone && !dismissedPreDeparture && (
+            <div className="flex items-start gap-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl px-4 py-3.5">
+              <span className="text-xl flex-shrink-0">🎯</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Pre-departure phase complete!</p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">Visa, employment, transport and shipping tasks are all done. Focus now on settling in after arrival.</p>
+              </div>
+              <button onClick={() => setDismissedPreDeparture(true)} className="text-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-300 flex-shrink-0 text-xl leading-none">×</button>
+            </div>
+          )}
+
+          {/* Regen diff */}
+          {regenDiff && (
+            <div className="flex items-start gap-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl px-4 py-3.5">
+              <span className="text-xl flex-shrink-0">✨</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">Checklist updated</p>
+                <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
+                  {regenDiff.added === 0 && regenDiff.removed === 0
+                    ? 'No changes to your task list.'
+                    : [
+                        regenDiff.added > 0 && `${regenDiff.added} task${regenDiff.added !== 1 ? 's' : ''} added`,
+                        regenDiff.removed > 0 && `${regenDiff.removed} task${regenDiff.removed !== 1 ? 's' : ''} removed`,
+                      ].filter(Boolean).join(' · ')
+                  }
+                </p>
+              </div>
+              <button onClick={() => setRegenDiff(null)} className="text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 flex-shrink-0 text-xl leading-none">×</button>
+            </div>
+          )}
+
+          {/* Document enrichment offer */}
+          {enrichmentHint && (
+            <div className="flex items-start gap-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-2xl px-4 py-3.5">
+              <span className="text-xl flex-shrink-0">🔍</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-purple-800 dark:text-purple-300">Detected from your employment document</p>
+                <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">
+                  {[
+                    enrichmentHint.hints.job_title,
+                    enrichmentHint.hints.employer_name,
+                    enrichmentHint.hints.salary_monthly_eur ? `€${enrichmentHint.hints.salary_monthly_eur.toLocaleString()}/mo` : null,
+                    enrichmentHint.hints.permit_track && enrichmentHint.hints.permit_track !== 'unknown'
+                      ? enrichmentHint.hints.permit_track.replace(/_/g, ' ')
+                      : null,
+                  ].filter(Boolean).join(' · ') || 'No recognisable details found.'}
+                </p>
+              </div>
+              <button onClick={() => setEnrichmentHint(null)} className="text-purple-400 hover:text-purple-600 dark:hover:text-purple-300 flex-shrink-0 text-xl leading-none">×</button>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6 items-start">
@@ -843,6 +933,53 @@ export default function DashboardPage() {
 
           {/* Main content */}
           <main className="flex-1 min-w-0 space-y-6">
+
+            {/* Focus Strip */}
+            {tasks.length > 0 && (() => {
+              const today = new Date(); today.setHours(0, 0, 0, 0)
+              const in7 = new Date(today); in7.setDate(in7.getDate() + 7)
+              const overdue = tasks.filter(t => t.status !== 'completed' && t.due_date && new Date(t.due_date) < today)
+              const dueSoon = tasks.filter(t => t.status !== 'completed' && t.due_date && new Date(t.due_date) >= today && new Date(t.due_date) <= in7)
+              const focusItems = [...overdue, ...dueSoon.filter(t => !overdue.find(o => o.id === t.id))]
+              const nextCritical = tasks.find(t => t.category === 'critical' && t.status !== 'completed')
+              if (nextCritical && !focusItems.find(t => t.id === nextCritical.id)) focusItems.push(nextCritical)
+              if (focusItems.length === 0) return null
+              return (
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 px-4 py-3.5">
+                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2.5">Focus this week</p>
+                  <div className="flex flex-wrap gap-2">
+                    {focusItems.map(task => {
+                      const isOverdue = task.due_date && new Date(task.due_date) < today
+                      const isCritical = task.category === 'critical' && !task.due_date
+                      const label = task.title.startsWith('[Partner]') ? task.title.slice(10) : task.title
+                      const dateStr = task.due_date
+                        ? new Date(task.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                        : null
+                      return (
+                        <button
+                          key={task.id}
+                          onClick={() => {
+                            setExpandedId(task.id)
+                            setTimeout(() => document.getElementById(`task-${task.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+                          }}
+                          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition ${
+                            isOverdue
+                              ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
+                              : isCritical
+                                ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400'
+                                : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+                          }`}>
+                          {isOverdue && <span>⚠</span>}
+                          <span className="max-w-[180px] truncate">{label}</span>
+                          {dateStr && <span className="opacity-60">· {dateStr}</span>}
+                          {isCritical && <span className="opacity-60">· critical</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Progress */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
@@ -956,7 +1093,7 @@ export default function DashboardPage() {
                   const docs = taskDocs[task.id] || []
 
                   return (
-                    <div key={task.id} className={`rounded-xl border transition-all ${
+                    <div key={task.id} id={`task-${task.id}`} className={`rounded-xl border transition-all ${
                       expanded
                         ? 'bg-white dark:bg-gray-800 border-indigo-200 dark:border-indigo-500 shadow-sm'
                         : done

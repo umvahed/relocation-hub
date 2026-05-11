@@ -42,6 +42,14 @@ class ProfileUpdate(BaseModel):
     partner_full_name: str | None = None
     partner_email: str | None = None
     partner_origin_country: str | None = None
+    # Expanded onboarding fields (migration 014)
+    employer_arranges_permit: str | None = None   # 'employer' | 'self' | 'eu_citizen' | 'unsure'
+    employer_is_sponsor: bool | None = None
+    has_driving_licence: bool | None = None
+    driving_licence_country: str | None = None
+    children_school_stage: str | None = None       # 'primary' | 'secondary' | 'both' | 'preschool' | 'not_sure'
+    expects_30_ruling: bool | None = None
+    already_in_netherlands: bool | None = None
 
 class ConsentUpdate(BaseModel):
     ai_validation_consent: bool
@@ -93,7 +101,8 @@ async def update_profile(user_id: str, data: ProfileUpdate):
         supabase = get_supabase()
         update_data = data.model_dump(exclude_unset=True)
         for key in ('move_date', 'contact_name', 'contact_email', 'destination_city',
-                    'partner_full_name', 'partner_email', 'partner_origin_country'):
+                    'partner_full_name', 'partner_email', 'partner_origin_country',
+                    'driving_licence_country', 'employer_arranges_permit', 'children_school_stage'):
             if key in update_data:
                 update_data[key] = update_data[key] or None
         if not update_data:

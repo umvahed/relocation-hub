@@ -26,6 +26,14 @@ const COUNTRIES = [
   'Brazil', 'Nigeria', 'Kenya', 'Ghana', 'Zimbabwe', 'Other'
 ]
 
+type BtnClass = (active: boolean) => string
+const btn: BtnClass = (active) =>
+  `flex-1 py-3 rounded-xl font-semibold border transition text-sm ${
+    active
+      ? 'bg-indigo-600 text-white border-indigo-600'
+      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+  }`
+
 export default function OnboardingPage() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -44,12 +52,20 @@ export default function OnboardingPage() {
     destination_city: '',
     has_children: false,
     number_of_children: 1,
+    children_school_stage: '',
     container_ship_date: '',
     has_partner: false,
     partner_full_name: '',
     partner_email: '',
     partner_origin_country: '',
     additional_context: '',
+    // Step 4 — permit & situation
+    employer_arranges_permit: '',           // 'employer' | 'self' | 'eu_citizen' | 'unsure'
+    employer_is_sponsor: null as boolean | null,
+    already_in_netherlands: null as boolean | null,
+    has_driving_licence: null as boolean | null,
+    driving_licence_country: '',
+    expects_30_ruling: null as boolean | null,
   })
   const router = useRouter()
   const supabase = createClient()
@@ -63,7 +79,6 @@ export default function OnboardingPage() {
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) { router.push('/login'); return }
-      // Already onboarded — skip the form
       const existing = await getChecklist(data.user.id).catch(() => null)
       if (existing?.tasks?.length > 0) { router.push('/dashboard'); return }
       setUser(data.user)
@@ -93,11 +108,18 @@ export default function OnboardingPage() {
         destination_city: form.destination_city || undefined,
         has_children: form.has_children,
         number_of_children: form.has_children ? form.number_of_children : undefined,
+        children_school_stage: form.has_children && form.children_school_stage ? form.children_school_stage : undefined,
         container_ship_date: form.container_ship_date || undefined,
         has_partner: form.has_partner,
         partner_full_name: form.has_partner ? form.partner_full_name || undefined : undefined,
         partner_email: form.has_partner ? form.partner_email || undefined : undefined,
         partner_origin_country: form.has_partner ? form.partner_origin_country || undefined : undefined,
+        employer_arranges_permit: form.employer_arranges_permit || undefined,
+        employer_is_sponsor: form.employer_is_sponsor !== null ? form.employer_is_sponsor : undefined,
+        already_in_netherlands: form.already_in_netherlands !== null ? form.already_in_netherlands : undefined,
+        has_driving_licence: form.has_driving_licence !== null ? form.has_driving_licence : undefined,
+        driving_licence_country: form.has_driving_licence && form.driving_licence_country ? form.driving_licence_country : undefined,
+        expects_30_ruling: form.expects_30_ruling !== null ? form.expects_30_ruling : undefined,
       })
 
       const checklistResult = await generateChecklist({
@@ -114,6 +136,13 @@ export default function OnboardingPage() {
         has_children: form.has_children,
         number_of_children: form.has_children ? form.number_of_children : undefined,
         additional_context: form.additional_context.trim() || undefined,
+        employer_arranges_permit: form.employer_arranges_permit || undefined,
+        employer_is_sponsor: form.employer_is_sponsor !== null ? form.employer_is_sponsor : undefined,
+        already_in_netherlands: form.already_in_netherlands !== null ? form.already_in_netherlands : undefined,
+        has_driving_licence: form.has_driving_licence !== null ? form.has_driving_licence : undefined,
+        driving_licence_country: form.has_driving_licence ? form.driving_licence_country || undefined : undefined,
+        children_school_stage: form.has_children ? form.children_school_stage || undefined : undefined,
+        expects_30_ruling: form.expects_30_ruling !== null ? form.expects_30_ruling : undefined,
       })
 
       if (checklistResult.detail) {
@@ -155,9 +184,9 @@ export default function OnboardingPage() {
     <main className="min-h-screen bg-gradient-to-br from-blue-50 dark:from-gray-900 to-indigo-100 dark:to-gray-800 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg w-full max-w-lg p-8">
 
-        {/* Progress */}
+        {/* Progress — 6 steps */}
         <div className="flex gap-2 mb-8">
-          {[1, 2, 3, 4, 5].map(s => (
+          {[1, 2, 3, 4, 5, 6].map(s => (
             <div key={s} className={`h-2 flex-1 rounded-full ${s <= step ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`} />
           ))}
         </div>
@@ -165,8 +194,8 @@ export default function OnboardingPage() {
         {/* Step 1 — Name */}
         {step === 1 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Welcome! What's your name?</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">Let's personalise your relocation plan.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Welcome! What&apos;s your name?</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">Let&apos;s personalise your relocation plan.</p>
             <input
               type="text"
               placeholder="Your full name"
@@ -183,11 +212,11 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 2 — Origin & employment */}
+        {/* Step 2 — Origin, employment, destination */}
         {step === 2 && (
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Where are you moving from?</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">We'll tailor your checklist to your specific situation.</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">We&apos;ll tailor your checklist to your specific situation.</p>
             <select
               value={form.origin_country}
               onChange={e => setForm(f => ({ ...f, origin_country: e.target.value }))}
@@ -199,7 +228,7 @@ export default function OnboardingPage() {
               value={form.employment_type}
               onChange={e => setForm(f => ({ ...f, employment_type: e.target.value }))}
               className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4">
-              <option value="employed">Moving for employment</option>
+              <option value="employed">Moving for employment (salaried)</option>
               <option value="self_employed">Self-employed / Freelance</option>
               <option value="student">Student</option>
               <option value="family">Family reunification</option>
@@ -248,114 +277,111 @@ export default function OnboardingPage() {
             </select>
             {(form.shipping_type === 'container' || form.shipping_type === 'both') && (
               <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                <p className="text-xs font-medium text-amber-800 mb-2">Containers take 2–14 weeks to arrive depending on origin. When are you planning to ship?</p>
+                <p className="text-xs font-medium text-amber-800 mb-2">Containers take 2–14 weeks to arrive. When are you planning to ship?</p>
                 <input
                   type="date"
                   value={form.container_ship_date}
                   onChange={e => setForm(f => ({ ...f, container_ship_date: e.target.value }))}
                   className="w-full border border-amber-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
                 />
-                <p className="text-xs text-amber-600 mt-1">Don't know yet? Leave blank — you can set it later.</p>
+                <p className="text-xs text-amber-600 mt-1">Don&apos;t know yet? Leave blank — you can set it later.</p>
               </div>
             )}
-            <div className="mb-2" />
 
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Does your employer provide a relocation or housing allowance?</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 mt-4">Does your employer provide a relocation or housing allowance?</label>
             <div className="flex gap-3 mb-5">
-              <button
-                onClick={() => setForm(f => ({ ...f, has_relocation_allowance: true }))}
-                className={`flex-1 py-3 rounded-xl font-semibold border transition ${form.has_relocation_allowance ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-                Yes
-              </button>
-              <button
-                onClick={() => setForm(f => ({ ...f, has_relocation_allowance: false }))}
-                className={`flex-1 py-3 rounded-xl font-semibold border transition ${!form.has_relocation_allowance ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-                No
-              </button>
+              <button onClick={() => setForm(f => ({ ...f, has_relocation_allowance: true }))} className={btn(form.has_relocation_allowance)}>Yes</button>
+              <button onClick={() => setForm(f => ({ ...f, has_relocation_allowance: false }))} className={btn(!form.has_relocation_allowance)}>No</button>
             </div>
 
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Are you bringing pets?</label>
             <div className="flex gap-3 mb-5">
-              <button
-                onClick={() => setForm(f => ({ ...f, has_pets: true }))}
-                className={`flex-1 py-3 rounded-xl font-semibold border transition ${form.has_pets ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-                Yes
-              </button>
-              <button
-                onClick={() => setForm(f => ({ ...f, has_pets: false }))}
-                className={`flex-1 py-3 rounded-xl font-semibold border transition ${!form.has_pets ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-                No
-              </button>
+              <button onClick={() => setForm(f => ({ ...f, has_pets: true }))} className={btn(form.has_pets)}>Yes</button>
+              <button onClick={() => setForm(f => ({ ...f, has_pets: false }))} className={btn(!form.has_pets)}>No</button>
             </div>
 
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Are you bringing children?</label>
             <div className="flex gap-3 mb-3">
-              <button
-                onClick={() => setForm(f => ({ ...f, has_children: true }))}
-                className={`flex-1 py-3 rounded-xl font-semibold border transition ${form.has_children ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-                Yes
-              </button>
-              <button
-                onClick={() => setForm(f => ({ ...f, has_children: false }))}
-                className={`flex-1 py-3 rounded-xl font-semibold border transition ${!form.has_children ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-                No
-              </button>
+              <button onClick={() => setForm(f => ({ ...f, has_children: true }))} className={btn(form.has_children)}>Yes</button>
+              <button onClick={() => setForm(f => ({ ...f, has_children: false }))} className={btn(!form.has_children)}>No</button>
             </div>
             {form.has_children && (
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">How many children?</label>
-                <select
-                  value={form.number_of_children}
-                  onChange={e => setForm(f => ({ ...f, number_of_children: Number(e.target.value) }))}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
+              <div className="mb-4 space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">How many children?</label>
+                  <select
+                    value={form.number_of_children}
+                    onChange={e => setForm(f => ({ ...f, number_of_children: Number(e.target.value) }))}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">What age stage are your children?</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { val: 'preschool', label: 'Pre-school (under 4)' },
+                      { val: 'primary', label: 'Primary school (4–12)' },
+                      { val: 'secondary', label: 'Secondary (12–18)' },
+                      { val: 'both', label: 'Primary & secondary' },
+                    ].map(({ val, label }) => (
+                      <button key={val}
+                        onClick={() => setForm(f => ({ ...f, children_school_stage: val }))}
+                        className={`py-2.5 px-3 rounded-xl text-xs font-semibold border transition text-left ${
+                          form.children_school_stage === val
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setForm(f => ({ ...f, children_school_stage: 'not_sure' }))}
+                    className={`mt-2 w-full py-2 rounded-xl text-xs font-semibold border transition ${
+                      form.children_school_stage === 'not_sure'
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}>
+                    Not sure / skip
+                  </button>
+                </div>
               </div>
             )}
-            {!form.has_children && <div className="mb-3" />}
 
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Is your partner relocating with you?</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 mt-2">Is your partner relocating with you?</label>
             <div className="flex gap-3 mb-3">
-              <button
-                onClick={() => setForm(f => ({ ...f, has_partner: true }))}
-                className={`flex-1 py-3 rounded-xl font-semibold border transition ${form.has_partner ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-                Yes
-              </button>
-              <button
-                onClick={() => setForm(f => ({ ...f, has_partner: false }))}
-                className={`flex-1 py-3 rounded-xl font-semibold border transition ${!form.has_partner ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-                No
-              </button>
+              <button onClick={() => setForm(f => ({ ...f, has_partner: true }))} className={btn(form.has_partner)}>Yes</button>
+              <button onClick={() => setForm(f => ({ ...f, has_partner: false }))} className={btn(!form.has_partner)}>No</button>
             </div>
             {form.has_partner && (
-              <div className="mb-5 bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 space-y-2">
-                <p className="text-xs font-medium text-violet-800 mb-1">We'll generate partner-specific tasks and send them reminders too.</p>
+              <div className="mb-5 bg-violet-50 dark:bg-violet-900/10 border border-violet-200 dark:border-violet-800 rounded-xl px-4 py-3 space-y-2">
+                <p className="text-xs font-medium text-violet-800 dark:text-violet-300 mb-1">We&apos;ll generate partner-specific tasks and send them reminders too.</p>
                 <input
                   type="text"
                   placeholder="Partner's full name"
                   value={form.partner_full_name}
                   onChange={e => setForm(f => ({ ...f, partner_full_name: e.target.value }))}
-                  className="w-full border border-violet-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  className="w-full border border-violet-200 dark:border-violet-700 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
                 />
                 <input
                   type="email"
                   placeholder="Partner's email address"
                   value={form.partner_email}
                   onChange={e => setForm(f => ({ ...f, partner_email: e.target.value }))}
-                  className="w-full border border-violet-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  className="w-full border border-violet-200 dark:border-violet-700 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
                 />
                 <select
                   value={form.partner_origin_country}
                   onChange={e => setForm(f => ({ ...f, partner_origin_country: e.target.value }))}
-                  className="w-full border border-violet-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-400">
-                  <option value="">Partner's origin country</option>
+                  className="w-full border border-violet-200 dark:border-violet-700 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400">
+                  <option value="">Partner&apos;s origin country</option>
                   {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
             )}
-            {!form.has_partner && <div className="mb-5" />}
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 mt-4">
               <button onClick={() => setStep(2)}
                 className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 py-3 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                 ← Back
@@ -369,20 +395,103 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 4 — Move date */}
+        {/* Step 4 — Permit & situation (NEW) */}
         {step === 4 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">When are you planning to move?</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">This helps us prioritise and sequence your tasks correctly.</p>
-            <input
-              type="date"
-              value={form.move_date}
-              min={new Date().toISOString().split('T')[0]}
-              onChange={e => setForm(f => ({ ...f, move_date: e.target.value }))}
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
-            />
-            <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">Don't know yet? Skip this — you can set it from your dashboard later.</p>
-            <div className="flex gap-3">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Your permit &amp; situation</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">
+              Helps us tailor your visa and admin tasks. Skip anything you&apos;re unsure about.
+            </p>
+
+            {/* Permit arrangement */}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Who is arranging your work permit?</label>
+            <div className="grid grid-cols-2 gap-2 mb-5">
+              {[
+                { val: 'employer', label: 'My employer (most common)' },
+                { val: 'self', label: 'I\'m arranging it myself' },
+                { val: 'eu_citizen', label: 'EU/EEA citizen — no permit needed' },
+                { val: 'unsure', label: 'Not sure yet' },
+              ].map(({ val, label }) => (
+                <button key={val}
+                  onClick={() => setForm(f => ({ ...f, employer_arranges_permit: val, employer_is_sponsor: null }))}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-semibold border transition text-left ${
+                    form.employer_arranges_permit === val
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setForm(f => ({ ...f, employer_arranges_permit: '', employer_is_sponsor: null }))}
+              className={`mb-5 w-full py-2 rounded-xl text-xs font-semibold border transition ${
+                form.employer_arranges_permit === ''
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}>
+              Skip this question
+            </button>
+
+            {/* IND sponsor — only if employer is handling */}
+            {form.employer_arranges_permit === 'employer' && (
+              <div className="mb-5">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Is your employer a registered IND sponsor?</label>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Most large companies are. If not, it adds 4–8 weeks before they can apply.</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setForm(f => ({ ...f, employer_is_sponsor: true }))} className={btn(form.employer_is_sponsor === true)}>Yes</button>
+                  <button onClick={() => setForm(f => ({ ...f, employer_is_sponsor: false }))} className={btn(form.employer_is_sponsor === false)}>No / not sure</button>
+                  <button onClick={() => setForm(f => ({ ...f, employer_is_sponsor: null }))} className={btn(form.employer_is_sponsor === null)}>Skip</button>
+                </div>
+              </div>
+            )}
+
+            {/* Already in NL */}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Are you already living in the Netherlands?</label>
+            <div className="flex gap-3 mb-5">
+              <button onClick={() => setForm(f => ({ ...f, already_in_netherlands: true }))} className={btn(form.already_in_netherlands === true)}>Yes, I&apos;m already here</button>
+              <button onClick={() => setForm(f => ({ ...f, already_in_netherlands: false }))} className={btn(form.already_in_netherlands === false)}>No, moving from abroad</button>
+              <button onClick={() => setForm(f => ({ ...f, already_in_netherlands: null }))} className={btn(form.already_in_netherlands === null)}>Skip</button>
+            </div>
+
+            {/* Driving licence */}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Do you have a driving licence?</label>
+            <div className="flex gap-3 mb-3">
+              <button onClick={() => setForm(f => ({ ...f, has_driving_licence: true }))} className={btn(form.has_driving_licence === true)}>Yes</button>
+              <button onClick={() => setForm(f => ({ ...f, has_driving_licence: false, driving_licence_country: '' }))} className={btn(form.has_driving_licence === false)}>No</button>
+              <button onClick={() => setForm(f => ({ ...f, has_driving_licence: null, driving_licence_country: '' }))} className={btn(form.has_driving_licence === null)}>Skip</button>
+            </div>
+            {form.has_driving_licence === true && (
+              <div className="mb-5">
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Where was it issued?</label>
+                <select
+                  value={form.driving_licence_country}
+                  onChange={e => setForm(f => ({ ...f, driving_licence_country: e.target.value }))}
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="">Select country (optional)</option>
+                  {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+            {!form.has_driving_licence && form.has_driving_licence !== null && <div className="mb-5" />}
+
+            {/* 30% ruling — only for salaried employees */}
+            {form.employment_type === 'employed' && (
+              <>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Do you expect to qualify for the 30% ruling?</label>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+                  Tax benefit for expats earning above the IND salary threshold — must apply within 4 months of your first Dutch workday.
+                  <a href="/tools/30-ruling" target="_blank" className="text-indigo-500 dark:text-indigo-400 ml-1 underline">Check eligibility →</a>
+                </p>
+                <div className="flex gap-3 mb-2">
+                  <button onClick={() => setForm(f => ({ ...f, expects_30_ruling: true }))} className={btn(form.expects_30_ruling === true)}>Yes, likely</button>
+                  <button onClick={() => setForm(f => ({ ...f, expects_30_ruling: false }))} className={btn(form.expects_30_ruling === false)}>Probably not</button>
+                  <button onClick={() => setForm(f => ({ ...f, expects_30_ruling: null }))} className={btn(form.expects_30_ruling === null)}>Not sure / skip</button>
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-3 mt-6">
               <button onClick={() => setStep(3)}
                 className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 py-3 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                 ← Back
@@ -396,11 +505,38 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 5 — HR contact (optional) & generate */}
+        {/* Step 5 — Move date */}
         {step === 5 && (
           <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">When are you planning to move?</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">This helps us prioritise and sequence your tasks correctly.</p>
+            <input
+              type="date"
+              value={form.move_date}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={e => setForm(f => ({ ...f, move_date: e.target.value }))}
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+            />
+            <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">Don&apos;t know yet? Skip this — you can set it from your dashboard later.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setStep(4)}
+                className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 py-3 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                ← Back
+              </button>
+              <button
+                onClick={() => setStep(6)}
+                className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition">
+                Continue →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 6 — HR contact & generate */}
+        {step === 6 && (
+          <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Do you have an HR or relocation contact?</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">They'll receive updates when you complete tasks. You can skip this.</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">They&apos;ll receive updates when you complete tasks. You can skip this.</p>
             <input
               type="text"
               placeholder="Contact name (e.g. Sarah — HR)"
@@ -438,7 +574,7 @@ export default function OnboardingPage() {
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setStep(4)}
+              <button onClick={() => setStep(5)}
                 className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 py-3 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                 ← Back
               </button>

@@ -332,6 +332,73 @@ def _notify_critical_doc_validation(supabase, doc: dict, profile: dict, validati
         )
 
 
+class EnrichProfileRequest(BaseModel):
+    user_id: str
+
+
+@router.post("/documents/{document_id}/enrich-profile")
+async def enrich_profile_from_document(document_id: str, body: EnrichProfileRequest):
+    """Extract profile hints (salary, job title, permit track) from an employment contract.
+    Returns hints the frontend can offer to apply to the user's profile."""
+    supabase = get_supabase()
+
+    doc_res = supabase.table("documents").select("*").eq("id", document_id).eq("user_id", body.user_id).execute()
+    if not doc_res.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    doc = doc_res.data[0]
+
+    profile_res = supabase.table("profiles").select("tier, trial_ends_at").eq("id", body.user_id).execute()
+    if not profile_res.data or not is_paid_or_trial(profile_res.data[0]):
+        raise HTTPException(status_code=402, detail="paid_tier_required")
+
+    mime_type = doc.get("mime_type", "")
+    if mime_type not in SUPPORTED_MIME_TYPES:
+        raise HTTPException(status_code=422, detail=f"Unsupported file type: {mime_type}")
+
+    try:
+        file_bytes = supabase.storage.from_("documents").download(doc["file_path"])
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not fetch document: {e}")
+
+    encoded = base64.standard_b64encode(file_bytes).decode("utf-8")
+    if mime_type == MIME_PDF:
+        content_block: dict = {"type": "document", "source": {"type": "base64", "media_type": MIME_PDF, "data": encoded}}
+    else:
+        content_block = {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": encoded}}
+
+    user_prompt = (
+        "Extract the following from this employment document. "
+        "Return ONLY this JSON — no other text:\n"
+        "{\n"
+        '  "salary_monthly_eur": <number or null — gross monthly salary in EUR; convert if annual>,\n'
+        '  "job_title": "<string or null>",\n'
+        '  "permit_track": "highly_skilled_migrant" | "ict_transfer" | "daft" | "unknown",\n'
+        '  "employer_name": "<string or null>"\n'
+        "}\n\n"
+        "For permit_track: 'highly_skilled_migrant' if salary >= €4000/mo and standard Dutch employment; "
+        "'ict_transfer' if intra-company transfer; 'daft' if DAFT or self-employment treaty mentioned; 'unknown' if unclear."
+    )
+
+    try:
+        claude = get_claude()
+        message = claude.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=400,
+            system="Extract employment contract details as JSON. Never reproduce personal data like names, addresses, or ID numbers.",
+            messages=[{"role": "user", "content": [content_block, {"type": "text", "text": user_prompt}]}],
+        )
+        raw = message.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        hints = json.loads(raw)
+    except Exception:
+        return {"profile_hints": None}
+
+    return {"profile_hints": hints}
+
+
 @router.get("/documents/{document_id}/validation")
 async def get_validation(document_id: str, user_id: str):
     supabase = get_supabase()
