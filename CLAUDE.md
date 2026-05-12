@@ -57,6 +57,10 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEN
 - Checklist generation uses all 7 new fields; regenerate returns `{ tasks, diff: { added: N, removed: N } }` — dashboard shows a dismissible diff banner
 - Profile enrichment: `POST /api/documents/{id}/enrich-profile` — paid only, no rate limit, extracts `salary_monthly_eur`, `job_title`, `permit_track`, `employer_name` from employment contracts via Claude; dashboard shows a dismissible offer banner when triggered
 - Dashboard Priority Actions widget (top of sidebar): shows up to 3 items — overdue tasks, due-within-7-days tasks, next critical task — each with a colored left border and scroll-to-task arrow
+- Migration 015 added `extracted_date` (TEXT, YYYY-MM-DD) + `extracted_date_label` (TEXT, max 4 words) columns to `documents` table
+- Document date extraction: `POST /api/documents/{id}/extract-date` — claude-haiku-4-5-20251001, no rate limit, available to all tiers; extracts single most important date (passport expiry, flight departure, employment start, tenancy begin, etc.) and persists to documents table; called automatically on every validatable upload
+- Relocation Timeline (`TimelineBanner`): replaces CountdownBanner on dashboard; proportional horizontal timeline with pulsing "today" cursor; milestones from profile.created_at, extracted document dates, IND appointment, container ship date, profile.move_date; renders only when profile has at least 2 milestones; labels alternate above/below to reduce collision
+- Completing any task without an attached document shows a confirmation dialog; critical tasks say "IND applications require supporting documents", all others say "attach to help build your relocation timeline"
 
 ## Task categories (fixed order)
 
@@ -70,7 +74,7 @@ RDW driving licence exchange lives in `admin` (post-arrival), not `transport`.
 
 ## Current state
 
-Working end-to-end: Google OAuth / email auth → onboarding (6 steps: basics, employment, logistics+school-stage, permit+situation, move-date, HR-contact) → AI checklist (EU citizen path, partner-aware, school-stage-specific tasks, 30%-ruling task, RDW driving-licence note, `[Partner]` prefixed tasks) → dashboard (Priority Actions sidebar widget, progress, tasks) → task search → custom task add/delete → document upload → AI validation → employment-doc profile enrichment → risk score → iCal feed → task reminders (partner email) → HR contact notifications → profile editing → checklist regeneration (diff banner) → IND appointment slot monitor → 30% ruling calculator → resource links → container arrival estimate → document pack (merged PDF) → relocation allowance tracker → shareable HR progress link.
+Working end-to-end: Google OAuth / email auth → onboarding (6 steps: basics, employment, logistics+school-stage, permit+situation, move-date, HR-contact) → AI checklist (EU citizen path, partner-aware, school-stage-specific tasks, 30%-ruling task, RDW driving-licence note, `[Partner]` prefixed tasks) → dashboard (Priority Actions sidebar widget, relocation timeline, progress, tasks) → task search → custom task add/delete → document upload → AI validation → document date extraction (auto on upload, feeds timeline) → employment-doc profile enrichment → risk score → iCal feed → task reminders (partner email) → HR contact notifications → profile editing → checklist regeneration (diff banner) → IND appointment slot monitor → 30% ruling calculator → resource links → container arrival estimate → document pack (merged PDF) → relocation allowance tracker → shareable HR progress link.
 
 Not yet built: Stripe payments, B2B HR portal.
 
@@ -97,6 +101,7 @@ Not yet built: Stripe payments, B2B HR portal.
 | DELETE | `/api/documents/{document_id}` | Delete document |
 | POST | `/api/documents/{document_id}/validate` | AI document validation |
 | GET | `/api/documents/{document_id}/validation` | Get latest validation result |
+| POST | `/api/documents/{document_id}/extract-date` | Extract key date from document via claude-haiku (no rate limit, all tiers); persists to documents.extracted_date |
 | POST | `/api/documents/{document_id}/enrich-profile` | Extract salary, job title, permit track, employer from employment contract (paid; no rate limit) |
 | POST | `/api/risk-score/compute` | Compute + upsert risk score |
 | GET | `/api/risk-score/{user_id}` | Get cached risk score |
@@ -131,6 +136,7 @@ Not yet built: Stripe payments, B2B HR portal.
 - GitHub Actions secrets: `RAILWAY_URL` + `RESEND_API_KEY` set; `ind_monitor.yml` runs every Monday
 - Supabase: migration 013 run (`user_slots_available` column on `ind_monitor_subscriptions`, `ind_appointments` table)
 - Supabase: migration 014 run (7 new `profiles` columns — see Key constraints above)
+- Supabase: migration 015 run (`extracted_date` + `extracted_date_label` on `documents`)
 - Smoke test: OAuth login → onboarding → checklist → document upload → validation → risk score → IND subscribe → check "no slots" → iCal → edit profile → delete account
 
 ## Performance notes (full roadmap in PLAN.md)
@@ -171,6 +177,7 @@ Not yet built: Stripe payments, B2B HR portal.
 14. ✅ Checklist improvements — school-stage-specific tasks, RDW direct-exchange countries, 30%-ruling 4-month deadline task, employer_is_sponsor urgent blocker
 15. ✅ Profile enrichment from documents — employment contract → salary/job title/permit track extracted by Claude; dismissible offer banner on dashboard
 16. ✅ Dashboard Priority Actions widget — top-of-sidebar card showing overdue + due-soon + next critical tasks with scroll-to-task; regen diff + IND urgency + pre-departure milestone banners
+17. ✅ Document date extraction + Relocation Timeline — claude-haiku extracts key dates from uploaded docs (passport expiry, flight departure, employment start, tenancy begin); TimelineBanner replaces CountdownBanner; proportional horizontal timeline with pulsing today cursor, colour-coded nodes, alternating labels; milestones from profile + IND appointment + container ship + extracted document dates
 
 ### Phase 4 — Monetisation ← NEXT
 - Stripe one-time payment €19.99 (individual; relocation is bounded, not ongoing — no monthly anxiety)
