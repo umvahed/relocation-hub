@@ -426,6 +426,20 @@ export async function downloadAllowanceStatement(user_id: string): Promise<void>
   URL.revokeObjectURL(url)
 }
 
+// ── Document date extraction (for timeline) ──────────────────────────────────
+
+export async function extractDocumentDate(
+  document_id: string,
+  user_id: string
+): Promise<{ extracted_date: string | null; extracted_date_label: string | null }> {
+  const res = await fetch(`${API_URL}/api/documents/${document_id}/extract-date`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id }),
+  })
+  return handleResponse(res)
+}
+
 // ── Profile enrichment from document ────────────────────────────────────────
 
 export interface ProfileHints {

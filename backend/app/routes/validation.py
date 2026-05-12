@@ -399,6 +399,82 @@ async def enrich_profile_from_document(document_id: str, body: EnrichProfileRequ
     return {"profile_hints": hints}
 
 
+class ExtractDateRequest(BaseModel):
+    user_id: str
+
+
+@router.post("/documents/{document_id}/extract-date")
+async def extract_document_date(document_id: str, body: ExtractDateRequest):
+    """Extract the primary meaningful date from any uploaded document (passport expiry,
+    flight departure, employment start, etc.) for the relocation timeline."""
+    supabase = get_supabase()
+
+    doc_res = supabase.table("documents").select("*").eq("id", document_id).eq("user_id", body.user_id).execute()
+    if not doc_res.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    doc = doc_res.data[0]
+
+    mime_type = doc.get("mime_type", "")
+    if mime_type not in SUPPORTED_MIME_TYPES:
+        return {"extracted_date": None, "extracted_date_label": None}
+
+    try:
+        file_bytes = supabase.storage.from_("documents").download(doc["file_path"])
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not fetch document: {e}")
+
+    encoded = base64.standard_b64encode(file_bytes).decode("utf-8")
+    if mime_type == MIME_PDF:
+        content_block: dict = {"type": "document", "source": {"type": "base64", "media_type": MIME_PDF, "data": encoded}}
+    else:
+        content_block = {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": encoded}}
+
+    prompt = (
+        "Extract the single most important date from this document for a relocation timeline.\n"
+        "Return ONLY valid JSON — no other text:\n"
+        '{"date_value": "YYYY-MM-DD or null", "date_label": "max 4 words"}\n\n'
+        "Rules by document type:\n"
+        "- Passport / ID card: expiry date → label 'Passport expires'\n"
+        "- Flight ticket / boarding pass: departure date → label 'Departure to [city]'\n"
+        "- Employment contract / offer letter: employment start date → label 'Employment starts'\n"
+        "- Lease / tenancy agreement: tenancy start date → label 'Tenancy begins'\n"
+        "- IND / immigration letter: permit validity start → label 'Permit valid from'\n"
+        "- Insurance certificate: policy start date → label 'Insurance starts'\n"
+        "- Police clearance / apostille: issue date → label 'Certificate issued'\n"
+        "- If no clear date can be found: {\"date_value\": null, \"date_label\": null}"
+    )
+
+    try:
+        claude = get_claude()
+        message = claude.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=80,
+            messages=[{"role": "user", "content": [content_block, {"type": "text", "text": prompt}]}],
+        )
+        raw = message.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        result = json.loads(raw)
+    except Exception:
+        return {"extracted_date": None, "extracted_date_label": None}
+
+    date_value = result.get("date_value")
+    date_label = result.get("date_label")
+
+    if date_value and date_label:
+        try:
+            supabase.table("documents").update({
+                "extracted_date": date_value,
+                "extracted_date_label": date_label,
+            }).eq("id", document_id).execute()
+        except Exception:
+            pass
+
+    return {"extracted_date": date_value, "extracted_date_label": date_label}
+
+
 @router.get("/documents/{document_id}/validation")
 async def get_validation(document_id: str, user_id: str):
     supabase = get_supabase()

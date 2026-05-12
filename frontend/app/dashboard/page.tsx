@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, updateProfile, getDocumentValidation, validateDocument, createCustomTask, deleteTask, getIndAppointment, enrichProfileFromDocument, type RiskScore, type ValidationResult, type ProfileHints } from '@/lib/api'
+import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, updateProfile, getDocumentValidation, validateDocument, createCustomTask, deleteTask, getIndAppointment, enrichProfileFromDocument, extractDocumentDate, type RiskScore, type ValidationResult, type ProfileHints } from '@/lib/api'
 import RiskScoreWidget from '@/app/components/RiskScoreWidget'
 import IndMonitorWidget from '@/app/components/IndMonitorWidget'
 import ResourcesWidget from '@/app/components/ResourcesWidget'
@@ -135,6 +135,125 @@ function ContainerArrivalBanner({ shipDate, originCountry }: { shipDate: string;
   )
 }
 
+function TimelineBanner({
+  profile,
+  indAppointment,
+  allDocuments,
+}: {
+  profile: any
+  indAppointment: any
+  allDocuments: any[]
+}) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+
+  const raw: Array<{ date: Date; label: string; icon: string }> = []
+  if (profile?.created_at) raw.push({ date: new Date(profile.created_at), label: 'Registered', icon: '📋' })
+  for (const d of allDocuments) {
+    if (d.extracted_date && d.extracted_date_label) {
+      raw.push({ date: new Date(d.extracted_date), label: d.extracted_date_label, icon: '📄' })
+    }
+  }
+  if (indAppointment?.appointment_date) raw.push({ date: new Date(indAppointment.appointment_date), label: 'IND appointment', icon: '🏛️' })
+  if (profile?.container_ship_date && (profile.shipping_type === 'container' || profile.shipping_type === 'both')) {
+    raw.push({ date: new Date(profile.container_ship_date), label: 'Container ships', icon: '🚢' })
+  }
+  if (profile?.move_date) raw.push({ date: new Date(profile.move_date), label: 'Moving day', icon: '✈️' })
+
+  if (!profile?.move_date || raw.length < 2) return null
+
+  raw.sort((a, b) => a.date.getTime() - b.date.getTime())
+  // Dedupe same-day items (keep first)
+  const items = raw.filter((m, i, a) => i === 0 || m.date.toDateString() !== a[i - 1].date.toDateString()).slice(0, 8)
+
+  // Range includes today so "You are here" is always visible
+  const allTs = [...items.map(m => m.date.getTime()), today.getTime()]
+  const minT = Math.min(...allTs)
+  const maxT = Math.max(...allTs)
+  const span = maxT - minT || 1
+  // Clamp to [2, 98] so edge labels don't get clipped
+  const toPct = (d: Date) => Math.max(2, Math.min(98, ((d.getTime() - minT) / span) * 100))
+  const todayPct = toPct(today)
+
+  const moveDate = new Date(profile.move_date)
+  const daysToMove = Math.round((moveDate.getTime() - today.getTime()) / 86400000)
+
+  // Layout constants
+  const MID = 50    // px from top where the line sits
+  const H   = 110   // total container height
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 px-5 pt-4 pb-2">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-sm font-semibold text-gray-900 dark:text-white">Relocation Timeline</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          {daysToMove > 0
+            ? `${daysToMove} day${daysToMove !== 1 ? 's' : ''} to moving day`
+            : daysToMove === 0
+              ? 'Moving day! 🎉'
+              : `${Math.abs(daysToMove)} day${Math.abs(daysToMove) !== 1 ? 's' : ''} since moving 🌷`}
+        </p>
+      </div>
+
+      {/* Timeline canvas */}
+      <div className="relative" style={{ height: H }}>
+        {/* Base line */}
+        <div className="absolute left-0 right-0 bg-gray-100 dark:bg-gray-700"
+          style={{ top: MID, height: 2, borderRadius: 1 }} />
+        {/* Past-progress fill */}
+        <div className="absolute left-0 bg-indigo-200 dark:bg-indigo-800"
+          style={{ top: MID, height: 2, width: `${todayPct}%`, borderRadius: 1 }} />
+
+        {/* Today cursor */}
+        <div className="absolute z-20" style={{ left: `${todayPct}%`, top: 0, height: H }}>
+          <div className="absolute left-0 w-px bg-indigo-400 dark:bg-indigo-500 opacity-40" style={{ top: 0, bottom: 0 }} />
+          <div className="absolute w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse -translate-x-1/2"
+            style={{ top: MID - 5 }} />
+          <span className="absolute -translate-x-1/2 text-[9px] font-bold text-indigo-500 dark:text-indigo-400 whitespace-nowrap"
+            style={{ top: MID + 9 }}>
+            Today
+          </span>
+        </div>
+
+        {/* Milestone nodes */}
+        {items.map((m, i) => {
+          const pct = toPct(m.date)
+          const isPast = m.date <= today
+          const isMove = m.label === 'Moving day'
+          const above = i % 2 === 0
+          const ds = m.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+
+          return (
+            <div key={i} className="absolute z-10" style={{ left: `${pct}%` }}>
+              {/* Node circle */}
+              <div
+                className={`absolute rounded-full border-2 -translate-x-1/2 -translate-y-1/2 ${
+                  isMove
+                    ? 'w-4 h-4 bg-indigo-500 border-indigo-500 shadow-md shadow-indigo-200 dark:shadow-indigo-900'
+                    : isPast
+                      ? 'w-3 h-3 bg-emerald-500 border-emerald-500'
+                      : 'w-3 h-3 bg-white dark:bg-gray-800 border-gray-400 dark:border-gray-500'
+                }`}
+                style={{ top: MID + 1 }}
+              />
+              {/* Label */}
+              <div
+                className="absolute -translate-x-1/2 text-center"
+                style={above ? { bottom: H - MID + 6, width: 80 } : { top: MID + 14, width: 80 }}
+              >
+                <p className="text-[10px] font-medium text-gray-700 dark:text-gray-200 leading-snug truncate">
+                  {m.icon} {m.label}
+                </p>
+                <p className="text-[9px] text-gray-400 dark:text-gray-500">{ds}</p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<any[]>([])
   const [user, setUser] = useState<any>(null)
@@ -172,6 +291,7 @@ export default function DashboardPage() {
   const [dismissedPreDeparture, setDismissedPreDeparture] = useState(false)
   const [enrichmentHint, setEnrichmentHint] = useState<{ hints: ProfileHints; docName: string } | null>(null)
   const [indAppointment, setIndAppointment] = useState<any>(undefined)
+  const [allDocuments, setAllDocuments] = useState<any[]>([])
   const settingsRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -190,9 +310,14 @@ export default function DashboardPage() {
       if (prof?.tier === 'paid' || profTrialActive) {
         getRiskScore(data.user.id).then(setRiskScore).catch(() => null)
       }
-      // Load storage usage
-      const { data: docs } = await supabase.from('documents').select('file_size').eq('user_id', data.user.id)
-      if (docs) setStorageUsed(docs.reduce((sum, d) => sum + (d.file_size || 0), 0))
+      // Load storage usage + timeline document dates
+      const { data: docs } = await supabase.from('documents')
+        .select('id, task_id, file_size, extracted_date, extracted_date_label')
+        .eq('user_id', data.user.id)
+      if (docs) {
+        setStorageUsed(docs.reduce((sum, d) => sum + (d.file_size || 0), 0))
+        setAllDocuments(docs)
+      }
       setLoading(false)
     })
   }, [])
@@ -224,15 +349,16 @@ export default function DashboardPage() {
   const toggleTask = async (task: any) => {
     if (toggling.has(task.id)) return
     setTaskBlockMsg(prev => { const n = { ...prev }; delete n[task.id]; return n })
-    if (task.status !== 'completed' && task.category === 'critical') {
-      // Ensure docs are loaded even if task was never expanded
+    if (task.status !== 'completed') {
+      // Load docs for this task if not already cached
       let docs = taskDocs[task.id]
       if (docs === undefined) {
         const { data } = await supabase.from('documents').select('*').eq('task_id', task.id)
         docs = data || []
         setTaskDocs(prev => ({ ...prev, [task.id]: docs as any[] }))
       }
-      if (isPaid) {
+      // Validation block: critical tasks on paid tier only
+      if (task.category === 'critical' && isPaid) {
         const blockedDoc = docs.find((d: any) => taskValidations[d.id]?.status === 'fail' || taskValidations[d.id]?.status === 'warn')
         if (blockedDoc) {
           const v = taskValidations[blockedDoc.id]
@@ -241,7 +367,7 @@ export default function DashboardPage() {
           return
         }
       }
-      // No documents attached — require confirmation before completing
+      // All tasks: show confirmation if no document attached
       if (docs.length === 0) {
         setConfirmCompleteTaskId(task.id)
         return
@@ -305,6 +431,19 @@ export default function DashboardPage() {
       if (docId && task?.category === 'employment' && isPaid) {
         enrichProfileFromDocument(docId, user.id)
           .then(result => { if (result.profile_hints) setEnrichmentHint({ hints: result.profile_hints, docName: file.name }) })
+          .catch(() => null)
+      }
+      // Extract dates from all documents for the timeline
+      if (docId && VALIDATABLE_MIME_TYPES.has(processed.type)) {
+        extractDocumentDate(docId, user.id)
+          .then(result => {
+            if (result.extracted_date && result.extracted_date_label) {
+              setAllDocuments(prev => [
+                ...prev.filter(d => d.id !== docId),
+                { id: docId, task_id: taskId, extracted_date: result.extracted_date, extracted_date_label: result.extracted_date_label },
+              ])
+            }
+          })
           .catch(() => null)
       }
     }
@@ -495,7 +634,10 @@ export default function DashboardPage() {
                 <div className="text-3xl mb-3">📎</div>
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white">No documents attached</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">
-                  <span className="font-medium text-gray-800 dark:text-gray-200">&ldquo;{displayTitle}&rdquo;</span> is a critical task. IND applications require supporting documents.
+                  {task.category === 'critical'
+                    ? <><span className="font-medium text-gray-800 dark:text-gray-200">&ldquo;{displayTitle}&rdquo;</span> is a critical task. IND applications require supporting documents.</>
+                    : <>Attach a document to <span className="font-medium text-gray-800 dark:text-gray-200">&ldquo;{displayTitle}&rdquo;</span> to confirm completion and help build your relocation timeline.</>
+                  }
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Have you completed all required steps and do you have the documents ready?</p>
               </div>
@@ -804,7 +946,7 @@ export default function DashboardPage() {
 
         {/* Full-width banners */}
         <div className="space-y-4 mb-6">
-          {profile?.move_date && <CountdownBanner moveDate={profile.move_date} />}
+          {profile && <TimelineBanner profile={profile} indAppointment={indAppointment} allDocuments={allDocuments} />}
           {profile?.container_ship_date && (profile?.shipping_type === 'container' || profile?.shipping_type === 'both') && (
             <ContainerArrivalBanner shipDate={profile.container_ship_date} originCountry={profile.origin_country ?? ''} />
           )}
