@@ -25,7 +25,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">1. Who we are</h2>
-            <p>RelocationHub (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) is operated by <strong>[COMPANY NAME]</strong>, registered at <strong>[COMPANY ADDRESS]</strong>, registration number <strong>[KVK / COMPANY NUMBER]</strong>.</p>
+            <p>RelocationHub (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) is operated by <strong>Bitquanta</strong>, registered at <strong>Pieter Calandlaan 765, 1069SC Amsterdam, the Netherlands</strong>, KVK number <strong>97672920</strong>.</p>
             <p className="mt-2">We are the data controller for personal data processed through RelocationHub. Questions or requests about your data can be sent to <a href={`mailto:${SUPPORT_EMAIL}`} className="text-indigo-600 dark:text-indigo-400 hover:underline">{SUPPORT_EMAIL}</a>.</p>
           </section>
 

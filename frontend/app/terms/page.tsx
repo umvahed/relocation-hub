@@ -25,7 +25,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">1. About these terms</h2>
-            <p>These Terms of Service (&ldquo;Terms&rdquo;) govern your use of RelocationHub, operated by <strong>[COMPANY NAME]</strong> (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;), registered at <strong>[COMPANY ADDRESS]</strong>. By creating an account or using the service, you agree to these Terms. If you do not agree, do not use RelocationHub.</p>
+            <p>These Terms of Service (&ldquo;Terms&rdquo;) govern your use of RelocationHub, operated by <strong>Bitquanta</strong> (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;), registered at <strong>Pieter Calandlaan 765, 1069SC Amsterdam, the Netherlands</strong> (KVK 97672920). By creating an account or using the service, you agree to these Terms. If you do not agree, do not use RelocationHub.</p>
           </section>
 
           <section>
@@ -91,7 +91,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">9. Intellectual property</h2>
-            <p>All content on RelocationHub (design, code, copy, AI prompts, checklist templates) is owned by [COMPANY NAME] or its licensors. You may not copy, reproduce, or create derivative works without our written permission.</p>
+            <p>All content on RelocationHub (design, code, copy, AI prompts, checklist templates) is owned by Bitquanta or its licensors. You may not copy, reproduce, or create derivative works without our written permission.</p>
             <p className="mt-2">You retain ownership of documents you upload. By uploading, you grant us a limited licence to process them for the purpose of providing the service (validation, date extraction).</p>
           </section>
 
@@ -124,7 +124,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">14. Governing law</h2>
-            <p>These Terms are governed by Dutch law. Disputes will be submitted to the competent court in <strong>[CITY]</strong>, the Netherlands, unless EU consumer protection law requires otherwise.</p>
+            <p>These Terms are governed by Dutch law. Disputes will be submitted to the competent court in <strong>Amsterdam</strong>, the Netherlands, unless EU consumer protection law requires otherwise.</p>
           </section>
 
           <section>
