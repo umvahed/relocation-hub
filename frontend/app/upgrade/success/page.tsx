@@ -3,17 +3,13 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 
 export default function UpgradeSuccessPage() {
   const router = useRouter()
 
   useEffect(() => {
-    // Refresh the Supabase session so the re-fetched profile reflects tier='paid'
-    const supabase = createClient()
-    supabase.auth.getSession().then(() => {
-      setTimeout(() => router.push('/dashboard'), 4000)
-    })
+    const t = setTimeout(() => router.push('/dashboard'), 4000)
+    return () => clearTimeout(t)
   }, [router])
 
   return (
