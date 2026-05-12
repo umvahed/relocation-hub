@@ -78,7 +78,7 @@ export default function RiskScoreWidget({ userId, isPaid, hasConsent, initialSco
         <div className="flex items-center justify-between p-5 pb-4">
           <button
             onClick={() => setCollapsed(c => !c)}
-            className="flex items-center gap-3 flex-1 text-left min-w-0"
+            className="flex items-center gap-4 flex-1 text-left min-w-0"
           >
             <div className="min-w-0">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">Relocation Risk Score</h2>
