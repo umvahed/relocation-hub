@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, updateProfile, getDocumentValidation, validateDocument, createCustomTask, deleteTask, getIndAppointment, enrichProfileFromDocument, extractDocumentDate, type RiskScore, type ValidationResult, type ProfileHints } from '@/lib/api'
+import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, updateProfile, getDocumentValidation, validateDocument, createCustomTask, deleteTask, getIndAppointment, enrichProfileFromDocument, extractDocumentDate, createCheckoutSession, type RiskScore, type ValidationResult, type ProfileHints } from '@/lib/api'
 import RiskScoreWidget from '@/app/components/RiskScoreWidget'
 import IndMonitorWidget from '@/app/components/IndMonitorWidget'
 import ResourcesWidget from '@/app/components/ResourcesWidget'
@@ -286,6 +286,7 @@ export default function DashboardPage() {
   const [showShareLink, setShowShareLink] = useState(false)
   const [copiedShareLink, setCopiedShareLink] = useState(false)
   const [regenDiff, setRegenDiff] = useState<{ added: number; removed: number } | null>(null)
+  const [checkingOut, setCheckingOut] = useState(false)
   const [dismissedINDUrgency, setDismissedINDUrgency] = useState(false)
   const [preDepartureMilestone, setPreDepartureMilestone] = useState(false)
   const [dismissedPreDeparture, setDismissedPreDeparture] = useState(false)
@@ -321,6 +322,17 @@ export default function DashboardPage() {
       setLoading(false)
     })
   }, [])
+
+  const handleUpgrade = async () => {
+    if (!user?.email) return
+    setCheckingOut(true)
+    try {
+      const { checkout_url } = await createCheckoutSession(user.id, user.email)
+      window.location.href = checkout_url
+    } catch {
+      setCheckingOut(false)
+    }
+  }
 
   const performToggle = async (task: any) => {
     const newStatus = task.status === 'completed' ? 'pending' : 'completed'
@@ -873,19 +885,28 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Trial notice */}
-                  {(() => {
+                  {/* Upgrade notice */}
+                  {profile?.tier !== 'paid' && (() => {
                     const trialEndsAt = profile?.trial_ends_at
-                    if (!trialEndsAt || profile?.tier === 'paid') return null
-                    const daysLeft = Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)
-                    if (daysLeft <= 0) return null
-                    const isExpiring = daysLeft <= 2
+                    const daysLeft = trialEndsAt ? Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000) : 0
+                    const trialActive = daysLeft > 0
+                    const isExpiring = trialActive && daysLeft <= 2
                     return (
                       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                        <p className={`text-xs font-medium ${isExpiring ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                          {isExpiring ? `Trial ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : `Free trial — ${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining`}
-                          <a href="mailto:support@relocationhub.app?subject=Upgrade to paid plan" className="text-indigo-500 dark:text-indigo-400 ml-2 hover:underline">Upgrade →</a>
-                        </p>
+                        {trialActive && (
+                          <p className={`text-xs font-medium mb-2 ${isExpiring ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {isExpiring ? `Trial ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : `Free trial — ${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining`}
+                          </p>
+                        )}
+                        {!trialActive && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Unlock AI validation, risk score &amp; more</p>
+                        )}
+                        <button
+                          onClick={handleUpgrade}
+                          disabled={checkingOut}
+                          className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold transition">
+                          {checkingOut ? 'Redirecting…' : 'Upgrade — €19.99'}
+                        </button>
                       </div>
                     )
                   })()}
@@ -946,7 +967,7 @@ export default function DashboardPage() {
 
         {/* Full-width banners */}
         <div className="space-y-4 mb-6">
-          {profile && <TimelineBanner profile={profile} indAppointment={indAppointment} allDocuments={allDocuments} />}
+          {profile?.move_date && <CountdownBanner moveDate={profile.move_date} />}
           {profile?.container_ship_date && (profile?.shipping_type === 'container' || profile?.shipping_type === 'both') && (
             <ContainerArrivalBanner shipDate={profile.container_ship_date} originCountry={profile.origin_country ?? ''} />
           )}

@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_PUBLISHABLE_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    STRIPE_PRICE_ID: Optional[str] = None
     RESEND_API_KEY: Optional[str] = None
     RESEND_FROM_EMAIL: str = "Relocation Hub <onboarding@resend.dev>"
     FRONTEND_URL: str = "http://localhost:3000"

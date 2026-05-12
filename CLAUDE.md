@@ -30,6 +30,9 @@ backend/    → Railway (relocation-hub-production.up.railway.app)
 | `RESEND_FROM_EMAIL` | Railway |
 | `FRONTEND_URL` | Railway |
 | `ADMIN_SECRET` | Railway |
+| `STRIPE_SECRET_KEY` | Railway |
+| `STRIPE_WEBHOOK_SECRET` | Railway |
+| `STRIPE_PRICE_ID` | Railway |
 | `RAILWAY_URL` | GitHub Actions secret (IND weekly reset cron calls Railway directly) |
 
 Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEND_API_KEY` lives in BOTH Vercel (cron proxies) and Railway (email sending).
@@ -45,7 +48,7 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEN
 - GDPR: document bytes processed in Railway RAM only — never written to disk or logged. Only validation results (JSON) stored. Consent in `profiles.ai_validation_consent` + `ai_validation_consent_at`
 - Document validation supports PDF + images only (jpeg/png/gif/webp) — Word/DOCX returns 422
 - `api_usage` has a `call_type` column (`checklist` / `validation` / `risk_score`) — each type has independent daily limits with a UNIQUE(user_id, date, call_type) constraint
-- Tier gating: `profiles.tier` (`free` | `paid`). Paid tier manually granted via `POST /api/admin/grant-paid-tier` (X-Admin-Secret header) pre-Stripe
+- Tier gating: `profiles.tier` (`free` | `paid`). Stripe one-time payment €19.99: `POST /api/billing/create-checkout` → Stripe Checkout → webhook `checkout.session.completed` → `profiles.tier = 'paid'`. Also grantable manually via `POST /api/admin/grant-paid-tier` (X-Admin-Secret header)
 - Model in use: `claude-sonnet-4-6` for validation + risk score; `claude-sonnet-4-5` for checklist generation
 - `tasks.source` column: `'hardcoded'` (SA/general critical tasks), `'ai'` (Claude-generated), `'custom'` (user-added). Only `custom` tasks are deletable via `DELETE /api/checklist/task/{task_id}`
 - Partner tasks: titled `[Partner] ...` — displayed with a violet "Partner" badge on the dashboard (prefix stripped from display). Partner email receives reminders and completion notifications for these tasks
@@ -59,7 +62,7 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEN
 - Dashboard Priority Actions widget (top of sidebar): shows up to 3 items — overdue tasks, due-within-7-days tasks, next critical task — each with a colored left border and scroll-to-task arrow
 - Migration 015 added `extracted_date` (TEXT, YYYY-MM-DD) + `extracted_date_label` (TEXT, max 4 words) columns to `documents` table
 - Document date extraction: `POST /api/documents/{id}/extract-date` — claude-haiku-4-5-20251001, no rate limit, available to all tiers; extracts single most important date (passport expiry, flight departure, employment start, tenancy begin, etc.) and persists to documents table; called automatically on every validatable upload
-- Relocation Timeline (`TimelineBanner`): replaces CountdownBanner on dashboard; proportional horizontal timeline with pulsing "today" cursor; milestones from profile.created_at, extracted document dates, IND appointment, container ship date, profile.move_date; renders only when profile has at least 2 milestones; labels alternate above/below to reduce collision
+- Dashboard header still uses `CountdownBanner` (days to moving day). `TimelineBanner` component exists but is not rendered — extracted document dates are stored in `allDocuments` state for potential future use
 - Completing any task without an attached document shows a confirmation dialog; critical tasks say "IND applications require supporting documents", all others say "attach to help build your relocation timeline"
 
 ## Task categories (fixed order)
@@ -74,9 +77,9 @@ RDW driving licence exchange lives in `admin` (post-arrival), not `transport`.
 
 ## Current state
 
-Working end-to-end: Google OAuth / email auth → onboarding (6 steps: basics, employment, logistics+school-stage, permit+situation, move-date, HR-contact) → AI checklist (EU citizen path, partner-aware, school-stage-specific tasks, 30%-ruling task, RDW driving-licence note, `[Partner]` prefixed tasks) → dashboard (Priority Actions sidebar widget, relocation timeline, progress, tasks) → task search → custom task add/delete → document upload → AI validation → document date extraction (auto on upload, feeds timeline) → employment-doc profile enrichment → risk score → iCal feed → task reminders (partner email) → HR contact notifications → profile editing → checklist regeneration (diff banner) → IND appointment slot monitor → 30% ruling calculator → resource links → container arrival estimate → document pack (merged PDF) → relocation allowance tracker → shareable HR progress link.
+Working end-to-end: Google OAuth / email auth → onboarding (6 steps: basics, employment, logistics+school-stage, permit+situation, move-date, HR-contact) → AI checklist (EU citizen path, partner-aware, school-stage-specific tasks, 30%-ruling task, RDW driving-licence note, `[Partner]` prefixed tasks) → dashboard (Priority Actions sidebar widget, countdown banner, progress, tasks) → task search → custom task add/delete → document upload → AI validation → document date extraction (auto on upload, persisted to DB) → employment-doc profile enrichment → risk score → iCal feed → task reminders (partner email) → HR contact notifications → profile editing → checklist regeneration (diff banner) → IND appointment slot monitor → 30% ruling calculator → resource links → container arrival estimate → document pack (merged PDF) → relocation allowance tracker → shareable HR progress link → Stripe one-time upgrade (€19.99).
 
-Not yet built: Stripe payments, B2B HR portal.
+Not yet built: B2B HR portal.
 
 ## All API endpoints
 
@@ -126,6 +129,8 @@ Not yet built: Stripe payments, B2B HR portal.
 | DELETE | `/api/allowance/expense/{expense_id}` | Delete an expense (query param: user_id) |
 | GET | `/api/allowance/{user_id}/export` | Stream PDF allowance statement |
 | GET | `/api/share/{token}` | Public read-only progress summary (no auth) — name, task progress by category, risk score, doc count |
+| POST | `/api/billing/create-checkout` | Create Stripe Checkout session (one-time €19.99); returns `checkout_url` |
+| POST | `/api/billing/webhook` | Stripe webhook receiver; `checkout.session.completed` → `profiles.tier = 'paid'` |
 
 ## Go-live checklist (quick reference — full version in PLAN.md)
 
@@ -137,7 +142,8 @@ Not yet built: Stripe payments, B2B HR portal.
 - Supabase: migration 013 run (`user_slots_available` column on `ind_monitor_subscriptions`, `ind_appointments` table)
 - Supabase: migration 014 run (7 new `profiles` columns — see Key constraints above)
 - Supabase: migration 015 run (`extracted_date` + `extracted_date_label` on `documents`)
-- Smoke test: OAuth login → onboarding → checklist → document upload → validation → risk score → IND subscribe → check "no slots" → iCal → edit profile → delete account
+- Stripe: product + one-time price created, `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` + `STRIPE_PRICE_ID` set in Railway, webhook endpoint registered at `POST /api/billing/webhook`
+- Smoke test: OAuth login → onboarding → checklist → document upload → validation → risk score → IND subscribe → check "no slots" → iCal → edit profile → upgrade (Stripe) → delete account
 
 ## Performance notes (full roadmap in PLAN.md)
 
@@ -177,13 +183,10 @@ Not yet built: Stripe payments, B2B HR portal.
 14. ✅ Checklist improvements — school-stage-specific tasks, RDW direct-exchange countries, 30%-ruling 4-month deadline task, employer_is_sponsor urgent blocker
 15. ✅ Profile enrichment from documents — employment contract → salary/job title/permit track extracted by Claude; dismissible offer banner on dashboard
 16. ✅ Dashboard Priority Actions widget — top-of-sidebar card showing overdue + due-soon + next critical tasks with scroll-to-task; regen diff + IND urgency + pre-departure milestone banners
-17. ✅ Document date extraction + Relocation Timeline — claude-haiku extracts key dates from uploaded docs (passport expiry, flight departure, employment start, tenancy begin); TimelineBanner replaces CountdownBanner; proportional horizontal timeline with pulsing today cursor, colour-coded nodes, alternating labels; milestones from profile + IND appointment + container ship + extracted document dates
+17. ✅ Document date extraction — claude-haiku extracts key dates from uploaded docs (passport expiry, flight departure, employment start, tenancy begin); persisted to `documents.extracted_date` + `documents.extracted_date_label`; called automatically on every validatable upload
+18. ✅ Stripe payments — one-time €19.99; `POST /api/billing/create-checkout` + `POST /api/billing/webhook`; webhook sets `profiles.tier = 'paid'`; upgrade button in sidebar for free/expired-trial users; `/upgrade/success` landing page
 
-### Phase 4 — Monetisation ← NEXT
-- Stripe one-time payment €19.99 (individual; relocation is bounded, not ongoing — no monthly anxiety)
-- `POST /api/billing/create-checkout` + `POST /api/billing/webhook`
-- Webhook: `checkout.session.completed` → `profiles.tier = 'paid'`
-- No frontend/backend guard changes needed (tier checks already in place)
+### Phase 4 — B2B HR Portal ← NEXT
 
 ### Phase 5 — B2B HR Portal
 **Goal:** Companies pay per-seat; HR admins manage multiple relocatees from one dashboard.

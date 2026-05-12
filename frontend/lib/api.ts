@@ -440,6 +440,17 @@ export async function extractDocumentDate(
   return handleResponse(res)
 }
 
+// ── Billing ──────────────────────────────────────────────────────────────────
+
+export async function createCheckoutSession(user_id: string, email: string): Promise<{ checkout_url: string }> {
+  const res = await fetch(`${API_URL}/api/billing/create-checkout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id, email }),
+  })
+  return handleResponse(res)
+}
+
 // ── Profile enrichment from document ────────────────────────────────────────
 
 export interface ProfileHints {
