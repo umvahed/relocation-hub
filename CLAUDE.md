@@ -135,7 +135,7 @@ Not yet built: B2B HR portal.
 ## Go-live checklist (quick reference — full version in PLAN.md)
 
 - Supabase: migrations 000–011 run, RLS on all tables, `documents` storage bucket with auth policies, Google OAuth redirect set to `/auth/callback`
-- Railway: all 8 core env vars set, `GET /api/health` returns 200, CORS origin matches Vercel URL exactly
+- Railway: all env vars set (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ANTHROPIC_API_KEY, RESEND_API_KEY, RESEND_FROM_EMAIL, FRONTEND_URL, ADMIN_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID), `GET /api/health` returns 200, CORS origin matches Vercel URL exactly
 - Vercel: 3 `NEXT_PUBLIC_*` env vars set, build passes
 - cron-job.org: 4 jobs active (keepalive 5min, reminders daily, digest weekly, ind-appointment-reminders daily)
 - GitHub Actions secrets: `RAILWAY_URL` + `RESEND_API_KEY` set; `ind_monitor.yml` runs every Monday
@@ -187,8 +187,6 @@ Not yet built: B2B HR portal.
 18. ✅ Stripe payments — one-time €19.99; `POST /api/billing/create-checkout` + `POST /api/billing/webhook`; webhook sets `profiles.tier = 'paid'`; upgrade button in sidebar for free/expired-trial users; `/upgrade/success` landing page
 
 ### Phase 4 — B2B HR Portal ← NEXT
-
-### Phase 5 — B2B HR Portal
 **Goal:** Companies pay per-seat; HR admins manage multiple relocatees from one dashboard.
 
 **Data model additions:**
@@ -207,5 +205,5 @@ Not yet built: B2B HR portal.
 **Architecture notes:**
 - RLS policies: add `hr_admin` read policies on `tasks`, `documents`, `document_validations` scoped to `company_users`
 - All HR writes go through backend (never direct Supabase from HR portal) to enforce audit trail
-- Design RLS before Stripe (Phase 4) to avoid retrofitting security after paying users exist
-- Pricing: per-employee seat fee billed through Stripe, separate product from individual €3.99/mo
+- Design RLS early to avoid retrofitting security after paying users exist
+- Pricing: per-employee seat fee billed through Stripe, separate product from individual one-time €19.99
