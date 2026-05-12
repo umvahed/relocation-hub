@@ -8,8 +8,11 @@
 
 **Target users:** Expats moving to the Netherlands, primarily from South Africa, UK, US, India, and other countries. Also B2B: HR teams managing employee relocations.
 
+**Operator:** Bitquanta, Pieter Calandlaan 765, 1069SC Amsterdam (KVK 97672920)
+**Support:** support@relocationhub.app
+
 **Revenue model:**
-- Direct: €19.99 one-time per user (self-serve, Stripe — Phase 4)
+- Direct: €19.99 one-time per user (self-serve, Stripe — live)
 - Future B2B: per-seat pricing for HR/company portals
 
 ---
@@ -34,6 +37,10 @@
                      │   Auth +       │      └─────────────────┘  └──────────────┘
                      │   Storage)     │
                      └────────────────┘
+                                               ┌──────────────────┐
+                                               │  Stripe          │
+                                               │  (payments)      │
+                                               └──────────────────┘
 ```
 
 **Cron jobs:**
@@ -53,10 +60,12 @@ Note: `vercel.json` is intentionally empty — Vercel Hobby only allows daily cr
 **Stack:**
 - FastAPI + Uvicorn
 - Supabase Python client (database + auth)
-- Anthropic Python SDK — `claude-sonnet-4-5` for checklist, `claude-sonnet-4-6` for validation + risk score
+- Anthropic Python SDK — `claude-sonnet-4-5` for checklist, `claude-sonnet-4-6` for validation + risk score, `claude-haiku-4-5-20251001` for date extraction
+- Stripe Python SDK — billing checkout + webhook
 - Pydantic v2 + pydantic-settings
 - resend (email)
 - pypdf (document pack PDF merging)
+- fpdf2 (cover page + allowance statement PDF generation)
 
 **Files:**
 ```
@@ -65,14 +74,16 @@ backend/
 │   ├── main.py           # App entrypoint, CORS middleware, route registration
 │   ├── config.py         # Env vars: SUPABASE_*, ANTHROPIC_API_KEY, FRONTEND_URL,
 │   │                     #   DAILY_AI_CALL_LIMIT=5, DAILY_VALIDATION_LIMIT=10,
-│   │                     #   DAILY_RISK_SCORE_LIMIT=3, ADMIN_SECRET, MAX_VALIDATION_FILE_SIZE
+│   │                     #   DAILY_RISK_SCORE_LIMIT=3, ADMIN_SECRET, MAX_VALIDATION_FILE_SIZE,
+│   │                     #   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID
 │   └── routes/
 │       ├── health.py         # GET /api/health
 │       ├── auth.py           # onboard, get/update/delete profile, consent PATCH, admin tier grant
 │       ├── checklist.py      # generate, regenerate, get, update task, custom task, usage
 │       ├── documents.py      # list, delete documents
-│       ├── validation.py     # POST validate, GET validation result
+│       ├── validation.py     # POST validate, GET validation result, POST extract-date, POST enrich-profile
 │       ├── risk_score.py     # POST compute, GET risk score
+│       ├── billing.py        # POST /billing/create-checkout, POST /billing/webhook (Stripe)
 │       ├── notifications.py  # notify_task_complete() + POST /notifications/weekly-digest
 │       ├── reminders.py      # POST /reminders/send + PATCH /reminders/task/{task_id}/due-date
 │       ├── calendar.py       # GET /calendar/{user_id}/feed.ics
@@ -108,6 +119,10 @@ backend/
 | DELETE | `/api/documents/{document_id}` | Delete document from storage + DB |
 | POST | `/api/documents/{document_id}/validate` | AI validation (paid + consent gated) |
 | GET | `/api/documents/{document_id}/validation` | Get latest validation result |
+| POST | `/api/documents/{document_id}/extract-date` | Extract key date via claude-haiku (all tiers, no rate limit); persists to `documents.extracted_date` |
+| POST | `/api/documents/{document_id}/enrich-profile` | Extract salary/job title/permit track/employer from employment contract (paid, no rate limit) |
+| POST | `/api/billing/create-checkout` | Create Stripe Checkout session (one-time €19.99); returns `checkout_url` |
+| POST | `/api/billing/webhook` | Stripe webhook: `checkout.session.completed` → `profiles.tier = 'paid'` |
 | POST | `/api/risk-score/compute` | Compute + upsert risk score (paid + consent gated) |
 | GET | `/api/risk-score/{user_id}` | Get cached risk score |
 | GET | `/api/calendar/{user_id}/feed.ics` | iCal feed for deadline tasks |
@@ -136,6 +151,7 @@ backend/
 - Checklist: 5 calls (`DAILY_AI_CALL_LIMIT`)
 - Validation: 10 calls (`DAILY_VALIDATION_LIMIT`)
 - Risk score: 3 calls (`DAILY_RISK_SCORE_LIMIT`)
+- Date extraction + profile enrichment: no rate limit
 - Tracked in `api_usage` with `call_type` column; UNIQUE(user_id, date, call_type)
 
 ---
@@ -183,9 +199,18 @@ tier_granted_at (timestamptz)
 trial_ends_at (timestamptz)   -- set once on first onboard; isPaid = tier='paid' OR trial_ends_at > now()
 ai_validation_consent (boolean, default false)
 ai_validation_consent_at (timestamptz)
-stripe_customer_id, stripe_subscription_id (text, nullable)
+stripe_customer_id (text, nullable)
+stripe_subscription_id (text, nullable)
 share_token (text, UNIQUE, nullable)   -- set on first share; used for /share/[token] public page
 relocation_allowance (numeric, nullable)   -- total allowance budget
+-- Migration 014 additions:
+employer_arranges_permit ('employer' | 'self' | 'eu_citizen' | 'unsure', nullable)
+employer_is_sponsor (boolean, nullable)
+has_driving_licence (boolean, nullable)
+driving_licence_country (text, nullable)
+children_school_stage ('preschool' | 'primary' | 'secondary' | 'both' | 'not_sure', nullable)
+expects_30_ruling (boolean, nullable)
+already_in_netherlands (boolean, nullable)
 created_at, updated_at
 ```
 
@@ -201,7 +226,10 @@ created_at, updated_at
 
 **`documents`**
 ```sql
-id, user_id, task_id (nullable), file_name, file_path, file_size, mime_type, category, created_at
+id, user_id, task_id (nullable), file_name, file_path, file_size, mime_type, category
+extracted_date (text, nullable)        -- YYYY-MM-DD; extracted by claude-haiku (migration 015)
+extracted_date_label (text, nullable)  -- max 4 words e.g. "Passport expiry date" (migration 015)
+created_at
 ```
 
 **`document_validations`** — AI results only, no raw file content
@@ -252,19 +280,22 @@ created_at
 ```
 
 **Migrations:**
+- `000_initial_schema.sql` — profiles, tasks, documents base schema
 - `001_phase1_engagement.sql` — api_usage, contact columns, reminder_sent_at
 - `002_document_validation_risk_score.sql` — document_validations, risk_scores, profiles tier/consent columns, api_usage call_type
 - `003_ind_monitor.sql` — ind_monitor_subscriptions
 - `004_profile_logistics_columns.sql` — employment_type, has_pets, shipping_type, has_relocation_allowance on profiles
-- `005_resource_links.sql` — destination_city, has_children, number_of_children on profiles
+- `005_profile_city_children.sql` — destination_city, has_children, number_of_children on profiles
 - `006_container_ship_date.sql` — container_ship_date on profiles
-- `007_notify_by_email.sql` — notify_by_email BOOLEAN NOT NULL DEFAULT TRUE on profiles
+- `007_notification_preferences.sql` — notify_by_email BOOLEAN NOT NULL DEFAULT TRUE on profiles
 - `008_custom_tasks_and_partner.sql` — tasks.source column; has_partner, partner_full_name, partner_email, partner_origin_country on profiles
 - `009_trial_ends_at.sql` — trial_ends_at TIMESTAMPTZ on profiles
 - `010_allowance_tracker.sql` — relocation_expenses table; relocation_allowance column on profiles
 - `011_share_token.sql` — share_token UNIQUE TEXT on profiles
-- `012_stripe_fields.sql` — stripe_customer_id, stripe_subscription_id on profiles
+- `012_ind_slot_data.sql` — stripe_customer_id, stripe_subscription_id on profiles
 - `013_ind_community_status.sql` — user_slots_available on ind_monitor_subscriptions; ind_appointments table
+- `014_expanded_onboarding.sql` — 7 new profile columns (employer_arranges_permit, employer_is_sponsor, has_driving_licence, driving_licence_country, children_school_stage, expects_30_ruling, already_in_netherlands)
+- `015_document_dates.sql` — extracted_date + extracted_date_label TEXT columns on documents
 
 **Supabase Storage:** `documents` bucket (private). RLS policies restrict to own folder.
 
@@ -282,15 +313,19 @@ created_at
 
 | Route | File | What it does |
 |---|---|---|
-| `/` | `app/page.tsx` | Landing page |
+| `/` | `app/page.tsx` | Landing page — hero, feature grid, pricing, footer with legal links |
 | `/login` | `app/login/page.tsx` | Email+password + Google OAuth + forgot password |
 | `/auth/callback` | `app/auth/callback/route.ts` | Smart routing: profile found → dashboard, no profile → onboarding |
 | `/auth/reset-password` | `app/auth/reset-password/page.tsx` | PKCE + implicit password reset |
-| `/onboarding` | `app/onboarding/page.tsx` | 5-step form; guards re-entry |
-| `/dashboard` | `app/dashboard/page.tsx` | Checklist, countdown banner, widgets, settings, delete account |
+| `/onboarding` | `app/onboarding/page.tsx` | 6-step form; guards re-entry |
+| `/dashboard` | `app/dashboard/page.tsx` | Checklist, countdown banner, widgets, upgrade CTA, settings, delete account |
 | `/documents` | `app/documents/page.tsx` | Documents grouped by category, ValidationBadge, Validate button |
 | `/share/[token]` | `app/share/[token]/page.tsx` | Public read-only HR progress one-pager (no auth required) |
 | `/tools/30-ruling` | `app/tools/30-ruling/page.tsx` | Public 30% ruling eligibility calculator — 4 hard gates, no auth |
+| `/privacy` | `app/privacy/page.tsx` | GDPR Privacy Policy (Bitquanta data controller) |
+| `/terms` | `app/terms/page.tsx` | Terms of Service (EU Consumer Rights, payment terms, IP, governing law) |
+| `/refunds` | `app/refunds/page.tsx` | Refund Policy (voluntary 14-day guarantee) |
+| `/upgrade/success` | `app/upgrade/success/page.tsx` | Post-Stripe-payment landing; auto-redirects to dashboard after 4s |
 
 **Components (`app/components/`):**
 
@@ -318,7 +353,7 @@ Note: IND weekly flag reset runs via GitHub Actions (`.github/workflows/ind_moni
 
 **Lib files:**
 - `lib/supabase.ts` — Browser Supabase client
-- `lib/api.ts` — All fetch calls to FastAPI backend (full TypeScript types for all features)
+- `lib/api.ts` — All fetch calls to FastAPI backend (full TypeScript types for all features, including `createCheckoutSession`)
 
 ---
 
@@ -351,6 +386,20 @@ Note: IND weekly flag reset runs via GitHub Actions (`.github/workflows/ind_moni
 - Exception handlers log only `document_id`, never file content.
 - Supported MIME types: `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `application/pdf`. Word/DOCX → 422.
 - Legal basis: Article 6(1)(b) GDPR — contract performance.
+- Strictly necessary cookies only (Supabase auth session) — no consent banner needed.
+- AP (Autoriteit Persoonsgegevens) is the supervisory authority.
+
+---
+
+### Stripe Billing
+
+- One-time payment €19.99 (EUR), card only via Stripe Checkout
+- `POST /api/billing/create-checkout`: accepts `{ user_id, email }`, creates Checkout session, returns `{ checkout_url }`
+- `POST /api/billing/webhook`: verifies `stripe-signature` header; on `checkout.session.completed` → `profiles.tier = 'paid'`
+- Success URL: `/upgrade/success?session_id={CHECKOUT_SESSION_ID}` — auto-redirects to dashboard after 4s
+- Cancel URL: `/dashboard`
+- `metadata.user_id` passed through Checkout to webhook for profile update
+- No guard logic changes needed — tier checks already in place throughout frontend + backend
 
 ---
 
@@ -373,6 +422,9 @@ ANTHROPIC_API_KEY
 RESEND_API_KEY, RESEND_FROM_EMAIL
 FRONTEND_URL=https://relocation-hub.vercel.app
 ADMIN_SECRET=<random string>
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID=price_...
 ```
 
 Vercel (frontend):
@@ -394,27 +446,30 @@ RESEND_API_KEY ← used by ind_monitor.yml for auth header (ADMIN_SECRET pattern
 ## Current Status
 
 ✅ Google OAuth + email/password auth (sign up, sign in, forgot password, reset password)
-✅ 5-step onboarding (origin country, employment, shipping, pets, children, partner, move date, HR contact, destination city, additional context)
-✅ AI checklist generation: hardcoded SA VFS tasks + Claude-generated tasks; children-aware (apostilled birth certs, school search, JGZ); partner-aware (`[Partner]` prefixed tasks)
+✅ 6-step onboarding (basics, employment, logistics+school-stage, permit+situation, move-date, HR-contact)
+✅ AI checklist generation: hardcoded SA VFS tasks + Claude-generated tasks; EU citizen path; children-aware; partner-aware (`[Partner]` prefixed tasks); school-stage-specific; 30%-ruling task; RDW driving-licence note
 ✅ Dashboard: category sections, dependency lock, countdown banner, progress bar, dark mode, violet Partner badge
+✅ Priority Actions widget: top-of-sidebar card showing overdue + due-soon + next critical tasks with scroll-to-task
 ✅ Legal due dates: auto-applied from move_date for gemeente (5d), DigiD (17d), health insurance (125d), RDW exchange (190d)
 ✅ Document upload per task (Supabase Storage)
+✅ Document date extraction: claude-haiku extracts key dates (passport expiry, flight, employment start, tenancy begin); persisted to `documents.extracted_date`; auto-runs on upload
 ✅ Document list page (`/documents`)
 ✅ iCal feed + per-task Google Calendar add button
 ✅ Task search bar
 ✅ Custom tasks: inline "+ Add a task" per category; `×` delete for source='custom' tasks only
 ✅ Delete account (cascades all data)
 ✅ Dark mode
-✅ **Document AI Validation** — Claude validates against IND 2025 rules, GDPR-compliant, paid tier gated; inline "Validate it with AI" nudges on critical tasks
+✅ **Document AI Validation** — Claude validates against IND 2025 rules, GDPR-compliant, paid tier gated
 ✅ **Relocation Risk Score** — 0–100 across 4 dimensions; top blocker surfaced in collapsed widget header; action list before dimension breakdown
-✅ Paid tier system: `profiles.tier`, admin grant endpoint, consent modal, consent withdrawal
+✅ Paid tier system: `profiles.tier`, Stripe checkout, webhook, consent modal, consent withdrawal
 ✅ 7-day free trial — trial_ends_at set on first onboard; all paid features accessible during trial
 ✅ Per-type rate limiting (checklist / validation / risk_score)
+✅ Task completion confirmation dialog: critical tasks warn about IND documents; others prompt to attach a document
 ✅ Task completion → HR contact email notification
 ✅ Weekly digest email to HR contacts (cron-job.org)
 ✅ Task due-date reminders via Resend (cron-job.org); partner email included for `[Partner]` tasks
 ✅ Email notification preference (notify_by_email toggle)
-✅ **Profile editing + checklist regeneration** — EditProfileModal (incl. partner section); preserves custom tasks + completed status + manually-set due dates
+✅ **Profile editing + checklist regeneration** — EditProfileModal (incl. partner section); preserves custom tasks + completed status + manually-set due dates; diff banner (added/removed count)
 ✅ **IND Appointment Slot Monitor** — personal per-user flag system; Monday GitHub Actions reset; exception period Nov 24–Jan 7; appointment booking with countdown + what-to-bring view; 7d/1d reminder emails; nearest desk detection
 ✅ **30% Ruling calculator** — `/tools/30-ruling`, public, 4 hard gates (employer/distance/timing/salary), net monthly estimate, linked from landing + dashboard
 ✅ **Resource links** — ResourcesWidget: Pararius deep-link (city-aware), ExpatGuide schools (if children), Marktplaats + IKEA (if container)
@@ -424,7 +479,11 @@ RESEND_API_KEY ← used by ind_monitor.yml for auth header (ADMIN_SECRET pattern
 ✅ **Relocation allowance tracker** — set total budget, log expenses per task, running balance, HR email on each expense, PDF statement export
 ✅ **Shareable progress link** — `/share/[token]` public read-only one-pager for HR: overall %, per-category bars, risk score, doc count; print-friendly
 ✅ **WhatsApp reminder copy** — preformatted message copied to clipboard for tasks with due dates
-🔲 Stripe billing (Phase 4)
+✅ **Profile enrichment from documents** — employment contract → salary/job title/permit track/employer extracted by Claude; dismissible offer banner on dashboard
+✅ **Expanded onboarding (6 steps)** — permit arrangement, IND sponsor, already-in-NL, driving licence, school stage, 30% ruling expectation; EU citizen path skips IND tasks
+✅ **Stripe payments** — one-time €19.99; sidebar upgrade button; `/upgrade/success` redirect page
+✅ **Legal pages** — `/privacy` (GDPR compliant), `/terms` (EU Consumer Rights Directive), `/refunds` (voluntary 14-day guarantee)
+✅ **Landing page revamp** — hero, 9-feature grid, pricing section, expanded footer with legal links
 
 ---
 
@@ -442,33 +501,39 @@ RESEND_API_KEY ← used by ind_monitor.yml for auth header (ADMIN_SECRET pattern
 - Keepalive + cron jobs running
 
 ### Phase 3 — Innovation ✅ COMPLETE
-1. ✅ Checklist regeneration + profile editing (preserves custom tasks + completion state)
-2. ✅ IND Appointment Slot Monitor — personal flag system, Monday GitHub Actions reset, appointment booking, 7d/1d reminders, exception period
-3. ✅ 30% Ruling eligibility calculator (`/tools/30-ruling`) — public, 4 hard gates, net monthly estimate
-4. ✅ Resource links — Pararius (city-aware), ExpatGuide schools (if children), Marktplaats + IKEA (if container)
-5. ✅ Container shipping improvements + task search — 3 options, ship date, arrival banner, search bar
-6. ✅ Document pack — merged PDF (cover + non-failed docs), download + send to HR
-7. ✅ Custom tasks — inline add per category, × delete for custom tasks only
-8. ✅ Partner support — partner fields on profile, `[Partner]` tasks in checklist, violet badge, partner email for notifications
-9. ✅ Relocation allowance tracker — set total budget, log expenses, balance, HR email on expense, PDF statement
-10. ✅ Shareable progress link (`/share/[token]`) — public one-pager for HR: overall %, category bars, risk score, doc count
-11. ✅ Risk score top blocker surfaced in collapsed widget header; action list before dimension breakdown
-12. ✅ WhatsApp reminder copy — preformatted message to clipboard for tasks with due dates
-13. ✅ Children tasks — apostilled birth certs (SA), school search (tweetalige/international/Dutch), JGZ, kinderopvang
+1. ✅ Checklist regeneration + profile editing
+2. ✅ IND Appointment Slot Monitor
+3. ✅ 30% Ruling eligibility calculator
+4. ✅ Resource links
+5. ✅ Container shipping improvements + task search
+6. ✅ Document pack — merged PDF
+7. ✅ Custom tasks + partner support
+8. ✅ Relocation allowance tracker
+9. ✅ Shareable progress link
+10. ✅ Risk score top blocker + action list
+11. ✅ WhatsApp reminder copy
+12. ✅ Expanded onboarding (6 steps) — EU citizen path, school stage, permit arrangement
+13. ✅ School-stage-specific tasks + RDW direct-exchange + 30%-ruling task + employer_is_sponsor blocker
+14. ✅ Profile enrichment from documents (salary, job title, permit track, employer)
+15. ✅ Dashboard Priority Actions widget
+16. ✅ Document date extraction (claude-haiku) + auto-runs on upload
+17. ✅ Task completion confirmation dialog (critical vs non-critical messaging)
 
-### Phase 4 — Monetisation ← NEXT
-- Stripe one-time payment €19.99 (individual; relocation is bounded, not recurring)
-- `POST /api/billing/create-checkout` + `POST /api/billing/webhook`
-- Webhook: `checkout.session.completed` → `profiles.tier = 'paid'`
-- No frontend/backend tier-guard changes needed (checks already in place)
+### Phase 4 — Monetisation ✅ COMPLETE
+- ✅ Stripe one-time payment €19.99
+- ✅ `POST /api/billing/create-checkout` + `POST /api/billing/webhook`
+- ✅ Sidebar upgrade button (handles trial active/expired/none states)
+- ✅ `/upgrade/success` landing page
+- ✅ Legal pages: `/privacy`, `/terms`, `/refunds`
+- ✅ Landing page revamp
 
-### Phase 5 — B2B HR Portal
+### Phase 5 — B2B HR Portal ← NEXT
 - Companies pay per-seat; HR admins manage multiple relocatees from one dashboard
 - Data model: `companies` table + `company_users` junction (role: hr_admin | employee)
 - HR portal at `/hr` — Google OAuth only, role-checked on sign-in
 - Employee list with progress bars, critical task status, document count
 - RLS policies for HR read access scoped to company_users
-- Pricing: per-employee seat fee via Stripe, separate product from individual plan
+- Pricing: per-employee seat fee via Stripe, separate product from individual one-time €19.99
 
 ---
 
@@ -492,6 +557,7 @@ relocation-hub/
 │   │       ├── documents.py
 │   │       ├── validation.py
 │   │       ├── risk_score.py
+│   │       ├── billing.py
 │   │       ├── notifications.py
 │   │       ├── reminders.py
 │   │       ├── calendar.py
@@ -504,6 +570,10 @@ relocation-hub/
 ├── frontend/
 │   ├── app/
 │   │   ├── page.tsx
+│   │   ├── privacy/page.tsx
+│   │   ├── terms/page.tsx
+│   │   ├── refunds/page.tsx
+│   │   ├── upgrade/success/page.tsx
 │   │   ├── login/
 │   │   ├── onboarding/
 │   │   ├── dashboard/
@@ -531,17 +601,20 @@ relocation-hub/
 │   │   └── api.ts
 │   └── vercel.json               ← intentionally empty (Hobby plan)
 └── supabase/migrations/
+    ├── 000_initial_schema.sql
     ├── 001_phase1_engagement.sql
     ├── 002_document_validation_risk_score.sql
     ├── 003_ind_monitor.sql
     ├── 004_profile_logistics_columns.sql
-    ├── 005_resource_links.sql
+    ├── 005_profile_city_children.sql
     ├── 006_container_ship_date.sql
-    ├── 007_notify_by_email.sql
+    ├── 007_notification_preferences.sql
     ├── 008_custom_tasks_and_partner.sql
     ├── 009_trial_ends_at.sql
     ├── 010_allowance_tracker.sql
     ├── 011_share_token.sql
-    ├── 012_stripe_fields.sql
-    └── 013_ind_community_status.sql
+    ├── 012_ind_slot_data.sql
+    ├── 013_ind_community_status.sql
+    ├── 014_expanded_onboarding.sql
+    └── 015_document_dates.sql
 ```

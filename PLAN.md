@@ -1,6 +1,6 @@
 # RelocationHub — Implementation Plan
 
-> Last updated: 2026-05-09. Phases 1–3 complete + allowance tracker. Phase 4 (Stripe) is next.
+> Last updated: 2026-05-13. Phases 1–4 complete (Stripe live). Phase 5 (B2B HR Portal) is next.
 
 ---
 
@@ -8,9 +8,9 @@
 
 | Priority | Task | Notes |
 |---|---|---|
-| 1 | Run migration 010 in Supabase SQL editor | Adds `relocation_allowance_amount` to profiles + `allowance_expenses` table with RLS |
-| 2 | Set up pytest for backend | Before Stripe — cover tier gating, rate limiting, profile CRUD, SA tasks, IND monitor, partner tasks, allowance |
-| 3 | Build Phase 4 — Stripe | See Phase 4 below |
+| 1 | Add homepage link in dashboard nav | No way back to landing page from dashboard |
+| 2 | Set up pytest for backend | Cover tier gating, rate limiting, profile CRUD, SA tasks, IND monitor, partner tasks, allowance, billing |
+| 3 | Build Phase 5 — B2B HR Portal | See Phase 5 below |
 
 ---
 
@@ -19,30 +19,42 @@
 Run through this before any significant launch or after rebuilding infrastructure from scratch.
 
 ### Supabase
-- [ ] All migrations run in order: 000 → 001 → 002 → 003 → 004 → 005 → 006 → 007 → 008 → 009 → 010 → 011
-- [ ] RLS enabled on all tables: `profiles`, `tasks`, `documents`, `document_validations`, `risk_scores`, `api_usage`, `ind_monitor_subscriptions`, `ind_monitor_cache`
+- [ ] All migrations run in order: 000 → 001 → 002 → 003 → 004 → 005 → 006 → 007 → 008 → 009 → 010 → 011 → 012 → 013 → 014 → 015
+- [ ] RLS enabled on all tables: `profiles`, `tasks`, `documents`, `document_validations`, `risk_scores`, `api_usage`, `ind_monitor_subscriptions`, `ind_appointments`, `relocation_expenses`
 - [ ] Storage bucket `documents` exists with RLS policies (authenticated users can only access their own files)
 - [ ] `profiles.tier` default is `'free'`
 - [ ] Google OAuth provider enabled in Supabase Auth settings
 - [ ] Auth redirect URL set to `https://relocation-hub.vercel.app/auth/callback`
 
 ### Railway (backend)
-- [ ] All env vars set: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `FRONTEND_URL`, `ADMIN_SECRET`
+- [ ] All env vars set: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `FRONTEND_URL`, `ADMIN_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`
 - [ ] `GET /api/health` returns 200
 - [ ] CORS origin matches Vercel URL exactly (no trailing slash)
 - [ ] Railway service is not sleeping (paid plan or keepalive cron active)
+- [ ] Stripe webhook endpoint registered in Stripe dashboard: `POST https://relocation-hub-production.up.railway.app/api/billing/webhook`
 
 ### Vercel (frontend)
-- [ ] All env vars set: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL`
+- [ ] All env vars set: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL`, `RESEND_API_KEY`
 - [ ] `NEXT_PUBLIC_API_URL` points to Railway URL (no trailing slash)
 - [ ] Build passes without type errors
 - [ ] `vercel.json` — leave as `{}` on Hobby; add cron config on Pro upgrade (see CLAUDE.md)
+
+### Stripe
+- [ ] Product created with price €19.99 (one-time, EUR)
+- [ ] `STRIPE_PRICE_ID` matches the price ID in Railway env vars
+- [ ] Webhook endpoint registered and `STRIPE_WEBHOOK_SECRET` set in Railway
+- [ ] Test checkout flow end-to-end with Stripe test card `4242 4242 4242 4242`
 
 ### cron-job.org (all 4 jobs)
 - [ ] Keepalive: `GET https://relocation-hub.vercel.app/api/keepalive` — every 5 min
 - [ ] Send reminders: `GET https://relocation-hub.vercel.app/api/send-reminders` — daily
 - [ ] Weekly digest: `GET https://relocation-hub.vercel.app/api/weekly-digest` — weekly (Monday 08:00)
-- [ ] IND monitor: `GET https://relocation-hub.vercel.app/api/ind-monitor` — every 4 hours
+- [ ] IND appointment reminders: `GET https://relocation-hub.vercel.app/api/ind-appointment-reminders` — daily
+
+### GitHub Actions
+- [ ] `RAILWAY_URL` secret set (used by `ind_monitor.yml`)
+- [ ] `RESEND_API_KEY` secret set
+- [ ] `ind_monitor.yml` runs every Monday 07:00 CET
 
 ### Resend
 - [ ] Domain verified (or using Resend sandbox for testing)
@@ -50,22 +62,27 @@ Run through this before any significant launch or after rebuilding infrastructur
 
 ### End-to-end smoke test
 - [ ] Sign up with Google OAuth → redirects to onboarding
-- [ ] Complete onboarding (5 steps, including container ship date, partner details if applicable) → checklist generated
+- [ ] Complete 6-step onboarding (basics, employment, logistics+school-stage, permit+situation, move-date, HR-contact) → checklist generated
+- [ ] EU citizen path: `employer_arranges_permit = 'eu_citizen'` skips IND/visa hardcoded tasks
 - [ ] Partner set → `[Partner]` prefixed tasks appear with violet Partner badge on dashboard
 - [ ] Add a custom task via "+ Add a task" → appears with `×` delete button; only custom tasks are deletable
+- [ ] Mark a task complete without document → confirmation dialog appears; critical task says IND warning
 - [ ] Mark a task complete → HR contact email sent (if configured); partner email also notified for `[Partner]` tasks
-- [ ] Upload a document → AI validation returns result
+- [ ] Upload a document → date extraction runs automatically; extracted date appears in timeline milestones
+- [ ] AI validation returns result (paid user / trial)
 - [ ] Compute risk score → result displayed on dashboard
-- [ ] IND monitor subscribe → confirmation shown
+- [ ] IND monitor subscribe → confirmation shown; "I checked — no slots" flips flag
 - [ ] iCal feed URL opens in calendar app
-- [ ] `/tools/30-ruling` loads and runs through all 4 gates
 - [ ] Edit profile → save → changes reflected
-- [ ] Edit profile → regenerate → new checklist generated
+- [ ] Edit profile → regenerate → new checklist generated; diff banner shown
 - [ ] Container ship date set → arrival banner appears on dashboard
 - [ ] Task search → filters correctly, clear button works
 - [ ] Download document pack → merged PDF with cover page + all non-failed docs
 - [ ] Allowance tracker → set amount → log expense → balance updates → PDF export downloads
-- [ ] New user → 7-day trial active → paid features accessible
+- [ ] Shareable link → `/share/[token]` public page renders correctly (no auth)
+- [ ] Stripe upgrade → `POST /api/billing/create-checkout` → Stripe Checkout → `/upgrade/success` → tier flipped to paid
+- [ ] `/privacy`, `/terms`, `/refunds` pages load
+- [ ] `/tools/30-ruling` loads and runs through all 4 gates
 - [ ] Delete account → all data removed
 
 ---
@@ -101,69 +118,101 @@ Run through this before any significant launch or after rebuilding infrastructur
 - `EditProfileModal.tsx` with two-step confirm for regenerate
 
 ### Feature 2 ✅ — IND Appointment Slot Monitor
-- OAP JSON API for 4 desks (AM, DH, ZW, DB)
-- Notifies on state change only: unavailable → available
-- Cron every 4h via cron-job.org
-- `IndMonitorWidget.tsx` on dashboard
-- Community self-report endpoint (`POST /api/ind-monitor/report-slot`) kept in backend but UI button removed — users unlikely to alert competitors
+- Personal per-user flag system — optimistic default; user manually flips false after checking OAP
+- Monday GitHub Actions cron (`ind_monitor.yml`) resets all flags + emails subscribers
+- Exception period Nov 24–Jan 7 skips reset (IND holiday closure)
+- `IndMonitorWidget.tsx` on dashboard; 6 states including appointment booking
+- 7d/1d pre-appointment reminder emails
 
 ### Feature 3 ✅ — 30% Ruling eligibility calculator
 - Public page `/tools/30-ruling` — no auth, no backend
 - 4 hard gates: Dutch employer / distance / timing / salary
-- Linked from nav (desktop), hero (mobile CTA), tools banner, footer, dashboard
+- Linked from nav, hero, tools banner, footer, dashboard
 
 ### Feature 4 ✅ — Resource links
 - `destination_city`, `has_children`, `number_of_children` (migration 005)
 - `ResourcesWidget.tsx` — Pararius deep-link, ExpatGuide schools, Marktplaats + IKEA when container
-- Fields in onboarding step 2+3 and EditProfileModal
 
 ### Feature 5 ✅ — Container shipping improvements + task search
-- Three shipping options: luggage only / full container / both (luggage now + container later)
+- Three shipping options: luggage only / full container / both
 - `container_ship_date` profile field (migration 006)
-- Onboarding + EditProfileModal: ship date picker with lead-time warning when container selected
-- Backend: `both` shipping type generates combined luggage + container task set; ship date in prompt context
-- `ContainerArrivalBanner` on dashboard: origin-country-specific arrival estimate (min/max weeks), switches to "should have arrived" message once window passes
-- Task search bar: filters by title, description, category; live match count; clear button
+- `ContainerArrivalBanner` on dashboard with origin-specific arrival estimates
+- Task search bar: live filter by title/description/category
 
 ### Feature 6 ✅ — Document pack
-- Cover PDF (fpdf2): applicant info, relocation overview, household, shipping, HR contact, document table with validation status
-- Merged PDF download: `GET /api/docpack/{user_id}` streams cover page + all non-failed documents merged into a single PDF (not a ZIP)
-- Send to HR: `POST /api/docpack/{user_id}/send-to-hr` uploads merged PDF to Supabase, emails HR 7-day signed URL
-- Document pack card on `/documents` page
+- Cover PDF (fpdf2): applicant info, relocation overview, household, shipping, HR contact, document table
+- Merged PDF download: `GET /api/docpack/{user_id}` streams cover page + all non-failed documents
+- Send to HR: `POST /api/docpack/{user_id}/send-to-hr` uploads merged PDF, emails HR 7-day signed URL
 
-### Feature 7 ✅ — Document validation UX + task gate
-- Critical tasks block completion if any attached document has `fail` OR `warn` validation status
-- Background auto-validation fires after upload to a critical task (paid + consent users)
-- Validation badges (`✓ pass` / `⚠ warn` / `✗ fail`) inline on task document rows
-- "Details" link on each validated doc row → navigates to `/documents`
-- Backend email on critical-doc validation: notifies user + HR contact with result and issues
-- Passport prompt tightened: expiry within 6 months → hard `fail`/`error`, not `warn`
-- Quirky loading sayings during onboarding AI checklist generation (12 Dutch-themed messages, 2.4s cycle)
+### Feature 7 ✅ — Custom tasks + partner support
+- Inline "+ Add a task" per category; `×` delete for source='custom' tasks only
+- Partner fields on profile; `[Partner]` prefixed tasks; violet Partner badge on dashboard
+- Partner email receives reminders + task completion notifications for partner tasks
 
-### Feature 8 ✅ — Email notification preference
-- `notify_by_email BOOLEAN NOT NULL DEFAULT TRUE` on profiles (migration 007)
-- Toggle in dashboard settings dropdown — persisted via `PATCH /api/auth/profile/{user_id}`
-- Backend respects preference in: document validation emails, IND slot alerts, IND reminders
+### Feature 8 ✅ — Relocation allowance tracker
+- Set total budget, log expenses per task, running balance
+- HR email on each expense; PDF statement export
+- `GET /api/allowance/{user_id}/export`
+
+### Feature 9 ✅ — Shareable progress link
+- `/share/[token]` public read-only one-pager for HR
+- Overall %, per-category bars, risk score, doc count; print-friendly
+
+### Feature 10 ✅ — Expanded onboarding (6 steps)
+- Step 4 expanded: `employer_arranges_permit` (employer/self/eu_citizen/unsure), `employer_is_sponsor`, `already_in_netherlands`
+- Step 3 expanded: `children_school_stage`, `has_driving_licence`, `driving_licence_country`
+- Step 5 expanded: `expects_30_ruling`
+- Migration 014 — 7 new profile columns
+- EU citizen path: skips IND/visa hardcoded tasks; only passport validity check remains
+
+### Feature 11 ✅ — Checklist improvements
+- School-stage-specific tasks (preschool/primary/secondary/both)
+- RDW driving-licence direct-exchange country check
+- 30%-ruling 4-month deadline task when `expects_30_ruling = true`
+- `employer_is_sponsor = false` → urgent blocker task in checklist
+- Regenerate returns `{ tasks, diff: { added, removed } }` — diff banner on dashboard
+
+### Feature 12 ✅ — Profile enrichment from documents
+- `POST /api/documents/{id}/enrich-profile` — paid, no rate limit
+- Extracts `salary_monthly_eur`, `job_title`, `permit_track`, `employer_name` from employment contracts via Claude
+- Dismissible offer banner on dashboard
+
+### Feature 13 ✅ — Dashboard Priority Actions widget
+- Top-of-sidebar card showing up to 3 items: overdue tasks, due-within-7-days tasks, next critical task
+- Colored left border per urgency; scroll-to-task arrow button
+
+### Feature 14 ✅ — Document date extraction + Relocation Timeline
+- `POST /api/documents/{id}/extract-date` — claude-haiku, no rate limit, all tiers
+- Extracts single most important date (passport expiry, flight, employment start, tenancy begin)
+- Persisted to `documents.extracted_date` + `documents.extracted_date_label` (migration 015)
+- Auto-runs on every validatable upload
+- `CountdownBanner` retained (days-until-move); extracted dates feed future timeline milestones
+- Task completion confirmation dialog: critical tasks show IND warning; others prompt to attach a document
 
 ---
 
-## Phase 4 — Monetisation 🔲 ← NEXT
+## Phase 4 — Monetisation ✅ COMPLETE
 
-**Dependencies**: migrations 000–010 run, pytest suite passing (recommended).
-
-| Task | Notes |
+| Feature | Status |
 |---|---|
-| `POST /api/billing/create-checkout` | Creates Stripe Checkout session, returns URL. Accepts `user_id` + `price_id`. |
-| `POST /api/billing/webhook` | Verifies Stripe signature. On `checkout.session.completed` → set `profiles.tier = 'paid'` + `tier_granted_at` |
-| Stripe env vars on Railway | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
-| Upgrade CTA in paywall modal | "Upgrade" button → POST `/api/billing/create-checkout` → redirect to Stripe Checkout |
-| Success redirect | Stripe returns to `/dashboard?upgraded=1` → show success toast |
-| No guard logic changes | Frontend + backend already check `profiles.tier === 'paid'` / `'free'` |
-| Price | €19.99 one-time (relocation is bounded 6–18 months; monthly billing creates cancellation anxiety) |
+| `POST /api/billing/create-checkout` | ✅ Live |
+| `POST /api/billing/webhook` | ✅ Live |
+| Stripe env vars on Railway | ✅ Set |
+| Upgrade CTA in dashboard sidebar | ✅ Live |
+| `/upgrade/success` redirect page | ✅ Live |
+| Legal pages: `/privacy`, `/terms`, `/refunds` | ✅ Live |
+| Landing page revamp | ✅ Live |
+
+**Notes:**
+- One-time €19.99 (Stripe Checkout, card only)
+- Webhook: `checkout.session.completed` → `profiles.tier = 'paid'`
+- Upgrade button handles three states: trial active (days remaining), trial expired, no trial
+- Operator: Bitquanta, Pieter Calandlaan 765, 1069SC Amsterdam (KVK 97672920)
+- Support: support@relocationhub.app
 
 ---
 
-## Phase 5 — B2B HR Portal 🔲
+## Phase 5 — B2B HR Portal 🔲 ← NEXT
 
 **Goal:** Companies pay per-seat; HR admins manage multiple relocatees from one dashboard.
 
@@ -181,13 +230,13 @@ Run through this before any significant launch or after rebuilding infrastructur
 | Bulk onboarding | CSV upload → triggers onboarding + checklist generation per row |
 | Reminders | HR sets/overrides due dates; sends one-off email reminders to individuals |
 | Weekly digest | Already covers HR contacts — no new email infrastructure needed |
-| Team completion dashboard | "14/20 employees on track · 3 at risk · 2 not started" — surfaces who needs a nudge; the HR equivalent of a leaderboard without the gimmicks |
+| Team completion dashboard | "14/20 employees on track · 3 at risk · 2 not started" |
 
 ### Architecture notes
 - RLS policies: `hr_admin` read on `tasks`, `documents`, `document_validations` scoped to `company_users`
 - All HR writes go through backend (audit trail)
-- **Design RLS before Stripe (Phase 4)** to avoid retrofitting after paying users exist
-- Pricing: per-employee seat fee via Stripe (separate product from €3.99/mo individual)
+- Design RLS before hooking into Stripe to avoid retrofitting after paying customers exist
+- Pricing: per-employee seat fee via Stripe (separate product from individual one-time €19.99)
 - Higher value than consumer: 50 companies × 20 employees = 1,000 users from 50 deals
 
 ---
@@ -212,10 +261,10 @@ Run through this before any significant launch or after rebuilding infrastructur
 - [ ] **B2B multi-tenancy prep**: `companies` table + `company_id` on profiles + per-company RLS.
 
 ### Revenue vs. infra cost
-| Users | Paid (10%) | Revenue/mo | Infra/mo |
+| Users | Paid (10%) | Revenue (one-time) | Infra/mo |
 |---|---|---|---|
-| 500 | 50 | €200 | ~€50 |
-| 2,000 | 200 | €800 | ~€75 |
-| 5,000 | 500 | €2,000 | ~€200 |
-| 10,000 | 1,000 | €4,000 | ~€400 |
-| 50 B2B cos. | — | €5,000+ | ~€400 |
+| 500 | 50 | €1,000 | ~€50 |
+| 2,000 | 200 | €4,000 | ~€75 |
+| 5,000 | 500 | €10,000 | ~€200 |
+| 10,000 | 1,000 | €20,000 | ~€400 |
+| 50 B2B cos. | — | €5,000+/mo | ~€400 |
