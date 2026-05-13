@@ -44,10 +44,11 @@ function ProgressBar({ value, max, color = 'bg-indigo-500' }: { value: number; m
   )
 }
 
-export default async function SharePage({ params }: { params: { token: string } }) {
+export default async function SharePage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
   let data: any
   try {
-    data = await getShareData(params.token)
+    data = await getShareData(token)
   } catch {
     notFound()
   }
