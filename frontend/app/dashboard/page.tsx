@@ -13,6 +13,7 @@ import EditProfileModal from '@/app/components/EditProfileModal'
 import { compressImage, formatBytes, MAX_FILE_SIZE_FREE, MAX_FILE_SIZE_PAID, STORAGE_QUOTA_FREE, STORAGE_QUOTA_PAID } from '@/lib/storage'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import InstallPrompt from '@/app/components/InstallPrompt'
 
 const SECTION_ORDER = ['critical', 'visa', 'employment', 'transport', 'shipping', 'admin', 'housing', 'banking', 'healthcare', 'pets']
 
@@ -1496,6 +1497,7 @@ export default function DashboardPage() {
           </main>
         </div>
       </div>
+      <InstallPrompt />
     </main>
   )
 }

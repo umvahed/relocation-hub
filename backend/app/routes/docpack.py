@@ -47,6 +47,28 @@ def _truncate_text(pdf: FPDF, text: str, max_width: float) -> str:
     return text + "..."
 
 
+def _build_divider_pdf(doc_number: int, file_name: str, category: str) -> bytes:
+    pdf = FPDF()
+    pdf.set_margins(20, 20, 20)
+    pdf.add_page()
+    pdf.set_draw_color(229, 231, 235)
+    pdf.line(20, 148, pdf.w - 20, 148)
+    pdf.set_y(128)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(107, 114, 128)
+    pdf.cell(0, 10, f"Document {doc_number}", align="C", ln=True)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_text_color(26, 26, 26)
+    effective_w = pdf.w - 40
+    display_name = _truncate_text(pdf, file_name, effective_w)
+    pdf.cell(0, 12, display_name, align="C", ln=True)
+    if category:
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(107, 114, 128)
+        pdf.cell(0, 8, category.capitalize(), align="C", ln=True)
+    return bytes(pdf.output())
+
+
 def _image_to_pdf_bytes(image_bytes: bytes) -> bytes | None:
     """Wrap a single image in a full-page PDF using fpdf2."""
     try:
@@ -256,10 +278,14 @@ async def _build_merged_pdf(user_id: str) -> tuple[bytes, str]:
     for page in cover_reader.pages:
         writer.add_page(page)
 
-    for doc in included_docs:
+    for i, doc in enumerate(included_docs, 1):
         mime = doc.get("mime_type", "")
         if mime not in MERGEABLE_TYPES:
             continue
+        divider_bytes = _build_divider_pdf(i, doc.get("file_name", ""), doc.get("category", ""))
+        divider_reader = PdfReader(io.BytesIO(divider_bytes))
+        for page in divider_reader.pages:
+            writer.add_page(page)
         try:
             file_bytes = supabase.storage.from_("documents").download(doc["file_path"])
             if mime == "application/pdf":

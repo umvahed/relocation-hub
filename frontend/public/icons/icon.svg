@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0d1117"/>
+  <defs>
+    <linearGradient id="vg" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#a5b4fc"/>
+      <stop offset="45%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#3730a3"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c7d2fe"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+  </defs>
+  <!-- Left arm main body -->
+  <polygon points="158,112 248,112 280,388 196,388" fill="url(#vg)"/>
+  <!-- Fold piece top-left of left arm -->
+  <polygon points="118,112 158,112 150,152 122,168" fill="url(#fold)"/>
+  <!-- Right arm -->
+  <polygon points="226,380 274,380 402,126 356,110" fill="url(#vg)"/>
+</svg>
