@@ -480,7 +480,7 @@ export default function OnboardingPage() {
               <>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Do you expect to qualify for the 30% ruling?</label>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
-                  Tax benefit for expats earning above the IND salary threshold — must apply within 4 months of your first Dutch workday.
+                  Tax benefit for international hires earning above the IND salary threshold — must apply within 4 months of your first Dutch workday.
                   <a href="/tools/30-ruling" target="_blank" className="text-indigo-500 dark:text-indigo-400 ml-1 underline">Check eligibility →</a>
                 </p>
                 <div className="flex gap-3 mb-2">

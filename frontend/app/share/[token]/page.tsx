@@ -189,12 +189,12 @@ export default async function SharePage({ params }: { params: { token: string } 
         {/* Footer */}
         <div className="border-t border-gray-100 pt-5 print:pt-3 flex items-center justify-between">
           <span className="text-xs text-gray-400">
-            Shared via <span className="font-semibold text-gray-600">Relocation<span className="text-indigo-600">Hub</span></span>
+            Shared via <span className="font-bold tracking-widest text-gray-700">VALRYN</span>
           </span>
           <Link href="/" className="print:hidden text-xs text-indigo-600 hover:text-indigo-700 transition font-medium">
-            relocationhub.app →
+            valryn.com →
           </Link>
-          <span className="hidden print:block text-xs text-gray-400">relocationhub.app</span>
+          <span className="hidden print:block text-xs text-gray-400">valryn.com</span>
         </div>
 
       </div>

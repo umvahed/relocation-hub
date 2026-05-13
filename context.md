@@ -1,15 +1,15 @@
-# RelocationHub — Full Project Context
+# Valryn — Full Project Context
 
 ---
 
 ## What We're Building
 
-**RelocationHub** is a SaaS web application that helps people relocating to the Netherlands organize their entire move in one place. The core insight: moving to the Netherlands involves dozens of interdependent tasks (visa, BSN, DigiD, housing, banking, health insurance, shipping) across multiple institutions, timelines, and documents — and nobody has brought it all together in one intelligent hub.
+**Valryn** is a SaaS platform that helps professionals relocating to the Netherlands organize their entire move in one place. The core insight: moving to the Netherlands involves dozens of interdependent tasks (visa, BSN, DigiD, housing, banking, health insurance, shipping) across multiple institutions, timelines, and documents — and nobody has brought it all together in one intelligent hub.
 
-**Target users:** Expats moving to the Netherlands, primarily from South Africa, UK, US, India, and other countries. Also B2B: HR teams managing employee relocations.
+**Target users:** Professionals moving to the Netherlands, primarily from South Africa, UK, US, India, and other countries. Also B2B: HR teams managing employee relocations.
 
 **Operator:** Bitquanta, Pieter Calandlaan 765, 1069SC Amsterdam (KVK 97672920)
-**Support:** support@relocationhub.app
+**Support:** support@valryn.com
 
 **Revenue model:**
 - Direct: €19.99 one-time per user (self-serve, Stripe — live)

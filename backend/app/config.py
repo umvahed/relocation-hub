@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     STRIPE_PRICE_ID: Optional[str] = None
     RESEND_API_KEY: Optional[str] = None
-    RESEND_FROM_EMAIL: str = "Relocation Hub <onboarding@resend.dev>"
+    RESEND_FROM_EMAIL: str = "Valryn <onboarding@resend.dev>"
     FRONTEND_URL: str = "http://localhost:3000"
     DAILY_AI_CALL_LIMIT: int = 5
     DAILY_VALIDATION_LIMIT: int = 10

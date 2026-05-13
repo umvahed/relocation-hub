@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-const SUPPORT_EMAIL = 'support@relocationhub.app'
+const SUPPORT_EMAIL = 'support@valryn.com'
 const LAST_UPDATED = '13 May 2026'
 
 export default function TermsPage() {
@@ -9,7 +9,7 @@ export default function TermsPage() {
       <nav className="border-b border-gray-100 dark:border-gray-800 sticky top-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur z-10">
         <div className="max-w-3xl mx-auto px-5 py-4 flex justify-between items-center">
           <Link href="/" className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
-            Relocation<span className="text-indigo-600">Hub</span>
+            VALRYN
           </Link>
           <Link href="/" className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition">← Back</Link>
         </div>
@@ -25,12 +25,12 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">1. About these terms</h2>
-            <p>These Terms of Service (&ldquo;Terms&rdquo;) govern your use of RelocationHub, operated by <strong>Bitquanta</strong> (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;), registered at <strong>Pieter Calandlaan 765, 1069SC Amsterdam, the Netherlands</strong> (KVK 97672920). By creating an account or using the service, you agree to these Terms. If you do not agree, do not use RelocationHub.</p>
+            <p>These Terms of Service (&ldquo;Terms&rdquo;) govern your use of Valryn, operated by <strong>Bitquanta</strong> (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;), registered at <strong>Pieter Calandlaan 765, 1069SC Amsterdam, the Netherlands</strong> (KVK 97672920). By creating an account or using the service, you agree to these Terms. If you do not agree, do not use Valryn.</p>
           </section>
 
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">2. The service</h2>
-            <p>RelocationHub is a relocation management tool that helps individuals and couples organise their move to the Netherlands. It provides:</p>
+            <p>Valryn is a relocation management tool that helps individuals and couples organise their move to the Netherlands. It provides:</p>
             <ul className="mt-2 space-y-1 list-disc list-inside text-gray-600 dark:text-gray-300">
               <li>A personalised, AI-generated relocation checklist.</li>
               <li>Document upload, storage, and AI-assisted validation.</li>
@@ -41,7 +41,7 @@ export default function TermsPage() {
               <li>A 30% ruling eligibility calculator (available free, without an account).</li>
             </ul>
             <p className="mt-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 text-amber-800 dark:text-amber-200">
-              <strong>Important:</strong> RelocationHub provides information and organisational tools. It does not provide legal advice. Nothing on the platform constitutes legal, immigration, financial, or tax advice. Always consult a qualified professional for your specific situation.
+              <strong>Important:</strong> Valryn provides information and organisational tools. It does not provide legal advice. Nothing on the platform constitutes legal, immigration, financial, or tax advice. Always consult a qualified professional for your specific situation.
             </p>
           </section>
 
@@ -91,7 +91,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">9. Intellectual property</h2>
-            <p>All content on RelocationHub (design, code, copy, AI prompts, checklist templates) is owned by Bitquanta or its licensors. You may not copy, reproduce, or create derivative works without our written permission.</p>
+            <p>All content on Valryn (design, code, copy, AI prompts, checklist templates) is owned by Bitquanta or its licensors. You may not copy, reproduce, or create derivative works without our written permission.</p>
             <p className="mt-2">You retain ownership of documents you upload. By uploading, you grant us a limited licence to process them for the purpose of providing the service (validation, date extraction).</p>
           </section>
 

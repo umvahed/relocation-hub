@@ -4,7 +4,7 @@ import Link from 'next/link'
 
 const THRESHOLD_STANDARD = 46660   // 2025 gross annual salary threshold
 const THRESHOLD_YOUNG    = 35468   // under 30 + master's degree
-const INCOME_TAX_RATE    = 0.495   // top bracket (applicable on 30% allowance for most expats)
+const INCOME_TAX_RATE    = 0.495   // top bracket (applicable on 30% allowance for most international hires)
 
 type Step = 'employment' | 'distance' | 'timing' | 'salary' | 'result' | 'ineligible'
 
@@ -491,7 +491,7 @@ export default function RulingCalculator() {
                 >
                   Start your free relocation plan →
                 </Link>
-                <p className="text-xs text-gray-400 dark:text-gray-500 text-center">RelocationHub tracks your entire move — visa, BSN, DigiD, housing and more.</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 text-center">Valryn tracks your entire move — visa, BSN, DigiD, housing and more.</p>
               </div>
 
               <button onClick={restart} className="w-full py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
@@ -518,9 +518,9 @@ export default function RulingCalculator() {
           <p className="text-xs text-gray-400 dark:text-gray-500">
             Planning your move?{' '}
             <Link href="/" className="underline hover:text-gray-600 dark:hover:text-gray-300">
-              RelocationHub
+              Valryn
             </Link>{' '}
-            helps expats organise every step of their Dutch relocation.
+            helps you organise every step of your Dutch move.
           </p>
         </div>
       </main>

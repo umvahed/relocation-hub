@@ -34,7 +34,7 @@ async def get_ical_feed(user_id: str):
         lines = [
             "BEGIN:VCALENDAR",
             "VERSION:2.0",
-            "PRODID:-//RelocationHub//Relocation Checklist//EN",
+            "PRODID:-//Valryn//Relocation Checklist//EN",
             "CALSCALE:GREGORIAN",
             "METHOD:PUBLISH",
             f"X-WR-CALNAME:{_escape_ical(user_name)}'s Relocation Plan",

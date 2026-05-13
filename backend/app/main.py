@@ -20,7 +20,7 @@ from app.routes.share import router as share_router
 from app.routes.billing import router as billing_router
 
 app = FastAPI(
-    title="RelocationHub API",
+    title="Valryn API",
     version="1.0.0"
 )
 
@@ -53,4 +53,4 @@ app.include_router(billing_router, prefix="/api")
 
 @app.get("/")
 def root():
-    return {"message": "RelocationHub API is running"}
+    return {"message": "Valryn API is running"}

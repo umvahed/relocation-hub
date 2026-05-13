@@ -1,4 +1,4 @@
-# RelocationHub — Implementation Plan
+# Valryn — Implementation Plan
 
 > Last updated: 2026-05-13. Phases 1–4 complete (Stripe live). Phase 5 (B2B HR Portal) is next.
 
@@ -208,7 +208,7 @@ Run through this before any significant launch or after rebuilding infrastructur
 - Webhook: `checkout.session.completed` → `profiles.tier = 'paid'`
 - Upgrade button handles three states: trial active (days remaining), trial expired, no trial
 - Operator: Bitquanta, Pieter Calandlaan 765, 1069SC Amsterdam (KVK 97672920)
-- Support: support@relocationhub.app
+- Support: support@valryn.com
 
 ---
 

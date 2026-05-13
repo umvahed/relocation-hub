@@ -1,6 +1,6 @@
-# RelocationHub
+# Valryn
 
-SaaS web app helping expats relocating to the Netherlands organise their entire move — visa, admin, housing, banking, healthcare and more — in one intelligent hub.
+SaaS platform helping professionals relocating to the Netherlands organise their entire move — visa, admin, housing, banking, healthcare and more — in one intelligent hub.
 
 **Operated by:** Bitquanta, Pieter Calandlaan 765, 1069SC Amsterdam (KVK 97672920)  
 **Live:** [relocation-hub.vercel.app](https://relocation-hub.vercel.app)  
@@ -190,5 +190,5 @@ npm run dev
 ## Legal
 
 Privacy Policy · Terms of Service · Refund Policy available at `/privacy`, `/terms`, `/refunds`.  
-Support: support@relocationhub.app  
+Support: support@valryn.com  
 Operator: Bitquanta, Pieter Calandlaan 765, 1069SC Amsterdam, KVK 97672920

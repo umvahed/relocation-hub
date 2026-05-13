@@ -344,7 +344,7 @@ export async function downloadDocpack(user_id: string): Promise<void> {
   a.href = url
   const disposition = res.headers.get('Content-Disposition') || ''
   const match = /filename="(.+)"/.exec(disposition)
-  a.download = match ? match[1] : 'RelocationHub_DocPack.pdf'
+  a.download = match ? match[1] : 'Valryn_DocPack.pdf'
   document.body.appendChild(a)
   a.click()
   a.remove()
@@ -419,7 +419,7 @@ export async function downloadAllowanceStatement(user_id: string): Promise<void>
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'RelocationHub_Allowance_Statement.pdf'
+  a.download = 'Valryn_Allowance_Statement.pdf'
   document.body.appendChild(a)
   a.click()
   a.remove()

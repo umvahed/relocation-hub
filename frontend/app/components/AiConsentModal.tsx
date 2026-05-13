@@ -34,7 +34,7 @@ export default function AiConsentModal({ userId, onConsent, onDecline }: Props) 
         </div>
 
         <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-          To validate your documents, RelocationHub will send them to the Claude AI API (Anthropic). Before we do, please read how your data is handled:
+          To validate your documents, Valryn will send them to an AI service (Anthropic). Before we do, please read how your data is handled:
         </p>
 
         <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-2 mb-4">

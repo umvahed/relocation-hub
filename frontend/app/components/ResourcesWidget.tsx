@@ -131,7 +131,7 @@ export default function ResourcesWidget({ profile }: Props) {
           )}
 
           {hasContainer && (
-            <a href="https://www.google.com/search?q=furniture+rental+expats+netherlands" target="_blank" rel="noopener noreferrer"
+            <a href="https://www.google.com/search?q=short+term+furniture+rental+netherlands" target="_blank" rel="noopener noreferrer"
               className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-700 transition group">
               <span className="text-xl leading-none mt-0.5">🛋️</span>
               <div className="min-w-0">

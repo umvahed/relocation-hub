@@ -134,7 +134,7 @@ export default function LoginPage() {
 
         <div className="text-center mb-6">
           <div className="text-3xl mb-2">🇳🇱</div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Welcome to RelocationHub</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Welcome to Valryn</h1>
           <a href="/" className="text-xs text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition mt-1 inline-block">← Back to home</a>
         </div>
 

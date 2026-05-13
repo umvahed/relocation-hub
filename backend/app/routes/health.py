@@ -6,6 +6,6 @@ router = APIRouter()
 def health_check():
     return {
         "status": "healthy",
-        "service": "RelocationHub API",
+        "service": "Valryn API",
         "version": "1.0.0"
     }

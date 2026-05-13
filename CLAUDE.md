@@ -1,6 +1,6 @@
-# RelocationHub
+# Valryn
 
-SaaS app helping expats relocating to the Netherlands organize their move. Two services: Next.js frontend (Vercel) + FastAPI backend (Railway) + Supabase for DB/auth/storage.
+SaaS app helping professionals relocating to the Netherlands organize their move. Two services: Next.js frontend (Vercel) + FastAPI backend (Railway) + Supabase for DB/auth/storage.
 
 ## Architecture
 

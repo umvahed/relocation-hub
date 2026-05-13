@@ -208,7 +208,7 @@ async def _build_and_insert_tasks(supabase, claude, user_id: str, origin_country
             f"for South African users this is a separate Home Affairs apostille per child (same 4–8 week process as the main applicant); category: visa\n"
             f"  * Research and choose a Dutch school for {'each child' if plural else 'the child'}: "
             f"options are Dutch-only basisschool, tweetalige (bilingual Dutch/English) basisschool, or international school. "
-            f"Most expats enrol in a tweetalige or international school initially while children learn Dutch. "
+            f"Most international families enrol in a tweetalige or international school initially while children learn Dutch. "
             f"Waiting lists can be 3–12 months — research schools before arrival and submit applications immediately on arriving; category: admin\n"
             f"  * Submit school enrolment application{'s' if plural else ''} (basisschool registration requires proof of address, birth certificate, and vaccination record — BSN needed); category: admin\n"
             f"  * Register {'children' if plural else 'child'} with a GP (huisarts) and the Jeugdgezondheidszorg (JGZ) for routine health checks and vaccinations; category: healthcare\n"

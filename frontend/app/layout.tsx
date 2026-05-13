@@ -9,8 +9,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "RelocationHub — Move to the Netherlands, organised.",
-  description: "AI-generated relocation checklist, document hub, and step-by-step guidance for moving to the Netherlands.",
+  title: "Valryn — Move smarter. Settle faster.",
+  description: "AI-powered relocation platform for moving to the Netherlands. Personalised checklist, document validation, IND monitoring and deadline tracking — all in one place.",
 };
 
 export default function RootLayout({

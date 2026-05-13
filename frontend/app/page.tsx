@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import NavAuthButton from '@/app/components/NavAuthButton'
 
-const SUPPORT_EMAIL = 'support@relocationhub.app'
+const SUPPORT_EMAIL = 'support@valryn.com'
 
 export default function Home() {
   return (
@@ -10,8 +10,8 @@ export default function Home() {
       {/* Nav */}
       <nav className="border-b border-gray-100 dark:border-gray-800 sticky top-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur z-10">
         <div className="max-w-5xl mx-auto px-5 py-4 flex justify-between items-center">
-          <div className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
-            Relocation<span className="text-indigo-600">Hub</span>
+          <div className="text-lg font-bold tracking-widest text-gray-900 dark:text-white">
+            VALRYN
           </div>
           <div className="flex items-center gap-4">
             <Link href="/tools/30-ruling" className="hidden sm:block text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-600 transition">
@@ -40,7 +40,7 @@ export default function Home() {
           <span className="text-indigo-600">at 2am.</span>
         </h1>
         <p className="text-base sm:text-xl text-gray-500 dark:text-gray-400 mb-3 max-w-2xl mx-auto leading-relaxed">
-          RelocationHub gives you a personalised checklist, AI document validation, IND appointment alerts, and deadline tracking — all in one place, so nothing falls through the cracks.
+          Valryn gives you a personalised checklist, AI document validation, IND appointment alerts, and deadline tracking — all in one place, so nothing falls through the cracks.
         </p>
         <p className="text-sm text-gray-400 dark:text-gray-500 mb-10 max-w-xl mx-auto">
           MVV visa · BSN registration · IND residence permit · DigiD · health insurance · 30% ruling — every step, in order, tracked.
@@ -147,7 +147,7 @@ export default function Home() {
         </div>
         <div className="mt-8 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200 mb-1">RelocationHub tracks every step above — personalised to your situation.</p>
+            <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200 mb-1">Valryn tracks every step above — personalised to your situation.</p>
             <p className="text-sm text-indigo-700 dark:text-indigo-400">EU citizen, highly skilled migrant, or ICT transfer — the right tasks, in the right order, for you.</p>
           </div>
           <Link href="/login" className="flex-shrink-0 bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition whitespace-nowrap">
@@ -201,7 +201,7 @@ export default function Home() {
           {[
             {
               title: 'IND Appointment Monitor',
-              desc: 'IND slots are notoriously scarce. RelocationHub monitors the booking portal and emails you the moment a slot becomes available — so you book before anyone else.',
+              desc: 'IND slots are notoriously scarce. Valryn monitors the booking portal and emails you the moment a slot becomes available — so you book before anyone else.',
               color: 'bg-amber-50 dark:bg-amber-950/50',
               iconColor: 'text-amber-500',
               badge: 'Unique feature',
@@ -390,7 +390,7 @@ export default function Home() {
                 Relocation<span className="text-indigo-600">Hub</span>
               </div>
               <p className="text-xs text-gray-400 dark:text-gray-500 max-w-xs leading-relaxed">
-                Helping expats navigate the Dutch relocation process — from IND paperwork to feeling at home.
+                Helping professionals navigate the Dutch relocation process — from IND paperwork to feeling at home.
               </p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-12 gap-y-3 text-sm text-gray-500 dark:text-gray-400">
@@ -414,7 +414,7 @@ export default function Home() {
             </div>
           </div>
           <div className="pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
-            <span>© {new Date().getFullYear()} RelocationHub. All rights reserved.</span>
+            <span>© {new Date().getFullYear()} Valryn. All rights reserved.</span>
             <div className="flex items-center gap-4">
               <Link href="/privacy" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">Privacy</Link>
               <Link href="/terms" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition">Terms</Link>

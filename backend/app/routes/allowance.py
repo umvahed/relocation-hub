@@ -200,7 +200,7 @@ async def export_allowance(user_id: str):
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": 'attachment; filename="RelocationHub_Allowance_Statement.pdf"'},
+        headers={"Content-Disposition": 'attachment; filename="Valryn_Allowance_Statement.pdf"'},
     )
 
 
@@ -213,8 +213,8 @@ def _build_statement_pdf(profile: dict, expenses: list, total: float, spent: flo
     # Header
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_text_color(79, 70, 229)
-    logo_w = pdf.get_string_width("RelocationHub") + 2
-    pdf.cell(logo_w, 10, "RelocationHub", ln=False)
+    logo_w = pdf.get_string_width("Valryn") + 2
+    pdf.cell(logo_w, 10, "Valryn", ln=False)
     pdf.set_font("Helvetica", "", 18)
     pdf.set_text_color(26, 26, 26)
     pdf.cell(0, 10, "  Allowance Statement", ln=True)
@@ -299,6 +299,6 @@ def _build_statement_pdf(profile: dict, expenses: list, total: float, spent: flo
     pdf.set_y(-20)
     pdf.set_font("Helvetica", "", 8)
     pdf.set_text_color(156, 163, 175)
-    pdf.cell(0, 5, "RelocationHub - Allowance Statement - For internal use only", align="C")
+    pdf.cell(0, 5, "Valryn - Allowance Statement - For internal use only", align="C")
 
     return bytes(pdf.output())
