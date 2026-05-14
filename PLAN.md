@@ -24,7 +24,7 @@ Run through this before any significant launch or after rebuilding infrastructur
 - [ ] Storage bucket `documents` exists with RLS policies (authenticated users can only access their own files)
 - [ ] `profiles.tier` default is `'free'`
 - [ ] Google OAuth provider enabled in Supabase Auth settings
-- [ ] Auth redirect URL set to `https://relocation-hub.vercel.app/auth/callback`
+- [ ] Auth redirect URL set to `https://valryn.nl/auth/callback`
 
 ### Railway (backend)
 - [ ] All env vars set: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `FRONTEND_URL`, `ADMIN_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`
@@ -46,10 +46,10 @@ Run through this before any significant launch or after rebuilding infrastructur
 - [ ] Test checkout flow end-to-end with Stripe test card `4242 4242 4242 4242`
 
 ### cron-job.org (all 4 jobs)
-- [ ] Keepalive: `GET https://relocation-hub.vercel.app/api/keepalive` — every 5 min
-- [ ] Send reminders: `GET https://relocation-hub.vercel.app/api/send-reminders` — daily
-- [ ] Weekly digest: `GET https://relocation-hub.vercel.app/api/weekly-digest` — weekly (Monday 08:00)
-- [ ] IND appointment reminders: `GET https://relocation-hub.vercel.app/api/ind-appointment-reminders` — daily
+- [ ] Keepalive: `GET https://valryn.nl/api/keepalive` — every 5 min
+- [ ] Send reminders: `GET https://valryn.nl/api/send-reminders` — daily
+- [ ] Weekly digest: `GET https://valryn.nl/api/weekly-digest` — weekly (Monday 08:00)
+- [ ] IND appointment reminders: `GET https://valryn.nl/api/ind-appointment-reminders` — daily
 
 ### GitHub Actions
 - [ ] `RAILWAY_URL` secret set (used by `ind_monitor.yml`)
@@ -220,7 +220,7 @@ Run through this before any significant launch or after rebuilding infrastructur
 - Webhook: `checkout.session.completed` → `profiles.tier = 'paid'`
 - Upgrade button handles three states: trial active (days remaining), trial expired, no trial
 - Operator: Bitquanta, Pieter Calandlaan 765, 1069SC Amsterdam (KVK 97672920)
-- Support: support@valryn.com
+- Support: support@valryn.nl
 
 ---
 

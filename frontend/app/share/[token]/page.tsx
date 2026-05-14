@@ -193,9 +193,9 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
             Shared via <span className="font-bold tracking-widest text-gray-700">VALRYN</span>
           </span>
           <Link href="/" className="print:hidden text-xs text-indigo-600 hover:text-indigo-700 transition font-medium">
-            valryn.com →
+            valryn.nl →
           </Link>
-          <span className="hidden print:block text-xs text-gray-400">valryn.com</span>
+          <span className="hidden print:block text-xs text-gray-400">valryn.nl</span>
         </div>
 
       </div>

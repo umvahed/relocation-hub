@@ -9,7 +9,7 @@
 **Target users:** Professionals moving to the Netherlands, primarily from South Africa, UK, US, India, and other countries. Also B2B: HR teams managing employee relocations.
 
 **Operator:** Bitquanta, Pieter Calandlaan 765, 1069SC Amsterdam (KVK 97672920)
-**Support:** support@valryn.com
+**Support:** support@valryn.nl
 
 **Revenue model:**
 - Direct: €19.99 one-time per user (self-serve, Stripe — live)
@@ -25,7 +25,7 @@
 ┌─────────────────────────────────┐     ┌──────────────────────────────────┐
 │  Frontend (Next.js — App Router)│────▶│  Backend (FastAPI / Python)       │
 │  Hosted on Vercel               │     │  Hosted on Railway                │
-│  relocation-hub.vercel.app      │     │  relocation-hub-production...     │
+│  valryn.nl                      │     │  relocation-hub-production...     │
 │                                 │     │  .up.railway.app                  │
 └─────────────────────────────────┘     └──────────────────────────────────┘
                                                         │
@@ -305,7 +305,7 @@ created_at
 
 **Location:** `relocation-hub/frontend/`
 **Deployed:** Vercel, auto-deploys on `git push` to `main`
-**Live URL:** `https://relocation-hub.vercel.app`
+**Live URL:** `https://valryn.nl`
 
 **Stack:** Next.js (App Router), TypeScript, Tailwind CSS v4, Supabase SSR client
 
@@ -421,7 +421,7 @@ Railway (backend):
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY
 ANTHROPIC_API_KEY
 RESEND_API_KEY, RESEND_FROM_EMAIL
-FRONTEND_URL=https://relocation-hub.vercel.app
+FRONTEND_URL=https://valryn.nl
 ADMIN_SECRET=<random string>
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...

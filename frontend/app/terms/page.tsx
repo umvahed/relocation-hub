@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-const SUPPORT_EMAIL = 'support@valryn.com'
+const SUPPORT_EMAIL = 'support@valryn.nl'
 const LAST_UPDATED = '13 May 2026'
 
 export default function TermsPage() {

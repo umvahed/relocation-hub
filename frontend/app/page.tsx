@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import NavAuthButton from '@/app/components/NavAuthButton'
 
-const SUPPORT_EMAIL = 'support@valryn.com'
+const SUPPORT_EMAIL = 'support@valryn.nl'
 
 export default function Home() {
   return (

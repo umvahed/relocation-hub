@@ -273,7 +273,7 @@ def _build_validation_email_html(
         f'<p style="font-size:13px;color:#374151;margin:0 0 16px;">{summary}</p>'
         f'{issues_block}{cta}'
         '<hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0"/>'
-        '<p style="font-size:11px;color:#9ca3af;">Valryn &middot; valryn.com</p>'
+        '<p style="font-size:11px;color:#9ca3af;">Valryn &middot; valryn.nl</p>'
         '</div>'
     )
 

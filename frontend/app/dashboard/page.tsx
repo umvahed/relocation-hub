@@ -473,7 +473,7 @@ export default function DashboardPage() {
     const dateStr = task.due_date
       ? new Date(task.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
       : ''
-    const msg = `Hi! Just a reminder that your task "${task.title}" is due on ${dateStr}. Check your full relocation plan at valryn.com 🇳🇱`
+    const msg = `Hi! Just a reminder that your task "${task.title}" is due on ${dateStr}. Check your full relocation plan at valryn.nl 🇳🇱`
     navigator.clipboard.writeText(msg).then(() => {
       setCopiedTaskId(task.id)
       setTimeout(() => setCopiedTaskId(null), 2000)
@@ -916,12 +916,12 @@ export default function DashboardPage() {
                   {/* Support + sign out + theme */}
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 space-y-2">
                     <ThemeToggle />
-                    <a href="mailto:support@valryn.com"
+                    <a href="mailto:support@valryn.nl"
                       className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition">
                       <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
-                      support@valryn.com
+                      support@valryn.nl
                     </a>
                     <button onClick={signOut}
                       className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition w-full text-left">

@@ -29,7 +29,9 @@ app.add_middleware(
     allow_origins=[
         settings.FRONTEND_URL,
         "http://localhost:3000",
-        "https://relocation-hub.vercel.app",
+        "https://valryn.nl",
+        "https://www.valryn.nl",
+        "https://relocation-hub.vercel.app",  # keep during DNS transition
     ],
     allow_credentials=True,
     allow_methods=["*"],

@@ -53,7 +53,7 @@ async def get_ical_feed(user_id: str):
             status_mark = "✓ " if task["status"] == "completed" else ""
             summary = _escape_ical(f"{status_mark}{task['title']}")
             description = _escape_ical(task.get("description", "")[:300])
-            uid = f"{task['id']}@relocationhub"
+            uid = f"{task['id']}@valryn.nl"
 
             lines += [
                 "BEGIN:VEVENT",
