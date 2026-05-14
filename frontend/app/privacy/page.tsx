@@ -1,4 +1,12 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description: "Valryn privacy policy — how we handle your relocation data under GDPR.",
+  alternates: { canonical: "https://valryn.nl/privacy" },
+  robots: { index: true, follow: false },
+}
 
 const SUPPORT_EMAIL = 'support@valryn.nl'
 const LAST_UPDATED = '13 May 2026'

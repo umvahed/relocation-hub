@@ -1,11 +1,76 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import NavAuthButton from '@/app/components/NavAuthButton'
 
 const SUPPORT_EMAIL = 'support@valryn.nl'
 
+export const metadata: Metadata = {
+  title: "Valryn — Relocation Platform for the Netherlands",
+  description: "Valryn organises your entire move to the Netherlands: IND permit checklist, document validation, 30% ruling calculator, BSN & DigiD deadlines, and more. Start free.",
+  alternates: { canonical: "https://valryn.nl" },
+  openGraph: {
+    title: "Valryn — Relocation Platform for the Netherlands",
+    description: "Organise your entire move to the Netherlands in one place. AI checklist, IND document validation, 30% ruling calculator and deadline tracking.",
+    url: "https://valryn.nl",
+  },
+}
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://valryn.nl/#org",
+      "name": "Valryn",
+      "url": "https://valryn.nl",
+      "logo": "https://valryn.nl/icons/icon.svg",
+      "contactPoint": { "@type": "ContactPoint", "email": "support@valryn.nl", "contactType": "customer support" },
+      "legalName": "Bitquanta",
+      "address": { "@type": "PostalAddress", "addressLocality": "Amsterdam", "addressCountry": "NL" },
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://valryn.nl/#app",
+      "name": "Valryn",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "url": "https://valryn.nl",
+      "description": "AI-powered relocation platform for professionals moving to the Netherlands. Personalised IND checklist, document validation, 30% ruling calculator, deadline tracking.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR",
+        "description": "Free tier available. Premium AI features from €19.99 one-time.",
+      },
+      "provider": { "@id": "https://valryn.nl/#org" },
+      "featureList": [
+        "IND permit checklist",
+        "AI document validation",
+        "30% ruling eligibility calculator",
+        "BSN and DigiD deadline tracking",
+        "Relocation risk score",
+        "Shareable HR progress report",
+      ],
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://valryn.nl/#website",
+      "url": "https://valryn.nl",
+      "name": "Valryn",
+      "publisher": { "@id": "https://valryn.nl/#org" },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://valryn.nl/tools/30-ruling",
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ],
+}
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-white dark:bg-gray-900">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       {/* Nav */}
       <nav className="border-b border-gray-100 dark:border-gray-800 sticky top-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur z-10">

@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /tools/
+Disallow: /dashboard
+Disallow: /documents
+Disallow: /onboarding
+Disallow: /auth/
+Disallow: /upgrade/
+Disallow: /share/
+
+Sitemap: https://valryn.nl/sitemap.xml

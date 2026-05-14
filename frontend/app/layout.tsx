@@ -9,8 +9,50 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Valryn — Move smarter. Settle faster.",
-  description: "AI-powered relocation platform for moving to the Netherlands. Personalised checklist, document validation, IND monitoring and deadline tracking — all in one place.",
+  metadataBase: new URL("https://valryn.nl"),
+  title: {
+    default: "Valryn — Move smarter. Settle faster.",
+    template: "%s | Valryn",
+  },
+  description: "AI-powered relocation platform for professionals moving to the Netherlands. Personalised checklist, IND document validation, 30% ruling calculator, deadline tracking — all in one place.",
+  keywords: [
+    "relocation Netherlands",
+    "moving to Netherlands",
+    "IND permit Netherlands",
+    "highly skilled migrant Netherlands",
+    "30% ruling calculator",
+    "BSN registration Netherlands",
+    "expat Netherlands checklist",
+    "relocate Amsterdam",
+    "kennismigrant Nederland",
+    "DigiD registration",
+  ],
+  authors: [{ name: "Valryn", url: "https://valryn.nl" }],
+  creator: "Valryn",
+  publisher: "Bitquanta",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://valryn.nl",
+    siteName: "Valryn",
+    title: "Valryn — Move smarter. Settle faster.",
+    description: "AI-powered relocation platform for professionals moving to the Netherlands. Personalised checklist, IND document validation, deadline tracking — all in one place.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Valryn — relocation platform for the Netherlands" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Valryn — Move smarter. Settle faster.",
+    description: "AI-powered relocation platform for professionals moving to the Netherlands.",
+    images: ["/og-image.png"],
+  },
+  alternates: {
+    canonical: "https://valryn.nl",
+  },
 };
 
 export default function RootLayout({
