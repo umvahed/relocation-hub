@@ -339,6 +339,7 @@ created_at
 | `EditProfileModal.tsx` | Edit all profile fields incl. partner section; Save profile or Save & regenerate checklist |
 | `ResourcesWidget.tsx` | City-aware housing (Pararius), ExpatGuide schools (if children), Marktplaats + IKEA (if container) |
 | `ThemeToggle.tsx` | Dark/light mode toggle |
+| `InstallPrompt.tsx` | PWA install banner (bottom of dashboard): native `beforeinstallprompt` on Android, manual Share instructions on iOS; dismisses permanently via `localStorage` |
 
 **Cron proxy routes (`app/api/`):**
 
@@ -474,7 +475,7 @@ RESEND_API_KEY ← used by ind_monitor.yml for auth header (ADMIN_SECRET pattern
 ✅ **30% Ruling calculator** — `/tools/30-ruling`, public, 4 hard gates (employer/distance/timing/salary), net monthly estimate, linked from landing + dashboard
 ✅ **Resource links** — ResourcesWidget: Pararius deep-link (city-aware), ExpatGuide schools (if children), Marktplaats + IKEA (if container)
 ✅ **Container shipping** — 3 shipping options, container_ship_date, ContainerArrivalBanner, arrival window estimate
-✅ **Document pack** — merged PDF (cover page + non-failed docs via pypdf), download + send to HR with 7-day signed URL
+✅ **Document pack** — merged PDF with cover page + per-document divider pages (showing #, filename, category) + document pages; download + send to HR with 7-day signed URL
 ✅ **Partner support** — partner fields on profile; `[Partner]` prefixed tasks; violet Partner badge on dashboard; partner email for reminders + completion notifications
 ✅ **Relocation allowance tracker** — set total budget, log expenses per task, running balance, HR email on each expense, PDF statement export
 ✅ **Shareable progress link** — `/share/[token]` public read-only one-pager for HR: overall %, per-category bars, risk score, doc count; print-friendly
@@ -484,6 +485,8 @@ RESEND_API_KEY ← used by ind_monitor.yml for auth header (ADMIN_SECRET pattern
 ✅ **Stripe payments** — one-time €19.99; sidebar upgrade button; `/upgrade/success` redirect page
 ✅ **Legal pages** — `/privacy` (GDPR compliant), `/terms` (EU Consumer Rights Directive), `/refunds` (voluntary 14-day guarantee)
 ✅ **Landing page revamp** — hero, 9-feature grid, pricing section, expanded footer with legal links
+✅ **PWA install prompt** — `manifest.json` + `icon.svg` (Valryn V-mark, dark navy, gradient violet); `InstallPrompt.tsx` on dashboard; Apple meta tags in layout; `beforeinstallprompt` on Android, Share instructions on iOS
+✅ **Share page Next.js 16 fix** — `params` in async Server Components is a Promise in Next.js 15+; `/share/[token]/page.tsx` now `await`s params before use
 
 ---
 
@@ -590,12 +593,17 @@ relocation-hub/
 │   │   │   ├── AllowanceTrackerWidget.tsx
 │   │   │   ├── EditProfileModal.tsx
 │   │   │   ├── ResourcesWidget.tsx
-│   │   │   └── ThemeToggle.tsx
+│   │   │   ├── ThemeToggle.tsx
+│   │   │   └── InstallPrompt.tsx
 │   │   └── api/
 │   │       ├── keepalive/
 │   │       ├── weekly-digest/
 │   │       ├── send-reminders/
 │   │       └── ind-appointment-reminders/
+│   ├── public/
+│   │   ├── manifest.json         # PWA manifest (display: standalone, theme: #4f46e5)
+│   │   └── icons/
+│   │       └── icon.svg          # Valryn V-mark (dark navy bg, gradient violet)
 │   ├── lib/
 │   │   ├── supabase.ts
 │   │   └── api.ts

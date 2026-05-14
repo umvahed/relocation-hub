@@ -40,11 +40,12 @@ SaaS platform helping professionals relocating to the Netherlands organise their
 - **Task reminders** — email alerts before due date; partner email included for `[Partner]` tasks
 - **iCal feed** — subscribe to task deadlines in Google Calendar / Apple Calendar
 - **WhatsApp reminder copy** — preformatted message to clipboard for tasks with due dates
-- **Document pack** — merged PDF (cover page + all non-failed docs via pypdf); download or email to HR contact
+- **Document pack** — merged PDF with cover page, per-document divider pages, and all non-failed docs; download or email to HR contact
 - **Document date extraction** — claude-haiku extracts key dates (passport expiry, flight departure, employment start, tenancy begin) from uploaded docs; persisted to `documents.extracted_date`; auto-runs on every validatable upload
 - **30% Ruling Calculator** — public, multi-step eligibility calculator at `/tools/30-ruling` (no auth required)
 - **Resource links** — city-aware housing (Pararius), ExpatGuide schools (if children), Marktplaats + IKEA (if container)
 - **Container arrival estimate** — origin-country-specific delivery window based on ship date
+- **PWA install prompt** — after login, prompts user to add Valryn to their home screen; native install on Android, Share instructions on iOS
 
 ### Paid tier (€19.99 one-time via Stripe)
 - **AI Document Validation** — Claude validates docs against IND 2025 rules (PDF + images); GDPR-compliant; explicit consent required

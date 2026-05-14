@@ -64,6 +64,9 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEN
 - Document date extraction: `POST /api/documents/{id}/extract-date` — claude-haiku-4-5-20251001, no rate limit, available to all tiers; extracts single most important date (passport expiry, flight departure, employment start, tenancy begin, etc.) and persists to documents table; called automatically on every validatable upload
 - Dashboard header still uses `CountdownBanner` (days to moving day). `TimelineBanner` component exists but is not rendered — extracted document dates are stored in `allDocuments` state for potential future use
 - Completing any task without an attached document shows a confirmation dialog; critical tasks say "IND applications require supporting documents", all others say "attach to help build your relocation timeline"
+- **Next.js 16 dynamic route params are a Promise** — in async Server Components, always `const { token } = await params` before use; accessing `params.token` directly returns `undefined` and causes silent 404s. Type as `params: Promise<{ token: string }>`.
+- Document pack merged PDF structure: cover page → (for each included doc) divider page → document pages. Divider shows doc number (matching cover table `#`), filename bold, category. Built by `_build_divider_pdf()` in `docpack.py`.
+- PWA: `public/manifest.json` + `public/icons/icon.svg` (Valryn V-mark). `InstallPrompt.tsx` shows on dashboard after login — `beforeinstallprompt` event on Android, manual Share instructions on iOS, dismissed permanently via `localStorage`. Apple meta tags in `layout.tsx`.
 
 ## Task categories (fixed order)
 
@@ -77,7 +80,7 @@ RDW driving licence exchange lives in `admin` (post-arrival), not `transport`.
 
 ## Current state
 
-Working end-to-end: Google OAuth / email auth → onboarding (6 steps: basics, employment, logistics+school-stage, permit+situation, move-date, HR-contact) → AI checklist (EU citizen path, partner-aware, school-stage-specific tasks, 30%-ruling task, RDW driving-licence note, `[Partner]` prefixed tasks) → dashboard (Priority Actions sidebar widget, countdown banner, progress, tasks) → task search → custom task add/delete → document upload → AI validation → document date extraction (auto on upload, persisted to DB) → employment-doc profile enrichment → risk score → iCal feed → task reminders (partner email) → HR contact notifications → profile editing → checklist regeneration (diff banner) → IND appointment slot monitor → 30% ruling calculator → resource links → container arrival estimate → document pack (merged PDF) → relocation allowance tracker → shareable HR progress link → Stripe one-time upgrade (€19.99).
+Working end-to-end: Google OAuth / email auth → onboarding (6 steps: basics, employment, logistics+school-stage, permit+situation, move-date, HR-contact) → AI checklist (EU citizen path, partner-aware, school-stage-specific tasks, 30%-ruling task, RDW driving-licence note, `[Partner]` prefixed tasks) → dashboard (Priority Actions sidebar widget, countdown banner, progress, tasks) → task search → custom task add/delete → document upload → AI validation → document date extraction (auto on upload, persisted to DB) → employment-doc profile enrichment → risk score → iCal feed → task reminders (partner email) → HR contact notifications → profile editing → checklist regeneration (diff banner) → IND appointment slot monitor → 30% ruling calculator → resource links → container arrival estimate → document pack (merged PDF with cover + divider pages + docs) → relocation allowance tracker → shareable HR progress link → Stripe one-time upgrade (€19.99) → PWA install prompt (home screen).
 
 Not yet built: B2B HR portal.
 

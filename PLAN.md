@@ -1,6 +1,6 @@
 # Valryn — Implementation Plan
 
-> Last updated: 2026-05-13. Phases 1–4 complete (Stripe live). Phase 5 (B2B HR Portal) is next.
+> Last updated: 2026-05-14. Phases 1–4 complete (Stripe live). Phase 5 (B2B HR Portal) is next.
 
 ---
 
@@ -8,9 +8,9 @@
 
 | Priority | Task | Notes |
 |---|---|---|
-| 1 | Add homepage link in dashboard nav | No way back to landing page from dashboard |
-| 2 | Set up pytest for backend | Cover tier gating, rate limiting, profile CRUD, SA tasks, IND monitor, partner tasks, allowance, billing |
-| 3 | Build Phase 5 — B2B HR Portal | See Phase 5 below |
+| 1 | Set up pytest for backend | Cover tier gating, rate limiting, profile CRUD, SA tasks, IND monitor, partner tasks, allowance, billing |
+| 2 | Build Phase 5 — B2B HR Portal | See Phase 5 below |
+| 3 | Add PNG icons for PWA | `public/icons/icon-192.png` + `icon-512.png` — needed for Android Chrome native install prompt; SVG works for most browsers but PNG is required for the `beforeinstallprompt` event |
 
 ---
 
@@ -77,12 +77,13 @@ Run through this before any significant launch or after rebuilding infrastructur
 - [ ] Edit profile → regenerate → new checklist generated; diff banner shown
 - [ ] Container ship date set → arrival banner appears on dashboard
 - [ ] Task search → filters correctly, clear button works
-- [ ] Download document pack → merged PDF with cover page + all non-failed docs
+- [ ] Download document pack → merged PDF has cover page + divider page per document (showing #, filename, category) + document pages
 - [ ] Allowance tracker → set amount → log expense → balance updates → PDF export downloads
-- [ ] Shareable link → `/share/[token]` public page renders correctly (no auth)
+- [ ] Shareable link → `/share/[token]` public page renders correctly in incognito (no auth)
 - [ ] Stripe upgrade → `POST /api/billing/create-checkout` → Stripe Checkout → `/upgrade/success` → tier flipped to paid
 - [ ] `/privacy`, `/terms`, `/refunds` pages load
 - [ ] `/tools/30-ruling` loads and runs through all 4 gates
+- [ ] On mobile: PWA install banner appears on dashboard; "Not now" dismisses permanently
 - [ ] Delete account → all data removed
 
 ---
@@ -180,6 +181,17 @@ Run through this before any significant launch or after rebuilding infrastructur
 ### Feature 13 ✅ — Dashboard Priority Actions widget
 - Top-of-sidebar card showing up to 3 items: overdue tasks, due-within-7-days tasks, next critical task
 - Colored left border per urgency; scroll-to-task arrow button
+
+### Feature 15 ✅ — Docpack divider pages
+- `_build_divider_pdf(doc_number, file_name, category)` in `docpack.py` — inserted before each document in the merged PDF
+- Divider shows document number (matching `#` in the cover table), filename in bold, category label below
+- Uses `enumerate(included_docs, 1)` so numbering always matches cover page table
+
+### Feature 16 ✅ — PWA install prompt
+- `public/manifest.json` — Valryn PWA manifest (`display: standalone`, `start_url: /dashboard`, violet theme)
+- `public/icons/icon.svg` — Valryn V-mark on dark navy background (gradient violet, fold detail)
+- `app/layout.tsx` — `<link rel="manifest">`, `apple-touch-icon`, `theme-color` meta tags
+- `InstallPrompt.tsx` — bottom banner on dashboard after login; native `beforeinstallprompt` on Android, manual Share instructions on iOS; "Not now" dismisses permanently via `localStorage`
 
 ### Feature 14 ✅ — Document date extraction + Relocation Timeline
 - `POST /api/documents/{id}/extract-date` — claude-haiku, no rate limit, all tiers
