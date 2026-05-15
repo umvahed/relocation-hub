@@ -1,6 +1,7 @@
 from datetime import date
 from fastapi import APIRouter, HTTPException, Header
 from app.config import settings
+from app.utils import is_paid_or_trial
 from supabase import create_client
 
 router = APIRouter()
@@ -30,6 +31,24 @@ def _send_email(to: str, subject: str, html: str) -> bool:
         return False
 
 
+def _truncate_desc(desc: str) -> str:
+    if not desc:
+        return ""
+    body = desc[:200] + ("..." if len(desc) > 200 else "")
+    return f'<p style="font-size: 13px; color: #4b5563; margin: 8px 0 0; line-height: 1.5;">{body}</p>'
+
+
+def _should_send_digest(profile: dict, progress: int) -> bool:
+    if progress == 100:
+        return False
+    move_date_str = profile.get("move_date")
+    if move_date_str:
+        weeks_since = (date.today() - date.fromisoformat(move_date_str[:10])).days // 7
+        if weeks_since >= 12:
+            return False
+    return True
+
+
 def notify_task_complete(task: dict, profile: dict) -> None:
     user_name = profile.get("full_name", "Your relocatee")
     contact_name = profile.get("contact_name") or "there"
@@ -51,7 +70,7 @@ def notify_task_complete(task: dict, profile: dict) -> None:
       <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;">
         <div style="font-size: 11px; font-weight: 600; color: #16a34a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">{category}</div>
         <div style="font-size: 15px; font-weight: 600; color: #15803d;">✓ {task_title}</div>
-        {f'<p style="font-size: 13px; color: #4b5563; margin: 8px 0 0; line-height: 1.5;">{task_description[:200]}{"..." if len(task_description) > 200 else ""}</p>' if task_description else ""}
+        {_truncate_desc(task_description)}
       </div>
       <p style="color: #9ca3af; font-size: 13px; margin: 0;">
         You're receiving this because you're listed as a contact for {user_name}'s relocation.
@@ -90,10 +109,11 @@ async def send_weekly_digest(authorization: str = Header(None)):
     sent = 0
     for profile in profiles.data:
         try:
+            if not is_paid_or_trial(profile):
+                continue
             user_id = profile["id"]
             user_name = profile.get("full_name", "Your relocatee")
             contact_email = profile["contact_email"]
-            contact_name = profile.get("contact_name") or "there"
 
             tasks_res = supabase.table("tasks").select("title, status, category").eq("user_id", user_id).execute()
             all_tasks = tasks_res.data or []
@@ -102,14 +122,8 @@ async def send_weekly_digest(authorization: str = Header(None)):
             pending = [t for t in all_tasks if t["status"] == "pending"]
             progress = round(len(completed) / total * 100) if total else 0
 
-            # No digest once fully complete or settled (12+ weeks post move-date)
-            if progress == 100:
+            if not _should_send_digest(profile, progress):
                 continue
-            move_date_str = profile.get("move_date")
-            if move_date_str:
-                weeks_since_move = (date.today() - date.fromisoformat(move_date_str[:10])).days // 7
-                if weeks_since_move >= 12:
-                    continue
 
             recent_done = completed[-5:]
             upcoming = pending[:5]

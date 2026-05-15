@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timezone
 from app.config import settings
 from app.routes.notifications import _send_email
+from app.utils import check_paid_tier
 from supabase import create_client
 
 logger = logging.getLogger(__name__)
@@ -93,6 +94,7 @@ class SubscribeRequest(BaseModel):
 @router.post("/ind-monitor/subscribe")
 async def subscribe(body: SubscribeRequest):
     supabase = get_supabase()
+    check_paid_tier(supabase, body.user_id)
     try:
         supabase.table("ind_monitor_subscriptions").upsert(
             {
@@ -148,6 +150,7 @@ class ReportNoSlotsRequest(BaseModel):
 async def report_no_slots(body: ReportNoSlotsRequest):
     """User checked OAP and found no slots — flips their personal availability flag to false."""
     supabase = get_supabase()
+    check_paid_tier(supabase, body.user_id)
     sub = (
         supabase.table("ind_monitor_subscriptions")
         .select("user_id")
@@ -246,6 +249,7 @@ class AppointmentRequest(BaseModel):
 @router.post("/ind-monitor/appointment")
 async def save_appointment(body: AppointmentRequest):
     supabase = get_supabase()
+    check_paid_tier(supabase, body.user_id)
     supabase.table("ind_appointments").upsert(
         {
             "user_id": body.user_id,
@@ -315,6 +319,16 @@ def _send_appointment_reminder_email(
     return _send_email(to=email, subject=subject, html=html)
 
 
+def _try_send_reminder(supabase, appt: dict, email: str, days: int) -> bool:
+    sent = _send_appointment_reminder_email(
+        email, appt["desk_code"], appt["desk_name"], appt["appointment_date"], days
+    )
+    if sent:
+        flag = "reminder_sent_7d" if days == 7 else "reminder_sent_1d"
+        supabase.table("ind_appointments").update({flag: True}).eq("user_id", appt["user_id"]).execute()
+    return sent
+
+
 @router.post("/ind-monitor/send-appointment-reminders")
 async def send_appointment_reminders(authorization: Annotated[str | None, Header()] = None):
     if authorization != f"Bearer {settings.RESEND_API_KEY}":
@@ -329,32 +343,17 @@ async def send_appointment_reminders(authorization: Annotated[str | None, Header
     ).execute()
 
     for appt in appointments.data or []:
-        appt_date = date_type.fromisoformat(appt["appointment_date"])
-        days_until = (appt_date - today).days
+        days_until = (date_type.fromisoformat(appt["appointment_date"]) - today).days
         if days_until < 0:
             continue
-
         profile = supabase.table("profiles").select("email").eq("id", appt["user_id"]).execute()
         if not profile.data:
             continue
         email = profile.data[0]["email"]
 
-        if days_until == 7 and not appt["reminder_sent_7d"]:
-            if _send_appointment_reminder_email(
-                email, appt["desk_code"], appt["desk_name"], appt["appointment_date"], 7
-            ):
-                supabase.table("ind_appointments").update({"reminder_sent_7d": True}).eq(
-                    "user_id", appt["user_id"]
-                ).execute()
-                sent_7d += 1
-
-        if days_until == 1 and not appt["reminder_sent_1d"]:
-            if _send_appointment_reminder_email(
-                email, appt["desk_code"], appt["desk_name"], appt["appointment_date"], 1
-            ):
-                supabase.table("ind_appointments").update({"reminder_sent_1d": True}).eq(
-                    "user_id", appt["user_id"]
-                ).execute()
-                sent_1d += 1
+        if days_until == 7 and not appt["reminder_sent_7d"] and _try_send_reminder(supabase, appt, email, 7):
+            sent_7d += 1
+        if days_until == 1 and not appt["reminder_sent_1d"] and _try_send_reminder(supabase, appt, email, 1):
+            sent_1d += 1
 
     return {"sent_7d": sent_7d, "sent_1d": sent_1d}

@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from app.config import settings
+from app.utils import check_paid_tier
 from supabase import create_client
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 router = APIRouter()
 _supabase = None
@@ -22,6 +23,7 @@ def _escape_ical(text: str) -> str:
 async def get_ical_feed(user_id: str):
     try:
         supabase = get_supabase()
+        check_paid_tier(supabase, user_id)
         tasks_res = supabase.table("tasks").select(
             "id, title, description, category, due_date, status"
         ).eq("user_id", user_id).not_.is_("due_date", "null").execute()
@@ -29,7 +31,7 @@ async def get_ical_feed(user_id: str):
         profile_res = supabase.table("profiles").select("full_name").eq("id", user_id).execute()
         user_name = profile_res.data[0]["full_name"] if profile_res.data else "Relocatee"
 
-        now = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
         lines = [
             "BEGIN:VCALENDAR",
@@ -74,7 +76,7 @@ async def get_ical_feed(user_id: str):
         return Response(
             content=ical_content,
             media_type="text/calendar; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="relocation-plan.ics"'},
+            headers={"Content-Disposition": 'attachment; filename="relocation-plan.ics"'},
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

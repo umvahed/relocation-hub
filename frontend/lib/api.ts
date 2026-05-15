@@ -442,12 +442,17 @@ export async function extractDocumentDate(
 
 // ── Billing ──────────────────────────────────────────────────────────────────
 
-export async function createCheckoutSession(user_id: string, email: string): Promise<{ checkout_url: string }> {
+export async function createCheckoutSession(user_id: string, email: string, promo_code?: string): Promise<{ checkout_url: string }> {
   const res = await fetch(`${API_URL}/api/billing/create-checkout`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id, email }),
+    body: JSON.stringify({ user_id, email, promo_code: promo_code || undefined }),
   })
+  return handleResponse(res)
+}
+
+export async function validatePromoCode(code: string): Promise<{ valid: boolean; discount_percent: number; code: string }> {
+  const res = await fetch(`${API_URL}/api/billing/promo-code/${encodeURIComponent(code.toUpperCase())}`)
   return handleResponse(res)
 }
 

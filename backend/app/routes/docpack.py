@@ -8,6 +8,7 @@ from pypdf import PdfWriter, PdfReader
 from supabase import create_client
 
 from app.config import settings
+from app.utils import check_paid_tier
 
 router = APIRouter()
 _supabase = None
@@ -310,6 +311,7 @@ async def _build_merged_pdf(user_id: str) -> tuple[bytes, str]:
 
 @router.get("/docpack/{user_id}")
 async def download_docpack(user_id: str):
+    check_paid_tier(get_supabase(), user_id)
     try:
         pdf_bytes, filename = await _build_merged_pdf(user_id)
     except HTTPException:
@@ -326,6 +328,7 @@ async def download_docpack(user_id: str):
 @router.post("/docpack/{user_id}/send-to-hr")
 async def send_docpack_to_hr(user_id: str):
     supabase = get_supabase()
+    check_paid_tier(supabase, user_id)
 
     p_res = supabase.table("profiles").select(
         "full_name, contact_name, contact_email"

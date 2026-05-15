@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, updateProfile, getDocumentValidation, validateDocument, createCustomTask, deleteTask, getIndAppointment, enrichProfileFromDocument, extractDocumentDate, createCheckoutSession, type RiskScore, type ValidationResult, type ProfileHints } from '@/lib/api'
+import { getChecklist, updateTask, getUsage, setDueDate, getProfile, deleteAccount, getRiskScore, updateConsent, updateProfile, getDocumentValidation, validateDocument, createCustomTask, deleteTask, getIndAppointment, enrichProfileFromDocument, extractDocumentDate, createCheckoutSession, validatePromoCode, type RiskScore, type ValidationResult, type ProfileHints } from '@/lib/api'
 import RiskScoreWidget from '@/app/components/RiskScoreWidget'
 import IndMonitorWidget from '@/app/components/IndMonitorWidget'
 import ResourcesWidget from '@/app/components/ResourcesWidget'
@@ -289,6 +289,11 @@ export default function DashboardPage() {
   const [copiedShareLink, setCopiedShareLink] = useState(false)
   const [regenDiff, setRegenDiff] = useState<{ added: number; removed: number } | null>(null)
   const [checkingOut, setCheckingOut] = useState(false)
+  const [showPromoModal, setShowPromoModal] = useState(false)
+  const [promoCode, setPromoCode] = useState('')
+  const [promoValidation, setPromoValidation] = useState<{ discount_percent: number; code: string } | null>(null)
+  const [promoError, setPromoError] = useState('')
+  const [validatingPromo, setValidatingPromo] = useState(false)
   const [dismissedINDUrgency, setDismissedINDUrgency] = useState(false)
   const [preDepartureMilestone, setPreDepartureMilestone] = useState(false)
   const [dismissedPreDeparture, setDismissedPreDeparture] = useState(false)
@@ -325,11 +330,34 @@ export default function DashboardPage() {
     })
   }, [])
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = () => {
+    setPromoCode('')
+    setPromoValidation(null)
+    setPromoError('')
+    setShowPromoModal(true)
+  }
+
+  const handleValidatePromo = async () => {
+    if (!promoCode.trim()) return
+    setValidatingPromo(true)
+    setPromoError('')
+    try {
+      const result = await validatePromoCode(promoCode.trim())
+      setPromoValidation(result)
+    } catch {
+      setPromoError('Invalid or expired code')
+      setPromoValidation(null)
+    } finally {
+      setValidatingPromo(false)
+    }
+  }
+
+  const handleCheckout = async () => {
     if (!user?.email) return
     setCheckingOut(true)
+    setShowPromoModal(false)
     try {
-      const { checkout_url } = await createCheckoutSession(user.id, user.email)
+      const { checkout_url } = await createCheckoutSession(user.id, user.email, promoValidation?.code)
       window.location.href = checkout_url
     } catch {
       setCheckingOut(false)
@@ -601,6 +629,62 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+
+      {/* Promo code modal */}
+      {showPromoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900 dark:text-white">Upgrade to Valryn</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">One-time payment · Lifetime access · No subscription</p>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 space-y-1 text-xs text-gray-600 dark:text-gray-300">
+              {['IND appointment monitor + alerts', 'HR email notifications (task + weekly digest)', 'iCal feed', 'Document pack (merged PDF)', 'Checklist regeneration', 'Unlimited custom tasks'].map(f => (
+                <div key={f} className="flex items-center gap-2"><span className="text-indigo-500">✓</span>{f}</div>
+              ))}
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5">Have a promo code? <span className="text-gray-400 font-normal">(optional)</span></p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoValidation(null); setPromoError('') }}
+                  onKeyDown={e => e.key === 'Enter' && handleValidatePromo()}
+                  placeholder="e.g. EXPAT20"
+                  className="flex-1 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <button
+                  onClick={handleValidatePromo}
+                  disabled={!promoCode.trim() || validatingPromo}
+                  className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-600 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-500 disabled:opacity-50 transition">
+                  {validatingPromo ? '…' : 'Apply'}
+                </button>
+              </div>
+              {promoValidation && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1.5 font-medium">
+                  {promoValidation.discount_percent}% discount applied — you pay €{(19.99 * (1 - promoValidation.discount_percent / 100)).toFixed(2)}
+                </p>
+              )}
+              {promoError && <p className="text-xs text-red-500 mt-1.5">{promoError}</p>}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setShowPromoModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                Cancel
+              </button>
+              <button
+                onClick={handleCheckout}
+                disabled={checkingOut}
+                className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-sm font-semibold text-white transition">
+                {checkingOut ? 'Redirecting…' : promoValidation ? `Pay €${(19.99 * (1 - promoValidation.discount_percent / 100)).toFixed(2)}` : 'Pay €19.99'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showEditProfile && user && profile && (
         <EditProfileModal
           userId={user.id}
@@ -821,6 +905,26 @@ export default function DashboardPage() {
                     </div>
                   )}
 
+                  {/* Refer a friend */}
+                  {isPaid && (
+                    <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
+                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Refer a friend</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Share this link — they get a discount, you help a fellow expat.</p>
+                      <div className="flex gap-1.5">
+                        <input
+                          readOnly
+                          value={`${typeof window !== 'undefined' ? window.location.origin : ''}/login?ref=${user?.id?.slice(0, 8).toUpperCase()}`}
+                          className="flex-1 text-xs border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 min-w-0"
+                        />
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/login?ref=${user?.id?.slice(0, 8).toUpperCase()}`) }}
+                          className="flex-shrink-0 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition">
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* 30% Ruling tool */}
                   <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
                     <a
@@ -901,7 +1005,7 @@ export default function DashboardPage() {
                           </p>
                         )}
                         {!trialActive && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Unlock AI validation, risk score &amp; more</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Unlock IND monitor, HR emails, iCal, doc pack &amp; more</p>
                         )}
                         <button
                           onClick={handleUpgrade}
@@ -1134,6 +1238,7 @@ export default function DashboardPage() {
               <IndMonitorWidget
                 userId={user.id}
                 userEmail={user.email ?? profile.email ?? ''}
+                isPaid={isPaid}
                 destinationCity={profile.destination_city ?? undefined}
                 moveDate={profile.move_date ?? undefined}
               />

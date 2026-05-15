@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from app.config import settings
 from supabase import create_client
 from app.routes.notifications import notify_task_complete
+from app.utils import check_paid_tier, is_paid_or_trial
 import anthropic
 import json
 from datetime import date
@@ -568,6 +569,7 @@ class RegenerateRequest(BaseModel):
 async def regenerate_checklist(request: RegenerateRequest):
     try:
         supabase = get_supabase()
+        check_paid_tier(supabase, request.user_id)
         profile_res = supabase.table("profiles").select("*").eq("id", request.user_id).execute()
         if not profile_res.data:
             raise HTTPException(status_code=404, detail="Profile not found")
@@ -721,10 +723,17 @@ class CustomTaskRequest(BaseModel):
     category: str
     description: str | None = None
 
+FREE_CUSTOM_TASK_LIMIT = 3
+
 @router.post("/checklist/custom-task")
 async def create_custom_task(request: CustomTaskRequest):
     try:
         supabase = get_supabase()
+        profile_res = supabase.table("profiles").select("tier, trial_ends_at").eq("id", request.user_id).execute()
+        if profile_res.data and not is_paid_or_trial(profile_res.data[0]):
+            existing = supabase.table("tasks").select("id").eq("user_id", request.user_id).eq("source", "custom").execute()
+            if len(existing.data or []) >= FREE_CUSTOM_TASK_LIMIT:
+                raise HTTPException(status_code=402, detail=f"Free plan allows {FREE_CUSTOM_TASK_LIMIT} custom tasks. Upgrade to add unlimited tasks.")
         valid_categories = {"critical", "visa", "admin", "employment", "housing", "banking", "healthcare", "transport", "shipping", "pets"}
         category = request.category if request.category in valid_categories else "admin"
         result = supabase.table("tasks").insert({
@@ -771,8 +780,10 @@ async def update_task(task_id: str, status: str):
         if status == "completed" and result.data:
             task = result.data[0]
             if task.get("category") in HR_NOTIFY_CATEGORIES:
-                profile_res = supabase.table("profiles").select("full_name, contact_name, contact_email, partner_email, partner_full_name").eq("id", task["user_id"]).execute()
-                if profile_res.data:
+                profile_res = supabase.table("profiles").select(
+                    "full_name, contact_name, contact_email, partner_email, partner_full_name, tier, trial_ends_at"
+                ).eq("id", task["user_id"]).execute()
+                if profile_res.data and is_paid_or_trial(profile_res.data[0]):
                     notify_task_complete(task, profile_res.data[0])
         return {"message": "Task updated", "task": result.data}
     except Exception as e:

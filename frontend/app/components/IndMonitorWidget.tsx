@@ -47,6 +47,7 @@ const DESK_ADDRESSES: Record<string, string> = {
 interface Props {
   readonly userId: string
   readonly userEmail: string
+  readonly isPaid: boolean
   readonly destinationCity?: string
   readonly moveDate?: string
 }
@@ -189,7 +190,7 @@ function BookingForm({ bookingDesk, setBookingDesk, bookingDate, setBookingDate,
   )
 }
 
-export default function IndMonitorWidget({ userId, userEmail, destinationCity, moveDate }: Props) {
+export default function IndMonitorWidget({ userId, userEmail, isPaid, destinationCity, moveDate }: Props) {
   const [subscribed, setSubscribed] = useState<boolean | null>(null)
   const [slotsAvailable, setSlotsAvailable] = useState(true)
   const [appointment, setAppointment] = useState<IndAppointment | null | undefined>(undefined)
@@ -287,6 +288,24 @@ export default function IndMonitorWidget({ userId, userEmail, destinationCity, m
 
   // Determine slot status for display (default optimistic when not subscribed)
   const showSlotsAvailable = inExceptionPeriod ? false : slotsAvailable
+
+  if (!isPaid) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-base">🇳🇱</span>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">IND Appointment Monitor</h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Biometrics (TKV) · residence permit</p>
+          </div>
+        </div>
+        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl px-4 py-3 text-center">
+          <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 mb-1">Premium feature</p>
+          <p className="text-xs text-indigo-500 dark:text-indigo-400">Get slot alerts, track your appointment, and receive 7-day + 1-day reminders. Upgrade to unlock.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5">
