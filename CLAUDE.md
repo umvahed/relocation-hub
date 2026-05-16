@@ -49,6 +49,11 @@ Never put `NEXT_PUBLIC_*` in Railway. Never put `FRONTEND_URL` in Vercel. `RESEN
 - Document validation supports PDF + images only (jpeg/png/gif/webp) — Word/DOCX returns 422
 - `api_usage` has a `call_type` column (`checklist` / `validation` / `risk_score`) — each type has independent daily limits with a UNIQUE(user_id, date, call_type) constraint
 - Tier gating: `profiles.tier` (`free` | `paid`). Stripe one-time payment €19.99: `POST /api/billing/create-checkout` → Stripe Checkout → webhook `checkout.session.completed` → `profiles.tier = 'paid'`. Also grantable manually via `POST /api/admin/grant-paid-tier` (X-Admin-Secret header)
+- **Paid-only features**: AI document validation, risk score, profile enrichment, IND Appointment Monitor (subscribe/report/appointment), checklist regeneration, iCal feed, document pack (download + send-to-HR), HR email notifications (task completion + weekly digest). Free tier gets checklist, document upload/view, date extraction, basic task management.
+- **Free tier custom task limit**: 3 custom tasks max; 4th attempt returns HTTP 402. Paid = unlimited. Enforced in `POST /api/checklist/custom-task`.
+- **`check_paid_tier(supabase, user_id)`** in `backend/app/utils.py` — call at top of any paid-only endpoint; raises HTTP 402 if free tier
+- **Promo/referral codes**: `promo_codes` table (migration 016). Admin creates codes via `POST /api/admin/promo-codes` (x-admin-secret). Users validate at checkout via `GET /api/billing/promo-code/{code}`. Valid codes create a Stripe coupon (`VALRYN_{CODE}`) and apply a `discounts` override to the checkout session. Webhook records `profiles.referred_by_code` and increments `promo_codes.uses_count`.
+- **Upgrade modal**: clicking Upgrade opens a modal (not direct Stripe redirect) listing all paid features with optional promo code field. Live validation shows discounted price before redirect.
 - Model in use: `claude-sonnet-4-6` for validation + risk score; `claude-sonnet-4-5` for checklist generation
 - `tasks.source` column: `'hardcoded'` (SA/general critical tasks), `'ai'` (Claude-generated), `'custom'` (user-added). Only `custom` tasks are deletable via `DELETE /api/checklist/task/{task_id}`
 - Partner tasks: titled `[Partner] ...` — displayed with a violet "Partner" badge on the dashboard (prefix stripped from display). Partner email receives reminders and completion notifications for these tasks
@@ -80,7 +85,7 @@ RDW driving licence exchange lives in `admin` (post-arrival), not `transport`.
 
 ## Current state
 
-Working end-to-end: Google OAuth / email auth → onboarding (6 steps: basics, employment, logistics+school-stage, permit+situation, move-date, HR-contact) → AI checklist (EU citizen path, partner-aware, school-stage-specific tasks, 30%-ruling task, RDW driving-licence note, `[Partner]` prefixed tasks) → dashboard (Priority Actions sidebar widget, countdown banner, progress, tasks) → task search → custom task add/delete → document upload → AI validation → document date extraction (auto on upload, persisted to DB) → employment-doc profile enrichment → risk score → iCal feed → task reminders (partner email) → HR contact notifications → profile editing → checklist regeneration (diff banner) → IND appointment slot monitor → 30% ruling calculator → resource links → container arrival estimate → document pack (merged PDF with cover + divider pages + docs) → relocation allowance tracker → shareable HR progress link → Stripe one-time upgrade (€19.99) → PWA install prompt (home screen).
+Working end-to-end: Google OAuth / email auth → onboarding (6 steps: basics, employment, logistics+school-stage, permit+situation, move-date, HR-contact) → AI checklist (EU citizen path, partner-aware, school-stage-specific tasks, 30%-ruling task, RDW driving-licence note, `[Partner]` prefixed tasks) → dashboard (Priority Actions sidebar widget, countdown banner, progress, tasks) → task search → custom task add/delete (free: 3 max) → document upload → AI validation (paid) → document date extraction (auto on upload, persisted to DB) → employment-doc profile enrichment (paid) → risk score (paid) → iCal feed (paid) → task reminders (partner email) → HR contact notifications (paid) → profile editing → checklist regeneration (paid, diff banner) → IND appointment slot monitor (paid) → 30% ruling calculator → resource links → container arrival estimate → document pack (paid, merged PDF with cover + divider pages + docs) → relocation allowance tracker → shareable HR progress link → Stripe one-time upgrade (€19.99, upgrade modal with promo code input) → promo/referral/influencer codes → PWA install prompt (home screen).
 
 Not yet built: B2B HR portal.
 
@@ -95,6 +100,8 @@ Not yet built: B2B HR portal.
 | PATCH | `/api/auth/profile/{user_id}/consent` | Set/withdraw AI validation consent |
 | DELETE | `/api/auth/profile/{user_id}` | Full account deletion (cascades all data) |
 | POST | `/api/admin/grant-paid-tier` | Manually grant paid tier (X-Admin-Secret) |
+| POST | `/api/admin/promo-codes` | Create promo/influencer/referral code (X-Admin-Secret) |
+| GET | `/api/admin/promo-codes` | List all promo codes (X-Admin-Secret) |
 | POST | `/api/checklist/generate` | Hardcoded critical tasks + Claude AI tasks |
 | POST | `/api/checklist/regenerate` | Delete all tasks + re-generate from current profile |
 | GET | `/api/checklist/{user_id}` | All tasks for user |
@@ -132,8 +139,9 @@ Not yet built: B2B HR portal.
 | DELETE | `/api/allowance/expense/{expense_id}` | Delete an expense (query param: user_id) |
 | GET | `/api/allowance/{user_id}/export` | Stream PDF allowance statement |
 | GET | `/api/share/{token}` | Public read-only progress summary (no auth) — name, task progress by category, risk score, doc count |
-| POST | `/api/billing/create-checkout` | Create Stripe Checkout session (one-time €19.99); returns `checkout_url` |
-| POST | `/api/billing/webhook` | Stripe webhook receiver; `checkout.session.completed` → `profiles.tier = 'paid'` |
+| GET | `/api/billing/promo-code/{code}` | Validate a promo code — returns discount_percent or 404 |
+| POST | `/api/billing/create-checkout` | Create Stripe Checkout session (one-time €19.99, optional promo_code); returns `checkout_url` |
+| POST | `/api/billing/webhook` | Stripe webhook; `checkout.session.completed` → `profiles.tier = 'paid'`, records `referred_by_code`, increments `promo_codes.uses_count` |
 
 ## Go-live checklist (quick reference — full version in PLAN.md)
 
@@ -145,8 +153,9 @@ Not yet built: B2B HR portal.
 - Supabase: migration 013 run (`user_slots_available` column on `ind_monitor_subscriptions`, `ind_appointments` table)
 - Supabase: migration 014 run (7 new `profiles` columns — see Key constraints above)
 - Supabase: migration 015 run (`extracted_date` + `extracted_date_label` on `documents`)
+- Supabase: migration 016 run (`promo_codes` table + `profiles.referred_by_code` column)
 - Stripe: product + one-time price created, `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` + `STRIPE_PRICE_ID` set in Railway, webhook endpoint registered at `POST /api/billing/webhook`
-- Smoke test: OAuth login → onboarding → checklist → document upload → validation → risk score → IND subscribe → check "no slots" → iCal → edit profile → upgrade (Stripe) → delete account
+- Smoke test: OAuth login → onboarding → checklist → document upload → validation → risk score → IND subscribe → check "no slots" → iCal → edit profile → upgrade (Stripe, test promo code) → delete account
 
 ## Performance notes (full roadmap in PLAN.md)
 
@@ -188,6 +197,7 @@ Not yet built: B2B HR portal.
 16. ✅ Dashboard Priority Actions widget — top-of-sidebar card showing overdue + due-soon + next critical tasks with scroll-to-task; regen diff + IND urgency + pre-departure milestone banners
 17. ✅ Document date extraction — claude-haiku extracts key dates from uploaded docs (passport expiry, flight departure, employment start, tenancy begin); persisted to `documents.extracted_date` + `documents.extracted_date_label`; called automatically on every validatable upload
 18. ✅ Stripe payments — one-time €19.99; `POST /api/billing/create-checkout` + `POST /api/billing/webhook`; webhook sets `profiles.tier = 'paid'`; upgrade button in sidebar for free/expired-trial users; `/upgrade/success` landing page
+19. ✅ Tier gating + promo/referral codes — paid-only features: IND monitor, checklist regen, iCal, doc pack, HR emails, unlimited custom tasks; free tier gets 3 custom tasks. Upgrade button opens modal listing features + optional promo code field with live discount preview. `promo_codes` table supports influencer/referral/manual codes with discount_percent, max_uses, expires_at. Admin manages codes via `POST /api/admin/promo-codes`. Referral link shown in sidebar for paid users.
 
 ### Phase 4 — B2B HR Portal ← NEXT
 **Goal:** Companies pay per-seat; HR admins manage multiple relocatees from one dashboard.
