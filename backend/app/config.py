@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     DAILY_AI_CALL_LIMIT: int = 5
     DAILY_VALIDATION_LIMIT: int = 10
     DAILY_RISK_SCORE_LIMIT: int = 3
-    ADMIN_SECRET: str = ""
+    ADMIN_SECRET: Optional[str] = None
+    CRON_SECRET: Optional[str] = None
     MAX_VALIDATION_FILE_SIZE: int = 20 * 1024 * 1024  # 20MB
 
 

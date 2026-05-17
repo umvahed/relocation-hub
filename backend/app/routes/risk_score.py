@@ -2,10 +2,11 @@ import json
 from datetime import date, datetime, timezone
 
 import anthropic
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
 from app.config import settings
+from app.deps import get_current_user_id
 from app.routes.checklist import _check_and_increment_usage
 from app.utils import is_paid_or_trial
 from supabase import create_client
@@ -147,7 +148,9 @@ def _risk_level(score: int) -> str:
 
 
 @router.post("/risk-score/compute")
-async def compute_risk_score(body: ComputeRiskScoreRequest):
+async def compute_risk_score(body: ComputeRiskScoreRequest, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != body.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
 
     profile_res = supabase.table("profiles").select("*").eq("id", body.user_id).execute()
@@ -224,7 +227,9 @@ async def compute_risk_score(body: ComputeRiskScoreRequest):
 
 
 @router.get("/risk-score/{user_id}")
-async def get_risk_score(user_id: str):
+async def get_risk_score(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
     result = supabase.table("risk_scores").select("*").eq("user_id", user_id).execute()
     if not result.data:

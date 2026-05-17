@@ -1,13 +1,14 @@
 import io
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from fpdf import FPDF
 from pypdf import PdfWriter, PdfReader
 from supabase import create_client
 
 from app.config import settings
+from app.deps import get_current_user_id
 from app.utils import check_paid_tier
 
 router = APIRouter()
@@ -310,7 +311,9 @@ async def _build_merged_pdf(user_id: str) -> tuple[bytes, str]:
 
 
 @router.get("/docpack/{user_id}")
-async def download_docpack(user_id: str):
+async def download_docpack(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     check_paid_tier(get_supabase(), user_id)
     try:
         pdf_bytes, filename = await _build_merged_pdf(user_id)
@@ -326,7 +329,9 @@ async def download_docpack(user_id: str):
 
 
 @router.post("/docpack/{user_id}/send-to-hr")
-async def send_docpack_to_hr(user_id: str):
+async def send_docpack_to_hr(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
     check_paid_tier(supabase, user_id)
 

@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from app.config import settings
+from app.deps import get_current_user_id
 from app.utils import check_paid_tier
 from supabase import create_client
 from datetime import datetime, date, timezone
@@ -16,11 +17,13 @@ def get_supabase():
 
 
 def _escape_ical(text: str) -> str:
-    return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+    return text.replace("\r", "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
 
 @router.get("/calendar/{user_id}/feed.ics")
-async def get_ical_feed(user_id: str):
+async def get_ical_feed(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         check_paid_tier(supabase, user_id)

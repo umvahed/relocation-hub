@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.config import settings
+from app.deps import get_current_user_id
 from supabase import create_client
 
 router = APIRouter()
@@ -13,7 +14,9 @@ def get_supabase():
 
 
 @router.get("/documents/{user_id}")
-async def list_documents(user_id: str):
+async def list_documents(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         result = supabase.table("documents").select(
@@ -25,7 +28,9 @@ async def list_documents(user_id: str):
 
 
 @router.delete("/documents/{document_id}")
-async def delete_document(document_id: str, user_id: str):
+async def delete_document(document_id: str, user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         doc_res = supabase.table("documents").select("file_path, user_id").eq("id", document_id).execute()

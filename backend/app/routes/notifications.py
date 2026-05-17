@@ -1,6 +1,8 @@
+import html as html_lib
 from datetime import date
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
 from app.config import settings
+from app.deps import verify_cron_secret
 from app.utils import is_paid_or_trial
 from supabase import create_client
 
@@ -50,12 +52,12 @@ def _should_send_digest(profile: dict, progress: int) -> bool:
 
 
 def notify_task_complete(task: dict, profile: dict) -> None:
-    user_name = profile.get("full_name", "Your relocatee")
-    contact_name = profile.get("contact_name") or "there"
-    task_title = task.get("title", "a task")
-    task_description = task.get("description", "")
-    category = task.get("category", "").capitalize()
-    is_partner_task = task_title.startswith("[Partner]")
+    user_name = html_lib.escape(profile.get("full_name") or "Your relocatee")
+    contact_name = html_lib.escape(profile.get("contact_name") or "there")
+    task_title = html_lib.escape(task.get("title") or "a task")
+    task_description = html_lib.escape(task.get("description") or "")
+    category = html_lib.escape((task.get("category") or "").capitalize())
+    is_partner_task = task.get("title", "").startswith("[Partner]")
 
     def _task_html(greeting_name: str, relocatee_desc: str) -> str:
         return f"""
@@ -98,10 +100,7 @@ def notify_task_complete(task: dict, profile: dict) -> None:
 
 
 @router.post("/notifications/weekly-digest")
-async def send_weekly_digest(authorization: str = Header(None)):
-    # Simple shared-secret guard — Vercel cron sends this header
-    if authorization != f"Bearer {settings.RESEND_API_KEY}":
-        raise HTTPException(status_code=401, detail="Unauthorised")
+async def send_weekly_digest(_: None = Depends(verify_cron_secret)):
 
     supabase = get_supabase()
     profiles = supabase.table("profiles").select("*").not_.is_("contact_email", "null").execute()
@@ -112,7 +111,7 @@ async def send_weekly_digest(authorization: str = Header(None)):
             if not is_paid_or_trial(profile):
                 continue
             user_id = profile["id"]
-            user_name = profile.get("full_name", "Your relocatee")
+            user_name = html_lib.escape(profile.get("full_name") or "Your relocatee")
             contact_email = profile["contact_email"]
 
             tasks_res = supabase.table("tasks").select("title, status, category").eq("user_id", user_id).execute()
@@ -129,12 +128,12 @@ async def send_weekly_digest(authorization: str = Header(None)):
             upcoming = pending[:5]
 
             recent_html = "".join(
-                f'<li style="margin-bottom:4px;">✓ {t["title"]}</li>'
+                f'<li style="margin-bottom:4px;">✓ {html_lib.escape(t["title"])}</li>'
                 for t in reversed(recent_done)
             ) or "<li style='color:#9ca3af;'>None yet</li>"
 
             upcoming_html = "".join(
-                f'<li style="margin-bottom:4px;">{t["title"]}</li>'
+                f'<li style="margin-bottom:4px;">{html_lib.escape(t["title"])}</li>'
                 for t in upcoming
             ) or "<li style='color:#9ca3af;'>All done!</li>"
 

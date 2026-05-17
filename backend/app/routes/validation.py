@@ -3,10 +3,11 @@ import json
 from datetime import date, datetime, timezone
 
 import anthropic
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
 from app.config import settings
+from app.deps import get_current_user_id
 from app.routes.checklist import _check_and_increment_usage
 from app.utils import is_paid_or_trial
 from supabase import create_client
@@ -145,7 +146,9 @@ class ValidateDocumentRequest(BaseModel):
 
 
 @router.post("/documents/{document_id}/validate", status_code=201)
-async def validate_document(document_id: str, body: ValidateDocumentRequest):
+async def validate_document(document_id: str, body: ValidateDocumentRequest, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != body.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
 
     # Ownership check
@@ -337,9 +340,11 @@ class EnrichProfileRequest(BaseModel):
 
 
 @router.post("/documents/{document_id}/enrich-profile")
-async def enrich_profile_from_document(document_id: str, body: EnrichProfileRequest):
+async def enrich_profile_from_document(document_id: str, body: EnrichProfileRequest, auth_user_id: str = Depends(get_current_user_id)):
     """Extract profile hints (salary, job title, permit track) from an employment contract.
     Returns hints the frontend can offer to apply to the user's profile."""
+    if auth_user_id != body.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
 
     doc_res = supabase.table("documents").select("*").eq("id", document_id).eq("user_id", body.user_id).execute()
@@ -404,9 +409,11 @@ class ExtractDateRequest(BaseModel):
 
 
 @router.post("/documents/{document_id}/extract-date")
-async def extract_document_date(document_id: str, body: ExtractDateRequest):
+async def extract_document_date(document_id: str, body: ExtractDateRequest, auth_user_id: str = Depends(get_current_user_id)):
     """Extract the primary meaningful date from any uploaded document (passport expiry,
     flight departure, employment start, etc.) for the relocation timeline."""
+    if auth_user_id != body.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
 
     doc_res = supabase.table("documents").select("*").eq("id", document_id).eq("user_id", body.user_id).execute()
@@ -476,7 +483,9 @@ async def extract_document_date(document_id: str, body: ExtractDateRequest):
 
 
 @router.get("/documents/{document_id}/validation")
-async def get_validation(document_id: str, user_id: str):
+async def get_validation(document_id: str, user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
     result = (
         supabase.table("document_validations")

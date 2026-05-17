@@ -1,7 +1,8 @@
 from typing import Annotated
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel
 from app.config import settings
+from app.deps import get_current_user_id, verify_admin_secret
 from supabase import create_client
 from datetime import datetime, timezone, timedelta
 
@@ -58,7 +59,9 @@ class GrantPaidTierRequest(BaseModel):
     user_id: str
 
 @router.post("/auth/onboard")
-async def onboard_user(data: OnboardingData):
+async def onboard_user(data: OnboardingData, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != data.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         existing = supabase.table("profiles").select("id, trial_ends_at").eq("id", data.user_id).execute()
@@ -85,7 +88,9 @@ async def onboard_user(data: OnboardingData):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/auth/profile/{user_id}")
-async def get_profile(user_id: str):
+async def get_profile(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         result = supabase.table("profiles").select("*").eq("id", user_id).execute()
@@ -96,7 +101,9 @@ async def get_profile(user_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.patch("/auth/profile/{user_id}")
-async def update_profile(user_id: str, data: ProfileUpdate):
+async def update_profile(user_id: str, data: ProfileUpdate, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         update_data = data.model_dump(exclude_unset=True)
@@ -114,7 +121,9 @@ async def update_profile(user_id: str, data: ProfileUpdate):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.patch("/auth/profile/{user_id}/consent")
-async def update_consent(user_id: str, body: ConsentUpdate):
+async def update_consent(user_id: str, body: ConsentUpdate, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         update: dict = {"ai_validation_consent": body.ai_validation_consent}
@@ -128,10 +137,8 @@ async def update_consent(user_id: str, body: ConsentUpdate):
 @router.post("/admin/grant-paid-tier", responses={403: {"description": "Invalid or missing admin secret"}})
 async def grant_paid_tier(
     body: GrantPaidTierRequest,
-    x_admin_secret: Annotated[str | None, Header()] = None,
+    _: None = Depends(verify_admin_secret),
 ):
-    if not settings.ADMIN_SECRET or x_admin_secret != settings.ADMIN_SECRET:
-        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         supabase.table("profiles").update({
@@ -143,7 +150,9 @@ async def grant_paid_tier(
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/auth/profile/{user_id}")
-async def delete_account(user_id: str):
+async def delete_account(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
 

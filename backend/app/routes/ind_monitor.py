@@ -1,9 +1,10 @@
 from typing import Annotated, Optional
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel
 import logging
 from datetime import datetime, timezone
 from app.config import settings
+from app.deps import get_current_user_id, verify_cron_secret
 from app.routes.notifications import _send_email
 from app.utils import check_paid_tier
 from supabase import create_client
@@ -92,7 +93,9 @@ class SubscribeRequest(BaseModel):
 
 
 @router.post("/ind-monitor/subscribe")
-async def subscribe(body: SubscribeRequest):
+async def subscribe(body: SubscribeRequest, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != body.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
     check_paid_tier(supabase, body.user_id)
     try:
@@ -111,7 +114,9 @@ async def subscribe(body: SubscribeRequest):
 
 
 @router.delete("/ind-monitor/subscribe/{user_id}")
-async def unsubscribe(user_id: str):
+async def unsubscribe(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
     try:
         supabase.table("ind_monitor_subscriptions").update({"active": False}).eq(
@@ -123,7 +128,9 @@ async def unsubscribe(user_id: str):
 
 
 @router.get("/ind-monitor/status/{user_id}")
-async def get_status(user_id: str):
+async def get_status(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
     try:
         sub = (
@@ -147,8 +154,10 @@ class ReportNoSlotsRequest(BaseModel):
 
 
 @router.post("/ind-monitor/report-no-slots")
-async def report_no_slots(body: ReportNoSlotsRequest):
+async def report_no_slots(body: ReportNoSlotsRequest, auth_user_id: str = Depends(get_current_user_id)):
     """User checked OAP and found no slots — flips their personal availability flag to false."""
+    if auth_user_id != body.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
     check_paid_tier(supabase, body.user_id)
     sub = (
@@ -199,9 +208,7 @@ def _send_weekly_reset_email(email: str) -> bool:
 
 
 @router.post("/ind-monitor/weekly-reset")
-async def weekly_reset(authorization: Annotated[str | None, Header()] = None):
-    if authorization != f"Bearer {settings.RESEND_API_KEY}":
-        raise HTTPException(status_code=401, detail="Unauthorised")
+async def weekly_reset(_: None = Depends(verify_cron_secret)):
 
     now_dt = datetime.now(timezone.utc)
     if _is_exception_period(now_dt):
@@ -247,7 +254,9 @@ class AppointmentRequest(BaseModel):
 
 
 @router.post("/ind-monitor/appointment")
-async def save_appointment(body: AppointmentRequest):
+async def save_appointment(body: AppointmentRequest, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != body.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
     check_paid_tier(supabase, body.user_id)
     supabase.table("ind_appointments").upsert(
@@ -269,14 +278,18 @@ async def save_appointment(body: AppointmentRequest):
 
 
 @router.get("/ind-monitor/appointment/{user_id}")
-async def get_appointment(user_id: str):
+async def get_appointment(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
     res = supabase.table("ind_appointments").select("*").eq("user_id", user_id).execute()
     return res.data[0] if res.data else None
 
 
 @router.delete("/ind-monitor/appointment/{user_id}")
-async def delete_appointment(user_id: str):
+async def delete_appointment(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     supabase = get_supabase()
     supabase.table("ind_appointments").delete().eq("user_id", user_id).execute()
     return {"deleted": True}
@@ -330,9 +343,7 @@ def _try_send_reminder(supabase, appt: dict, email: str, days: int) -> bool:
 
 
 @router.post("/ind-monitor/send-appointment-reminders")
-async def send_appointment_reminders(authorization: Annotated[str | None, Header()] = None):
-    if authorization != f"Bearer {settings.RESEND_API_KEY}":
-        raise HTTPException(status_code=401, detail="Unauthorised")
+async def send_appointment_reminders(_: None = Depends(verify_cron_secret)):
     from datetime import date as date_type
     supabase = get_supabase()
     today = date_type.today()

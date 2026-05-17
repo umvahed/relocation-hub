@@ -19,9 +19,16 @@ from app.routes.allowance import router as allowance_router
 from app.routes.share import router as share_router
 from app.routes.billing import router as billing_router
 
+import os
+
+_is_dev = os.getenv("ENVIRONMENT", "production").lower() in ("development", "dev", "local")
+
 app = FastAPI(
     title="Valryn API",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs" if _is_dev else None,
+    redoc_url="/redoc" if _is_dev else None,
+    openapi_url="/openapi.json" if _is_dev else None,
 )
 
 app.add_middleware(

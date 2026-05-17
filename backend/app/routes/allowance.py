@@ -2,13 +2,14 @@ import io
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from fpdf import FPDF
 from pydantic import BaseModel
 from supabase import create_client
 
 from app.config import settings
+from app.deps import get_current_user_id
 
 router = APIRouter()
 _supabase = None
@@ -78,7 +79,9 @@ def _hr_expense_email(profile: dict, expense: dict, balance: float) -> str:
 # ── GET /api/allowance/{user_id} ──────────────────────────────────────────────
 
 @router.get("/allowance/{user_id}")
-async def get_allowance(user_id: str):
+async def get_allowance(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     sb = get_supabase()
     profile_res = sb.table("profiles").select(
         "relocation_allowance_amount, has_relocation_allowance"
@@ -107,7 +110,9 @@ class SetAmountRequest(BaseModel):
 
 
 @router.patch("/allowance/{user_id}/amount")
-async def set_allowance_amount(user_id: str, body: SetAmountRequest):
+async def set_allowance_amount(user_id: str, body: SetAmountRequest, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if body.amount < 0:
         raise HTTPException(status_code=422, detail="Amount must be non-negative")
     sb = get_supabase()
@@ -127,7 +132,9 @@ class AddExpenseRequest(BaseModel):
 
 
 @router.post("/allowance/{user_id}/expense")
-async def add_expense(user_id: str, body: AddExpenseRequest):
+async def add_expense(user_id: str, body: AddExpenseRequest, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if body.amount_eur <= 0:
         raise HTTPException(status_code=422, detail="Amount must be positive")
     sb = get_supabase()
@@ -166,7 +173,9 @@ async def add_expense(user_id: str, body: AddExpenseRequest):
 # ── DELETE /api/allowance/expense/{expense_id} ───────────────────────────────
 
 @router.delete("/allowance/expense/{expense_id}")
-async def delete_expense(expense_id: str, user_id: str):
+async def delete_expense(expense_id: str, user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     sb = get_supabase()
     res = sb.table("allowance_expenses").select("id, user_id").eq("id", expense_id).single().execute()
     if not res.data:
@@ -180,7 +189,9 @@ async def delete_expense(expense_id: str, user_id: str):
 # ── GET /api/allowance/{user_id}/export ──────────────────────────────────────
 
 @router.get("/allowance/{user_id}/export")
-async def export_allowance(user_id: str):
+async def export_allowance(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     sb = get_supabase()
     profile_res = sb.table("profiles").select(
         "full_name, relocation_allowance_amount"

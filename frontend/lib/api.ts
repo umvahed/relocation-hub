@@ -1,4 +1,13 @@
+import { createClient } from '@/lib/supabase'
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) return {}
+  return { Authorization: `Bearer ${session.access_token}` }
+}
 
 async function handleResponse(res: Response) {
   if (!res.ok) {
@@ -19,7 +28,7 @@ export async function onboardUser(data: {
 }) {
   const res = await fetch(`${API_URL}/api/auth/onboard`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify(data),
   })
   return handleResponse(res)
@@ -49,20 +58,21 @@ export async function generateChecklist(data: {
 }) {
   const res = await fetch(`${API_URL}/api/checklist/generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify({ ...data, destination_country: 'Netherlands' }),
   })
   return handleResponse(res)
 }
 
 export async function getChecklist(user_id: string) {
-  const res = await fetch(`${API_URL}/api/checklist/${user_id}`)
+  const res = await fetch(`${API_URL}/api/checklist/${user_id}`, { headers: await getAuthHeaders() })
   return handleResponse(res)
 }
 
 export async function updateTask(task_id: string, status: string) {
   const res = await fetch(`${API_URL}/api/checklist/task/${task_id}?status=${status}`, {
     method: 'PATCH',
+    headers: await getAuthHeaders(),
   })
   return handleResponse(res)
 }
@@ -78,7 +88,7 @@ export interface UsageStats {
 }
 
 export async function getUsage(user_id: string): Promise<UsageStats> {
-  const res = await fetch(`${API_URL}/api/usage/${user_id}`)
+  const res = await fetch(`${API_URL}/api/usage/${user_id}`, { headers: await getAuthHeaders() })
   return handleResponse(res)
 }
 
@@ -122,35 +132,35 @@ export interface RiskScore {
 export async function validateDocument(document_id: string, user_id: string): Promise<ValidationResult> {
   const res = await fetch(`${API_URL}/api/documents/${document_id}/validate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify({ user_id }),
   })
   return handleResponse(res)
 }
 
 export async function getDocumentValidation(document_id: string, user_id: string): Promise<ValidationResult> {
-  const res = await fetch(`${API_URL}/api/documents/${document_id}/validation?user_id=${user_id}`)
+  const res = await fetch(`${API_URL}/api/documents/${document_id}/validation?user_id=${user_id}`, { headers: await getAuthHeaders() })
   return handleResponse(res)
 }
 
 export async function computeRiskScore(user_id: string): Promise<RiskScore> {
   const res = await fetch(`${API_URL}/api/risk-score/compute`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify({ user_id }),
   })
   return handleResponse(res)
 }
 
 export async function getRiskScore(user_id: string): Promise<RiskScore> {
-  const res = await fetch(`${API_URL}/api/risk-score/${user_id}`)
+  const res = await fetch(`${API_URL}/api/risk-score/${user_id}`, { headers: await getAuthHeaders() })
   return handleResponse(res)
 }
 
 export async function updateConsent(user_id: string, ai_validation_consent: boolean) {
   const res = await fetch(`${API_URL}/api/auth/profile/${user_id}/consent`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify({ ai_validation_consent }),
   })
   return handleResponse(res)
@@ -159,6 +169,7 @@ export async function updateConsent(user_id: string, ai_validation_consent: bool
 export async function setDueDate(task_id: string, due_date: string) {
   const res = await fetch(`${API_URL}/api/reminders/task/${task_id}/due-date?due_date=${encodeURIComponent(due_date)}`, {
     method: 'PATCH',
+    headers: await getAuthHeaders(),
   })
   return handleResponse(res)
 }
@@ -166,7 +177,7 @@ export async function setDueDate(task_id: string, due_date: string) {
 export async function createCustomTask(data: { user_id: string; title: string; category: string; description?: string }) {
   const res = await fetch(`${API_URL}/api/checklist/custom-task`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify(data),
   })
   return handleResponse(res)
@@ -175,6 +186,7 @@ export async function createCustomTask(data: { user_id: string; title: string; c
 export async function deleteTask(task_id: string, user_id: string) {
   const res = await fetch(`${API_URL}/api/checklist/task/${task_id}?user_id=${encodeURIComponent(user_id)}`, {
     method: 'DELETE',
+    headers: await getAuthHeaders(),
   })
   return handleResponse(res)
 }
@@ -208,7 +220,7 @@ export async function updateProfile(user_id: string, data: Partial<{
 }>) {
   const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify(data),
   })
   return handleResponse(res)
@@ -217,14 +229,14 @@ export async function updateProfile(user_id: string, data: Partial<{
 export async function regenerateChecklist(user_id: string) {
   const res = await fetch(`${API_URL}/api/checklist/regenerate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify({ user_id }),
   })
   return handleResponse(res)
 }
 
 export async function applyDueDates(user_id: string): Promise<{ updated: { id: string; due_date: string }[] }> {
-  const res = await fetch(`${API_URL}/api/checklist/${user_id}/apply-dates`, { method: 'POST' })
+  const res = await fetch(`${API_URL}/api/checklist/${user_id}/apply-dates`, { method: 'POST', headers: await getAuthHeaders() })
   return handleResponse(res)
 }
 
@@ -234,23 +246,24 @@ export async function getShareData(token: string) {
 }
 
 export async function getProfile(user_id: string) {
-  const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`)
+  const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`, { headers: await getAuthHeaders() })
   return handleResponse(res)
 }
 
 export async function deleteAccount(user_id: string) {
-  const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`, { method: 'DELETE' })
+  const res = await fetch(`${API_URL}/api/auth/profile/${user_id}`, { method: 'DELETE', headers: await getAuthHeaders() })
   return handleResponse(res)
 }
 
 export async function getDocuments(user_id: string) {
-  const res = await fetch(`${API_URL}/api/documents/${user_id}`)
+  const res = await fetch(`${API_URL}/api/documents/${user_id}`, { headers: await getAuthHeaders() })
   return handleResponse(res)
 }
 
 export async function deleteDocument(document_id: string, user_id: string) {
   const res = await fetch(`${API_URL}/api/documents/${document_id}?user_id=${user_id}`, {
     method: 'DELETE',
+    headers: await getAuthHeaders(),
   })
   return handleResponse(res)
 }
@@ -266,14 +279,14 @@ export interface IndMonitorStatus {
 }
 
 export async function getIndMonitorStatus(user_id: string): Promise<IndMonitorStatus> {
-  const res = await fetch(`${API_URL}/api/ind-monitor/status/${user_id}`)
+  const res = await fetch(`${API_URL}/api/ind-monitor/status/${user_id}`, { headers: await getAuthHeaders() })
   return handleResponse(res)
 }
 
 export async function subscribeIndMonitor(user_id: string, email: string) {
   const res = await fetch(`${API_URL}/api/ind-monitor/subscribe`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify({ user_id, email }),
   })
   return handleResponse(res)
@@ -282,6 +295,7 @@ export async function subscribeIndMonitor(user_id: string, email: string) {
 export async function unsubscribeIndMonitor(user_id: string) {
   const res = await fetch(`${API_URL}/api/ind-monitor/subscribe/${user_id}`, {
     method: 'DELETE',
+    headers: await getAuthHeaders(),
   })
   return handleResponse(res)
 }
@@ -289,7 +303,7 @@ export async function unsubscribeIndMonitor(user_id: string) {
 export async function reportNoSlots(user_id: string) {
   const res = await fetch(`${API_URL}/api/ind-monitor/report-no-slots`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify({ user_id }),
   })
   return handleResponse(res)
@@ -314,26 +328,27 @@ export async function saveIndAppointment(data: {
 }): Promise<{ saved: boolean }> {
   const res = await fetch(`${API_URL}/api/ind-monitor/appointment`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify(data),
   })
   return handleResponse(res)
 }
 
 export async function getIndAppointment(user_id: string): Promise<IndAppointment | null> {
-  const res = await fetch(`${API_URL}/api/ind-monitor/appointment/${user_id}`)
+  const res = await fetch(`${API_URL}/api/ind-monitor/appointment/${user_id}`, { headers: await getAuthHeaders() })
   return handleResponse(res)
 }
 
 export async function deleteIndAppointment(user_id: string): Promise<{ deleted: boolean }> {
   const res = await fetch(`${API_URL}/api/ind-monitor/appointment/${user_id}`, {
     method: 'DELETE',
+    headers: await getAuthHeaders(),
   })
   return handleResponse(res)
 }
 
 export async function downloadDocpack(user_id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/docpack/${user_id}`)
+  const res = await fetch(`${API_URL}/api/docpack/${user_id}`, { headers: await getAuthHeaders() })
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(error.detail || `Request failed: ${res.status}`)
@@ -354,6 +369,7 @@ export async function downloadDocpack(user_id: string): Promise<void> {
 export async function sendDocpackToHr(user_id: string): Promise<{ sent: boolean; to: string }> {
   const res = await fetch(`${API_URL}/api/docpack/${user_id}/send-to-hr`, {
     method: 'POST',
+    headers: await getAuthHeaders(),
   })
   return handleResponse(res)
 }
@@ -376,14 +392,14 @@ export interface AllowanceSummary {
 }
 
 export async function getAllowance(user_id: string): Promise<AllowanceSummary> {
-  const res = await fetch(`${API_URL}/api/allowance/${user_id}`)
+  const res = await fetch(`${API_URL}/api/allowance/${user_id}`, { headers: await getAuthHeaders() })
   return handleResponse(res)
 }
 
 export async function setAllowanceAmount(user_id: string, amount: number): Promise<void> {
   const res = await fetch(`${API_URL}/api/allowance/${user_id}/amount`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify({ amount }),
   })
   return handleResponse(res)
@@ -395,7 +411,7 @@ export async function addAllowanceExpense(
 ): Promise<AllowanceExpense> {
   const res = await fetch(`${API_URL}/api/allowance/${user_id}/expense`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify(data),
   })
   return handleResponse(res)
@@ -404,13 +420,13 @@ export async function addAllowanceExpense(
 export async function deleteAllowanceExpense(expense_id: string, user_id: string): Promise<void> {
   const res = await fetch(
     `${API_URL}/api/allowance/expense/${expense_id}?user_id=${encodeURIComponent(user_id)}`,
-    { method: 'DELETE' }
+    { method: 'DELETE', headers: await getAuthHeaders() }
   )
   return handleResponse(res)
 }
 
 export async function downloadAllowanceStatement(user_id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/allowance/${user_id}/export`)
+  const res = await fetch(`${API_URL}/api/allowance/${user_id}/export`, { headers: await getAuthHeaders() })
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(error.detail || `Request failed: ${res.status}`)
@@ -434,7 +450,7 @@ export async function extractDocumentDate(
 ): Promise<{ extracted_date: string | null; extracted_date_label: string | null }> {
   const res = await fetch(`${API_URL}/api/documents/${document_id}/extract-date`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify({ user_id }),
   })
   return handleResponse(res)
@@ -445,7 +461,7 @@ export async function extractDocumentDate(
 export async function createCheckoutSession(user_id: string, email: string, promo_code?: string): Promise<{ checkout_url: string }> {
   const res = await fetch(`${API_URL}/api/billing/create-checkout`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify({ user_id, email, promo_code: promo_code || undefined }),
   })
   return handleResponse(res)
@@ -471,7 +487,7 @@ export async function enrichProfileFromDocument(
 ): Promise<{ profile_hints: ProfileHints | null }> {
   const res = await fetch(`${API_URL}/api/documents/${document_id}/enrich-profile`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
     body: JSON.stringify({ user_id }),
   })
   return handleResponse(res)

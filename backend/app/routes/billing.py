@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Request, Header
+from fastapi import APIRouter, HTTPException, Request, Header, Depends
 from pydantic import BaseModel
 from typing import Optional
 import stripe
 from app.config import settings
+from app.deps import get_current_user_id, verify_admin_secret
 from supabase import create_client
 
 router = APIRouter()
@@ -59,10 +60,8 @@ class CreatePromoCodeRequest(BaseModel):
 @router.post("/admin/promo-codes")
 async def create_promo_code(
     body: CreatePromoCodeRequest,
-    x_admin_secret: Optional[str] = Header(None, alias="x-admin-secret"),
+    _: None = Depends(verify_admin_secret),
 ):
-    if x_admin_secret != settings.ADMIN_SECRET:
-        raise HTTPException(status_code=401, detail="Unauthorized")
     supabase = get_supabase()
     result = supabase.table("promo_codes").insert({
         "code": body.code.upper(),
@@ -77,10 +76,8 @@ async def create_promo_code(
 
 @router.get("/admin/promo-codes")
 async def list_promo_codes(
-    x_admin_secret: Optional[str] = Header(None, alias="x-admin-secret"),
+    _: None = Depends(verify_admin_secret),
 ):
-    if x_admin_secret != settings.ADMIN_SECRET:
-        raise HTTPException(status_code=401, detail="Unauthorized")
     result = get_supabase().table("promo_codes").select("*").order("created_at", desc=True).execute()
     return {"promo_codes": result.data or []}
 
@@ -94,7 +91,9 @@ class CreateCheckoutRequest(BaseModel):
 
 
 @router.post("/billing/create-checkout")
-async def create_checkout(body: CreateCheckoutRequest):
+async def create_checkout(body: CreateCheckoutRequest, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != body.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not settings.STRIPE_SECRET_KEY or not settings.STRIPE_PRICE_ID:
         raise HTTPException(status_code=503, detail="Billing not configured")
     stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -143,11 +142,7 @@ def _handle_checkout_completed(session: dict) -> None:
         update_data["referred_by_code"] = promo_code
     sb.table("profiles").update(update_data).eq("id", user_id).execute()
     if promo_code:
-        promo_res = sb.table("promo_codes").select("uses_count").eq("code", promo_code).execute()
-        if promo_res.data:
-            sb.table("promo_codes").update(
-                {"uses_count": promo_res.data[0]["uses_count"] + 1}
-            ).eq("code", promo_code).execute()
+        sb.rpc("increment_promo_uses", {"promo_code_val": promo_code}).execute()
 
 
 # ── Webhook ───────────────────────────────────────────────────────────────────

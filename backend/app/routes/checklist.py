@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from app.config import settings
+from app.deps import get_current_user_id
 from supabase import create_client
 from app.routes.notifications import notify_task_complete
 from app.utils import check_paid_tier, is_paid_or_trial
@@ -538,7 +539,9 @@ Generate 20-25 tasks. Return ONLY valid JSON array."""
 
 
 @router.post("/checklist/generate")
-async def generate_checklist(request: GenerateChecklistRequest):
+async def generate_checklist(request: GenerateChecklistRequest, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != request.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         existing = supabase.table("tasks").select("id").eq("user_id", request.user_id).execute()
@@ -566,7 +569,9 @@ class RegenerateRequest(BaseModel):
     user_id: str
 
 @router.post("/checklist/regenerate")
-async def regenerate_checklist(request: RegenerateRequest):
+async def regenerate_checklist(request: RegenerateRequest, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != request.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         check_paid_tier(supabase, request.user_id)
@@ -648,9 +653,11 @@ async def regenerate_checklist(request: RegenerateRequest):
 
 
 @router.post("/checklist/{user_id}/apply-dates")
-async def apply_due_dates(user_id: str):
+async def apply_due_dates(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
     """Apply legal due-date offsets to tasks that have no due_date, based on the profile's move_date.
     Safe to call any time move_date is set or changed — never overwrites existing due dates."""
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         from datetime import timedelta
         supabase = get_supabase()
@@ -689,7 +696,9 @@ async def apply_due_dates(user_id: str):
 
 
 @router.get("/checklist/{user_id}")
-async def get_checklist(user_id: str):
+async def get_checklist(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         result = supabase.table("tasks").select("*").eq("user_id", user_id).order("priority", desc=True).execute()
@@ -698,7 +707,9 @@ async def get_checklist(user_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/usage/{user_id}")
-async def get_usage(user_id: str):
+async def get_usage(user_id: str, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         today = date.today().isoformat()
@@ -726,7 +737,9 @@ class CustomTaskRequest(BaseModel):
 FREE_CUSTOM_TASK_LIMIT = 3
 
 @router.post("/checklist/custom-task")
-async def create_custom_task(request: CustomTaskRequest):
+async def create_custom_task(request: CustomTaskRequest, auth_user_id: str = Depends(get_current_user_id)):
+    if auth_user_id != request.user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         supabase = get_supabase()
         profile_res = supabase.table("profiles").select("tier, trial_ends_at").eq("id", request.user_id).execute()
@@ -751,14 +764,14 @@ async def create_custom_task(request: CustomTaskRequest):
 
 
 @router.delete("/checklist/task/{task_id}")
-async def delete_task(task_id: str, user_id: str):
+async def delete_task(task_id: str, auth_user_id: str = Depends(get_current_user_id)):
     try:
         supabase = get_supabase()
         task_res = supabase.table("tasks").select("source, user_id").eq("id", task_id).execute()
         if not task_res.data:
             raise HTTPException(status_code=404, detail="Task not found")
         t = task_res.data[0]
-        if t["user_id"] != user_id:
+        if t["user_id"] != auth_user_id:
             raise HTTPException(status_code=403, detail="Forbidden")
         if t.get("source") != "custom":
             raise HTTPException(status_code=403, detail="Only custom tasks can be deleted")
@@ -771,9 +784,14 @@ async def delete_task(task_id: str, user_id: str):
 
 
 @router.patch("/checklist/task/{task_id}")
-async def update_task(task_id: str, status: str):
+async def update_task(task_id: str, status: str, auth_user_id: str = Depends(get_current_user_id)):
     try:
         supabase = get_supabase()
+        owner_res = supabase.table("tasks").select("user_id").eq("id", task_id).execute()
+        if not owner_res.data:
+            raise HTTPException(status_code=404, detail="Task not found")
+        if owner_res.data[0]["user_id"] != auth_user_id:
+            raise HTTPException(status_code=403, detail="Forbidden")
         result = supabase.table("tasks").update({"status": status}).eq("id", task_id).execute()
         # Only notify HR for high-signal categories — not every admin/banking/shopping task
         HR_NOTIFY_CATEGORIES = {"critical", "visa", "employment"}
