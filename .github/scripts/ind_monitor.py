@@ -10,7 +10,7 @@ import sys
 
 def main():
     railway_url = os.environ["RAILWAY_URL"]
-    resend_api_key = os.environ["RESEND_API_KEY"]
+    cron_secret = os.environ["CRON_SECRET"]
 
     req = urllib.request.Request(
         f"{railway_url}/api/ind-monitor/weekly-reset",
@@ -18,7 +18,7 @@ def main():
         method="POST",
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {resend_api_key}",
+            "Authorization": f"Bearer {cron_secret}",
         },
     )
     with urllib.request.urlopen(req, timeout=30) as resp:

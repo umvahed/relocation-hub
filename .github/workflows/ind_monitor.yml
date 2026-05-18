@@ -14,5 +14,5 @@ jobs:
       - name: Trigger weekly reset on Railway
         env:
           RAILWAY_URL: ${{ secrets.RAILWAY_URL }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: python3 .github/scripts/ind_monitor.py
