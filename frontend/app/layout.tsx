@@ -75,6 +75,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col font-sans">
         {children}
+        <Script id="cookieyes" src="https://cdn-cookieyes.com/client_data/eb7e7f6851f3ece503b23682/script.js" strategy="beforeInteractive" />
         <Script src="https://www.googletagmanager.com/gtag/js?id=AW-18163704157" strategy="afterInteractive" />
         <Script id="google-ads" strategy="afterInteractive">{`
           window.dataLayer = window.dataLayer || [];
