@@ -1,4 +1,4 @@
-# RelocationHub — Frontend
+# Valryn — Frontend
 
 Next.js 14 (App Router) frontend deployed on Vercel. Companion service: FastAPI backend on Railway.
 
