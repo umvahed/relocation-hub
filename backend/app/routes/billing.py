@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request, Header, Depends
 from pydantic import BaseModel
@@ -6,6 +7,8 @@ import stripe
 from app.config import settings
 from app.deps import get_current_user_id, verify_admin_secret
 from supabase import create_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 _supabase = None
@@ -131,16 +134,23 @@ async def create_checkout(body: CreateCheckoutRequest, auth_user_id: str = Depen
     return {"checkout_url": session.url}
 
 
-def _handle_checkout_completed(session: dict) -> None:
-    user_id = session.get("metadata", {}).get("user_id")
+def _handle_checkout_completed(session) -> None:
+    # stripe v5+ returns StripeObject (not plain dict); extract metadata safely
+    raw_meta = session.get("metadata") or {}
+    # StripeObject supports .get() but may not be a plain dict — coerce to dict
+    if not isinstance(raw_meta, dict):
+        raw_meta = dict(raw_meta)
+    user_id = raw_meta.get("user_id")
     if not user_id:
+        logger.error("checkout.session.completed missing user_id in metadata: %s", raw_meta)
         return
-    promo_code = session.get("metadata", {}).get("promo_code") or ""
+    promo_code = raw_meta.get("promo_code") or ""
     sb = get_supabase()
     update_data: dict = {"tier": "paid"}
     if promo_code:
         update_data["referred_by_code"] = promo_code
     sb.table("profiles").update(update_data).eq("id", user_id).execute()
+    logger.info("upgraded user %s to paid (promo: %s)", user_id, promo_code or "none")
     if promo_code:
         sb.rpc("increment_promo_uses", {"promo_code_val": promo_code}).execute()
 
@@ -160,6 +170,10 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None, 
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     if event["type"] == "checkout.session.completed":
-        _handle_checkout_completed(event["data"]["object"])
+        try:
+            _handle_checkout_completed(event["data"]["object"])
+        except Exception as exc:
+            logger.exception("checkout.session.completed handler crashed: %s", exc)
+            # Return 200 so Stripe stops retrying — failure is logged for investigation
 
     return {"received": True}
