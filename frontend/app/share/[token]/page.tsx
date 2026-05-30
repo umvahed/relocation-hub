@@ -67,7 +67,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
       {/* Nav — hidden on print */}
       <nav className="print:hidden border-b border-gray-100 bg-white px-5 py-4 flex justify-between items-center">
         <Link href="/" className="text-base font-semibold tracking-tight text-gray-900">
-          Relocation<span className="text-indigo-600">Hub</span>
+          Valryn
         </Link>
         <div className="flex items-center gap-3">
           <PrintButton />

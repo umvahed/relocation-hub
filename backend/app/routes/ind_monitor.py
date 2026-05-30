@@ -182,7 +182,7 @@ def _send_weekly_reset_email(email: str) -> bool:
     html = f"""
     <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">
       <div style="margin-bottom:24px;">
-        <span style="font-size:18px;font-weight:700;">Relocation<span style="color:#4f46e5;">Hub</span></span>
+        <span style="font-size:18px;font-weight:700;">Valryn</span>
       </div>
       <h2 style="font-size:20px;font-weight:600;margin:0 0 8px;">New week — IND slots are available!</h2>
       <p style="font-size:15px;color:#374151;margin:0 0 20px;">
@@ -313,7 +313,7 @@ def _send_appointment_reminder_email(
     html = f"""
     <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">
       <div style="margin-bottom:24px;">
-        <span style="font-size:18px;font-weight:700;">Relocation<span style="color:#4f46e5;">Hub</span></span>
+        <span style="font-size:18px;font-weight:700;">Valryn</span>
       </div>
       <h2 style="font-size:20px;font-weight:600;margin:0 0 8px;">
         {"Your IND appointment is tomorrow!" if days <= 1 else f"IND appointment in {days} days"}

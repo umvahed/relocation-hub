@@ -158,7 +158,7 @@ export default function RulingCalculator() {
       <nav className="border-b border-gray-100 dark:border-gray-800">
         <div className="max-w-5xl mx-auto px-5 py-4 flex justify-between items-center">
           <Link href="/" className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
-            Relocation<span className="text-indigo-600">Hub</span>
+            Valryn
           </Link>
           <Link href="/login" className="text-sm font-medium bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
             Get started free

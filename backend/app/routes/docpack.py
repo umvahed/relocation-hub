@@ -367,7 +367,7 @@ async def send_docpack_to_hr(user_id: str, auth_user_id: str = Depends(get_curre
     html = f"""
     <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a;">
       <div style="margin-bottom: 24px;">
-        <span style="font-size: 18px; font-weight: 700; color: #1a1a1a;">Relocation<span style="color: #4f46e5;">Hub</span></span>
+        <span style="font-size: 18px; font-weight: 700; color: #1a1a1a;">Valryn</span>
       </div>
       <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 8px;">Hi {contact_name},</h2>
       <p style="color: #6b7280; margin: 0 0 24px; line-height: 1.6;">

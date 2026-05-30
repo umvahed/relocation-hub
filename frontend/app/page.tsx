@@ -452,7 +452,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row justify-between items-start gap-8 mb-8">
             <div>
               <div className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Relocation<span className="text-indigo-600">Hub</span>
+                Valryn
               </div>
               <p className="text-xs text-gray-400 dark:text-gray-500 max-w-xs leading-relaxed">
                 Helping professionals navigate the Dutch relocation process — from IND paperwork to feeling at home.

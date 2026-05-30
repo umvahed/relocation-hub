@@ -269,7 +269,7 @@ def _build_validation_email_html(
     return (
         '<div style="font-family:-apple-system,sans-serif;max-width:540px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">'
         '<div style="margin-bottom:20px;font-size:18px;font-weight:700;">'
-        'Relocation<span style="color:#4f46e5;">Hub</span></div>'
+        'Valryn</div>'
         f'<h2 style="font-size:18px;font-weight:600;margin:0 0 8px;">Hi {greeting},</h2>'
         f'<p style="color:#6b7280;margin:0 0 16px;line-height:1.6;">{intro}</p>'
         f'<p style="font-size:15px;font-weight:700;color:{status_color};margin:0 0 12px;">{status_label}</p>'

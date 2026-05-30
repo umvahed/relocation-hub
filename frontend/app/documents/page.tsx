@@ -188,7 +188,7 @@ function DocumentsContent() {
               {fromCategory ? `← Back to ${fromCategory.charAt(0).toUpperCase() + fromCategory.slice(1)} tasks` : '← Dashboard'}
             </button>
             <div className="text-base font-semibold tracking-tight text-gray-900 dark:text-white">
-              Relocation<span className="text-indigo-600">Hub</span>
+              Valryn
               <span className="text-gray-400 dark:text-gray-500 font-normal ml-2 text-sm">/ Documents</span>
             </div>
           </div>
