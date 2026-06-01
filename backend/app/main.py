@@ -18,6 +18,7 @@ from app.routes.docpack import router as docpack_router
 from app.routes.allowance import router as allowance_router
 from app.routes.share import router as share_router
 from app.routes.billing import router as billing_router
+from app.routes.feedback import router as feedback_router
 
 import os
 
@@ -58,6 +59,7 @@ app.include_router(docpack_router, prefix="/api")
 app.include_router(allowance_router, prefix="/api")
 app.include_router(share_router, prefix="/api")
 app.include_router(billing_router, prefix="/api")
+app.include_router(feedback_router, prefix="/api")
 
 @app.get("/")
 def root():
