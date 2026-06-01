@@ -11,10 +11,19 @@ Usage (from backend/ directory, with .env loaded or env vars set):
 import os
 import sys
 import time
+from pathlib import Path
+from dotenv import load_dotenv
 import resend
 from supabase import create_client
 
+# Load .env from backend/ regardless of where the script is called from
+load_dotenv(Path(__file__).parent.parent / ".env")
+
+# --dry-run  → print only, no emails sent
+# --to EMAIL → send only to that address (for testing)
 DRY_RUN    = "--dry-run" in sys.argv
+TEST_TO    = next((sys.argv[i+1] for i, a in enumerate(sys.argv) if a == "--to" and i+1 < len(sys.argv)), None)
+
 SUPABASE_URL  = os.environ["SUPABASE_URL"]
 SUPABASE_KEY  = os.environ["SUPABASE_SERVICE_KEY"]
 FROM_EMAIL    = os.environ.get("RESEND_FROM_EMAIL", "hello@valryn.nl")
@@ -23,16 +32,23 @@ FRONTEND_URL  = os.environ.get("FRONTEND_URL", "https://valryn.nl")
 resend.api_key = os.environ["RESEND_API_KEY"]
 sb = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-users = (
-    sb.table("profiles")
-    .select("id, full_name, email")
-    .eq("tier", "free")
-    .not_.is_("email", "null")
-    .execute()
-    .data or []
-)
+if TEST_TO:
+    users = [{"id": "test", "full_name": "Ahmed Vahed", "email": TEST_TO}]
+    print(f"TEST MODE — sending one email to {TEST_TO}\n")
+else:
+    # Priority 1: free users who have set a move date (most committed)
+    with_date = (
+        sb.table("profiles")
+        .select("id, full_name, email, created_at")
+        .eq("tier", "free")
+        .not_.is_("email", "null")
+        .not_.is_("move_date", "null")
+        .execute()
+        .data or []
+    )
 
-print(f"{'[DRY RUN] ' if DRY_RUN else ''}Sending to {len(users)} free users...\n")
+    users = list(with_date)
+    print(f"{'[DRY RUN] ' if DRY_RUN else ''}Sending to {len(users)} users with a move date...\n")
 
 for user in users:
     email = (user.get("email") or "").strip()
@@ -106,14 +122,14 @@ for user in users:
         print(f"            Link: {feedback_url}\n")
     else:
         try:
-            resend.Emails.send({
+            resp = resend.Emails.send({
                 "from": FROM_EMAIL,
                 "to": [email],
-                "reply_to": "ahmedvahed@gmail.com",
+                "reply_to": "info@valryn.nl",
                 "subject": subject,
                 "html": html,
             })
-            print(f"  ✓ {first_name} <{email}>")
+            print(f"  ✓ {first_name} <{email}> → {resp}")
             time.sleep(0.3)
         except Exception as e:
             print(f"  ✗ {email}: {e}")
