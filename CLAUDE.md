@@ -212,7 +212,8 @@ Not yet built: B2B HR portal.
 20. ✅ User feedback flow — `/feedback` page (multi-step, no login, prize CTA), `POST /api/feedback` stores in `feedback` table + emails Ahmed via Resend. `backend/scripts/broadcast_feedback.py` sends personalised emails to users with move_date first; supports `--to EMAIL` (test) and `--dry-run` (preview). Reply-to: `info@valryn.nl`.
 
 ## Resend / email notes
-- **Verified sending domain**: `resend.hawastack.nl` — `RESEND_FROM_EMAIL` must be `hello@resend.hawastack.nl` in both Railway and local `.env`
+- **Verified sending domain**: `resend.hawastack.nl` — `RESEND_FROM_EMAIL` must be `Valryn <noreply@resend.hawastack.nl>` in both Railway and local `.env`
+- **reply_to separation**: broadcast emails set `reply_to: info@valryn.nl` so user replies go there; app notification emails have no reply_to so replies go nowhere (correct for automated emails)
 - Free tier limit: ~100 emails/month — upgrade Resend before any bulk broadcast
 - Reply-to for broadcast: `info@valryn.nl`
 
