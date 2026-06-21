@@ -1,0 +1,23 @@
+name: IND Appointment Reminders
+
+on:
+  schedule:
+    # Every day at 07:30 UTC
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  send-appointment-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send IND appointment reminders (7d and 1d)
+        run: |
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${{ secrets.RAILWAY_URL }}/api/ind-monitor/send-appointment-reminders" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          echo "Response code: $RESPONSE"
+          if [ "$RESPONSE" -ne 200 ]; then
+            echo "Failed with HTTP $RESPONSE"
+            exit 1
+          fi

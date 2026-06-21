@@ -129,9 +129,9 @@ for user in users:
                 "subject": subject,
                 "html": html,
             })
-            print(f"  ✓ {first_name} <{email}> → {resp}")
+            print(f"  OK {first_name} <{email}> id={resp.get('id') if isinstance(resp, dict) else resp}")
             time.sleep(0.3)
         except Exception as e:
-            print(f"  ✗ {email}: {e}")
+            print(f"  FAIL {email}: {e}")
 
 print(f"\nDone. {len(users)} users processed.")
