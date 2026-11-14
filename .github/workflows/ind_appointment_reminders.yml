@@ -8,6 +8,7 @@ on:
 
 jobs:
   send-appointment-reminders:
+    if: false  # decommissioned
     runs-on: ubuntu-latest
     steps:
       - name: Send IND appointment reminders (7d and 1d)
